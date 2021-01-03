@@ -203,6 +203,7 @@ namespace JPFITS
 			/// <para> Pass nullptr or Range[0] = -1 to default to full image size, assuming the image data is a vector.</para></param>
 			static array<double>^ ReadImageVectorOnly(String^ file, array<int, 1>^ Range, bool do_parallel);
 
+			/// <summary>Return the primary image of the FITS file as a double 1-D array.</summary>
 			static void ConvertToImage(String^ Source_FullFileName, String^ Destination_FullFileName, String^ contrast_scaling, bool invert_colormap, bool do_parallel);
 
 			//Image Operations
