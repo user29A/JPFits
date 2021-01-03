@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.102
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "JPFits", "JPFits\JPFits_x32.vcxproj", "{97EB0114-5566-43DB-A79A-D4BED33D7BD4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+		x64|x64 = x64|x64
+		x64|x86 = x64|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.Debug|x64.ActiveCfg = Debug|x64
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.Debug|x64.Build.0 = Debug|x64
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.Debug|x86.ActiveCfg = Debug|Win32
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.Debug|x86.Build.0 = Debug|Win32
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.Release|x64.ActiveCfg = Release|x64
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.Release|x64.Build.0 = Release|x64
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.Release|x86.ActiveCfg = Release|Win32
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.Release|x86.Build.0 = Release|Win32
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.x64|x64.ActiveCfg = x64|x64
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.x64|x64.Build.0 = x64|x64
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.x64|x86.ActiveCfg = x64|Win32
+		{97EB0114-5566-43DB-A79A-D4BED33D7BD4}.x64|x86.Build.0 = x64|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9EFED948-EA21-4A9B-91B8-96A7DEDDA4CD}
+	EndGlobalSection
+EndGlobal
