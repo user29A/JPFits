@@ -2057,9 +2057,10 @@ bool JPFITS::FITSBinTable::ExtensionExists(String^ FileName, String^ ExtensionNa
 
 void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<TypeCode>^ ExtensionEntryDataTypes, array<int>^ ExtensionEntryDataTypeInstances, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData)
 {
-	if (!File::Exists(FileName))//then write a new file, otherwise check the existing file for existing table, etc.
+	if (!File::Exists(FileName))//then create a new file
 	{
 		JPFITS::FITSImage^ ff = gcnew FITSImage(FileName);
+		ff->AddKey("EXTEND", "T", "FITS file may contain extensions", -1);
 		ff->WriteFile(TypeCode::Double, true);
 	}
 
@@ -2083,7 +2084,7 @@ void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionNam
 		{
 			String^ line = System::Text::Encoding::ASCII->GetString(c, i * 80, 80);
 
-			if (line->Substring(0, 8) == "EXTEND  ")
+			if (line->Substring(0, 8) == "EXTEND  " && line->Substring(10, 20)->Trim() == "T")
 				extendkeyexists = true;//if it doesn't exist, then it needs to be added
 
 			if (line->Substring(0, 8) == "NAXIS   ")

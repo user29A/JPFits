@@ -45,6 +45,17 @@ void JPFITS::FITSImage::READHEADER(FileStream^ fs, bool pop)
 		fs->Read(charheaderline, 0, 80);
 		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
 
+		if (headerlines == 1)
+		{
+			if (strheaderline->Substring(0, 8) != "SIMPLE  ")
+				throw gcnew Exception("Error: File is not a FITS. SIMPLE keyword non-existent");
+			if (strheaderline->Substring(10, 20)->Trim() != "T")
+				throw gcnew Exception("Error: File does not conform to FITS. SIMPLE keyvalue not 'T'");
+
+			fs->Close();
+			return;
+		}
+
 		if (strheaderline->Substring(0,8) == "BZERO   ")
 			BZERO = (__int64)::Convert::ToDouble(strheaderline->Substring(10,20));
 		if (strheaderline->Substring(0,8) == "BSCALE  ")
@@ -323,8 +334,8 @@ void JPFITS::FITSImage::READDATA(FileStream^ fs, array<int,1>^ Range, bool do_pa
 	NAXIS2 = H;
 	if (HEADER_POP)
 	{
-		SetKey("NAXIS1",W.ToString(),false,0);
-		SetKey("NAXIS2",H.ToString(),false,0);
+		SetKey("NAXIS1", W.ToString(), false, 0);
+		SetKey("NAXIS2", H.ToString(), false, 0);
 	}
 }
 
@@ -647,7 +658,7 @@ array<double>^ JPFITS::FITSImage::ReadImageVectorOnly(System::String ^file, cli:
 
 	if ((R[1] - R[0]) > 0 && (R[3] - R[2]) > 0)
 	{
-		::MessageBox::Show("Requested defualt Vector Output but Image is 2D", "Error");
+		::MessageBox::Show("Requested default Vector Output but Image is 2D", "Error");
 		return nullptr;
 	}
 

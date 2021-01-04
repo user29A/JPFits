@@ -100,9 +100,7 @@ JPFITS::FITSImage::FITSImage(System::String ^FullFileName, array<int,1>^ Range, 
 	READHEADER(fs,HEADER_POP);//reads and sets and populates the header ans properties and sets the position of fs to the beginning of the image data
 
 	if (DATA_POP == true)
-	{
 		READDATA(fs, Range, do_parallel);
-	}
 
 	fs->Close();
 
