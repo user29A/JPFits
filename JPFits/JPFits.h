@@ -55,24 +55,40 @@ namespace JPFITS
 		return result;
 	}
 
-	/// <summary> FITSImage class to create, read, interact with, modify components of, and write FITS primary image data.</summary>
+	/*private ref class FITSFILEOPS
+	{
+		public:
+		static void READPRIMARYHEADER(FileStream^ fs, bool pop)//read and fromat new header keys/vals/comms and advance basestream to end of header card block
+		{
+		}
+	};*/
+
+	/// <summary> FITSImage class to create, read, interact with, modify components of, and write FITS Primary image data and its Header.</summary>
 	public ref class FITSImage
 	{
 		public:
 
 			/// <summary>Create a dummy FITSImage object.</summary>
-			/// <param name="FullFileName">File name. Can be anything for this dummy object.</param>
+			/// <param name="FullFileName">File name. May be anything for this dummy object.</param>
 			FITSImage(String^ FullFileName);
+
+			/// <summary>Create a FITSImage object from an array object containing existing data.
+			/// <para>Image data is maintained at or converted to double precision.</para></summary>
+			/// <param name="FullFileName">File name.</param>
+			/// <param name="ImageData">The data array to use for the FITS image data. The precision and rank of the underlying array will be automatically determined. Vectors will be converted to an array with column-rank.</param>
+			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
+			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
+			FITSImage(String^ FullFileName, Object^ ImageData, bool Do_Stats, bool do_parallel);
 
 			/// <summary>Create a FITSImage object referencing raw UChar data on disk.</summary>
 			/// <param name="FullFileName">File name for the FITS object.</param>
 			/// <param name="DiskUCharBufferName">File name of the disk char data.</param>
-			/// <param name="Precision">Precision to convert the data stored in the disk char array.</param>
+			/// <param name="Precision">Precision of the data stored in the disk char array.</param>
 			/// <param name="NAxis1">Length of the 1st axis (x-axis)</param>
 			/// <param name="NAxis2">Length of the 2nd axis (y-axis)</param>
 			FITSImage(String^ FullFileName, String^ DiskUCharBufferName, TypeCode Precision, int NAxis1, int NAxis2);
 
-			/// <summary>Create a FITSImage object with an existing __int8 (char) 2-D array.
+			/*/// <summary>Create a FITSImage object with an existing __int8 (char) 2-D array.
 			/// <para>Image data is converted to double precision.</para></summary>
 			/// <param name="FullFileName">File name.</param>
 			/// <param name="ImageData">The data array to use for the FITS image data.</param>
@@ -94,7 +110,7 @@ namespace JPFITS
 			/// <param name="ImageData">The data array to use for the FITS image data.</param>
 			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
 			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<double,2>^ ImageData, bool Do_Stats, bool do_parallel);
+			FITSImage(String^ FullFileName, array<double, 2>^ ImageData, bool Do_Stats, bool do_parallel);
 
 			/// <summary>Create a FITSImage object with an existing __int32 (int) 2-D array
 			/// <para>Image data is converted to double precision.</para></summary>
@@ -158,7 +174,7 @@ namespace JPFITS
 			/// <param name="ImageData">The data array to use for the FITS image data.</param>
 			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
 			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<unsigned short>^ ImageData, bool Do_Stats, bool do_parallel);
+			FITSImage(String^ FullFileName, array<unsigned short>^ ImageData, bool Do_Stats, bool do_parallel);*/
 
 			/// <summary>Create a FITSImage object with image data loaded to RAM memory from disk.
 			/// <para>Image data is loaded as double precision independent of storage precision on disk.</para></summary>
@@ -203,8 +219,8 @@ namespace JPFITS
 			/// <para> Pass nullptr or Range[0] = -1 to default to full image size, assuming the image data is a vector.</para></param>
 			static array<double>^ ReadImageVectorOnly(String^ file, array<int, 1>^ Range, bool do_parallel);
 
-			/// <summary>Return the primary image of the FITS file as a double 1-D array.</summary>
-			static void ConvertToImage(String^ Source_FullFileName, String^ Destination_FullFileName, String^ contrast_scaling, bool invert_colormap, bool do_parallel);
+			///// <summary>Return the primary image of the FITS file as a double 1-D array.</summary>
+			//static void ConvertToImage(String^ Source_FullFileName, String^ Destination_FullFileName, String^ file_type, String^ contrast_scaling, bool invert_colormap, bool do_parallel);
 
 			//Image Operations
 			
@@ -335,6 +351,47 @@ namespace JPFITS
 			/// <summary>CopyHeader copies the header from the given source FITSImage to the current FITSImage object.</summary>
 			void CopyHeader(JPFITS::FITSImage^ source);
 
+			/// <summary>HeaderLines accesses a string array of all lines of the primary header.
+			/// <para>Individual String^ lines can be accessed by indexing HeaderLines[i].</para></summary>
+			property array<String^>^ HeaderLines
+			{
+				array<String^>^ get() { return HEADERLINES; }
+				void set(array<String^>^ hlines) { HEADERKEYS = hlines; }
+			}
+
+			/// <summary>HeaderKeys accesses a string array of all keys of the primary header.
+			/// <para>Individual String^ keys can be accessed by indexing HeaderKeys[i].</para></summary>
+			property array<String^>^ HeaderKeys
+			{
+				array<String^>^ get() { return HEADERKEYS; }
+				void set(array<String^>^ hkeys) { HEADERKEYS = hkeys; }
+			}
+
+			/// <summary>HeaderKeyValues accesses a string array of all key values of the primary header.
+			/// <para>Individual String^ values can be accessed by indexing HeaderKeyValues[i].</para></summary>
+			property array<String^>^ HeaderKeyValues
+			{
+				array<String^>^ get() { return HEADERKEYVALS; }
+				void set(array<String^>^ hkeyvals) { HEADERKEYVALS = hkeyvals; }
+			}
+
+			/// <summary>HeaderKeyComments accesses a string array of all key comments of the primary header.
+			/// <para>Individual String^ comments can be accessed by indexing HeaderKeyComments[i].</para></summary>
+			property array<String^>^ HeaderKeyComments
+			{
+				array<String^>^ get() { return HEADERKEYCOMS; }
+				void set(array<String^>^ hkeycoms) { HEADERKEYCOMS = hkeycoms; }
+			}
+
+			/// <summary>Header returns a fully formated header card(s).</summary>
+			property array<String^>^ Header
+			{
+				array<String^>^ get() { FORMATHEADER(); return HEADER; }
+			}
+
+
+			/*********************************Operators***********************************************/
+
 			//Class Static Primary Image Math Operators
 			static array<double,2>^ operator +(FITSImage^ lhs_img, FITSImage^ rhs_img);
 			static array<double,2>^ operator +(FITSImage^ lhs_img, double scalar);
@@ -349,6 +406,13 @@ namespace JPFITS
 
 			
 			/*********************************Properties***********************************************/
+
+			/// <summary>Default indexer accesses the image element of the primary image of the FITSImage object.</summary>
+			property double default[int]
+			{
+				double get(int x) { return DIMAGE[0, x]; }
+				void set(int x, double val) { DIMAGE[0, x] = val; }
+			}
 
 			/// <summary>Default indexer accesses the image element of the primary image of the FITSImage object.</summary>
 			property double default[int, int]
@@ -438,44 +502,6 @@ namespace JPFITS
 					FILENAME = FULLFILENAME->Substring(index+1);
 					FILEPATH = FULLFILENAME->Substring(0,index+1);
 				}
-			}
-
-			/// <summary>HeaderLines accesses a string array of all lines of the primary header.
-			/// <para>Individual String^ lines can be accessed by indexing HeaderLines[i].</para></summary>
-			property array<String^>^ HeaderLines
-			{
-				array<String^>^ get() { return HEADERLINES; }
-				void set(array<String^>^ hlines) { HEADERKEYS = hlines; }
-			}
-
-			/// <summary>HeaderKeys accesses a string array of all keys of the primary header.
-			/// <para>Individual String^ keys can be accessed by indexing HeaderKeys[i].</para></summary>
-			property array<String^>^ HeaderKeys
-			{
-				array<String^>^ get() {return HEADERKEYS;}
-				void set(array<String^>^ hkeys) {HEADERKEYS = hkeys;}
-			}
-
-			/// <summary>HeaderKeyValues accesses a string array of all key values of the primary header.
-			/// <para>Individual String^ values can be accessed by indexing HeaderKeyValues[i].</para></summary>
-			property array<String^>^ HeaderKeyValues
-			{
-				array<String^>^ get() {return HEADERKEYVALS;}
-				void set(array<String^>^ hkeyvals) {HEADERKEYVALS = hkeyvals;}
-			}
-
-			/// <summary>HeaderKeyComments accesses a string array of all key comments of the primary header.
-			/// <para>Individual String^ comments can be accessed by indexing HeaderKeyComments[i].</para></summary>
-			property array<String^>^ HeaderKeyComments
-			{
-				array<String^>^ get() {return HEADERKEYCOMS;}
-				void set(array<String^>^ hkeycoms) {HEADERKEYCOMS = hkeycoms;}
-			}
-
-			/// <summary>Header returns a fully formated header card(s).</summary>
-			property array<String^>^ Header
-			{
-				array<String^>^ get() { FORMATHEADER(); return HEADER; }
 			}
 
 			/// <summary>Image accesses the 2-D double array of the primary FITS object image.
@@ -848,7 +874,7 @@ namespace JPFITS
 		/// <summary>Returns an array of all binary table extension names in the FITS file. If there are no binary table extensions, returns an empty array.</summary>
 		static array<String^>^ GetAllExtensionNames(String^ FileName);
 
-		/// <summary>Write a binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be overwritten.</summary>
+		/*/// <summary>Write a binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be overwritten.</summary>
 		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
 		/// <param name="ExtensionName">The name of the binary table extension. If the table is to have no name then it will be written as the first binary table extension.</param>
 		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
@@ -859,11 +885,27 @@ namespace JPFITS
 		/// <param name="ExtensionHeaderExtraKeys">A String array of additional header keys for the table. Pass nullptr if not required.</param>
 		/// <param name="ExtensionHeaderExtraKeyValues">A String array of additional header key values for the table. Pass nullptr if not required.</param>
 		/// <param name="ExtensionHeaderExtraKeyComments">A String array of additional header key comments for the table. Pass nullptr if not required.</param>
-		/// <param name="ExtensionEntryData">An Object array of the data to be written as the table. The array members are the original data as their own types casted as Objects, ex.: 
+		/// <param name="ExtensionEntryData">An Object array of the data to be written as the table. The array members are the original data as their own types cast as Objects, ex.: 
 		/// <para>ExtensionEntryData[0] = (Object^)array1; where array1 is an array&lt;int&gt;^.</para>
 		/// <para>ExtensionEntryData[1] = (Object^)array2; where array2 is an array&lt;double, 2&gt;^.</para>
 		/// <para>The members arrays must all be the same height, i.e. same number of rows, but can have variable width if not single type instances.</para></param>
-		static void WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<TypeCode>^ ExtensionEntryDataTypes, array<int>^ ExtensionEntryDataTypeInstances, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData);
+		static void WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<TypeCode>^ ExtensionEntryDataTypes, array<int>^ ExtensionEntryDataTypeInstances, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData);*/
+
+		/// <summary>Write a binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be overwritten.</summary>
+		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
+		/// <param name="ExtensionName">The name of the binary table extension. If the table is to have no name then it will be written as the first binary table extension.</param>
+		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
+		/// <param name="ExtensionEntryLabels">A String array of the binary table extension entries, i.e. the TTYPEn values.</param>
+		/// <param name="ExtensionEntryDataUnits">A String array of the physical units for the table entries, i.e. the TUNITn values.</param>
+		/// <param name="ExtensionHeaderExtraKeys">A String array of additional header keys for the table. Pass nullptr if not required.</param>
+		/// <param name="ExtensionHeaderExtraKeyValues">A String array of additional header key values for the table. Pass nullptr if not required.</param>
+		/// <param name="ExtensionHeaderExtraKeyComments">A String array of additional header key comments for the table. Pass nullptr if not required.</param>
+		/// <param name="ExtensionEntryData">An Object array of the data to be written as the table. The array members are the original data as their own types cast as Objects, ex.: 
+		/// <para>ExtensionEntryData[0] = (Object^)array1; where array1 is an array&lt;int&gt;^.</para>
+		/// <para>ExtensionEntryData[1] = (Object^)array2; where array2 is an array&lt;double, 2&gt;^.</para>
+		/// <para>The member arrays will be written as their Type as determined automatically by the ExtensionEntryData Object array member contents.</para>
+		/// <para>The member arrays must all be the same height, i.e. same number of rows, but can have variable width (columns) if their array rank = 2.</para></param>
+		static void WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData);
 
 		/// <summary>Write a binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be overwritten.</summary>
 		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>

@@ -729,15 +729,13 @@ FITSImage^ JPFITS::FITSImageSet::Mean(JPFITS::FITSImageSet^ ImageSet, bool Do_St
 		array<Object^>^ arg = gcnew array<Object^>{ImageSet, "Mean"};
 		BGWRKR->RunWorkerAsync(arg);
 		WAITBAR->ShowDialog();
-		if (WAITBAR->DialogResult == ::DialogResult::OK)
-		{
-			return gcnew FITSImage("Mean", (array<double, 2>^)BGWRKR_RESULT, Do_Stats, true);
-		}
-		else
+		if (WAITBAR->DialogResult == ::DialogResult::Cancel)
 		{
 			WAITBAR->Close();
 			return nullptr;
 		}
+		
+		return gcnew FITSImage("Mean", (array<double, 2>^)BGWRKR_RESULT, Do_Stats, true);
 	}
 	else
 	{

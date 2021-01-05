@@ -100,7 +100,9 @@ JPFITS::FITSImage::FITSImage(System::String ^FullFileName, array<int,1>^ Range, 
 	READHEADER(fs,HEADER_POP);//reads and sets and populates the header ans properties and sets the position of fs to the beginning of the image data
 
 	if (DATA_POP == true)
+	{
 		READDATA(fs, Range, do_parallel);
+	}
 
 	fs->Close();
 
@@ -108,17 +110,148 @@ JPFITS::FITSImage::FITSImage(System::String ^FullFileName, array<int,1>^ Range, 
 		StatsUpD(do_parallel);
 }
 
-JPFITS::FITSImage::FITSImage(String^ FullFileName, array<double,2>^ ImageData, bool Do_Stats, bool do_parallel)//create new fits image from new data array, using path_file filename
+JPFITS::FITSImage::FITSImage(String^ FullFileName, Object^ ImageData, bool Do_Stats, bool do_parallel)
 {
-	int index;
-	DIMAGE = ImageData;
-	FULLFILENAME = FullFileName;
-	index = FULLFILENAME->LastIndexOf("\\");
-	FILENAME = FULLFILENAME->Substring(index+1);
-	FILEPATH = FULLFILENAME->Substring(0,index+1);
+	if (!(ImageData->GetType()->IsArray))
+	{
+		throw gcnew Exception("Error: Object 'ImageData' is not an array.");
+		return;
+	}
+	
+	int rank = ((Array^)ImageData)->Rank;
+
+	if (rank > 2)
+	{
+		throw gcnew Exception("Error: Rank of Object 'ImageData' is not a 1D or 2D array. Use other implementations for creating larger dimensional FITS primary data.");
+		return;
+	}
+
 	NAXIS = 2;
-	NAXIS1 = ImageData->GetLength(0);
-	NAXIS2 = ImageData->GetLength(1);
+	if (rank == 1)
+	{
+		NAXIS1 = 1;
+		NAXIS2 = ((Array^)ImageData)->Length;
+	}
+	else
+	{
+		NAXIS1 = ((Array^)ImageData)->GetLength(0);
+		NAXIS2 = ((Array^)ImageData)->GetLength(1);
+	}
+
+	DIMAGE = gcnew array<double, 2>(NAXIS1, NAXIS2);
+
+	TypeCode type = Type::GetTypeCode((((Array^)ImageData)->GetType())->GetElementType());
+
+	switch (type)
+	{
+		case TypeCode::Double:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS2; x++)
+					DIMAGE[0, x] = ((array<double>^)ImageData)[x];
+			}
+			else
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS1; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						DIMAGE[x, y] = ((array<double, 2>^)ImageData)[x, y];
+			}
+
+			break;
+		}
+
+		case TypeCode::UInt16:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS2; x++)
+					DIMAGE[0, x] = (double)((array<unsigned __int16>^)ImageData)[x];
+			}
+			else
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS1; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						DIMAGE[x, y] = (double)((array<unsigned __int16, 2>^)ImageData)[x, y];
+			}
+
+			break;
+		}
+
+		case TypeCode::Int16:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS2; x++)
+					DIMAGE[0, x] = (double)((array<__int16>^)ImageData)[x];
+			}
+			else
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS1; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						DIMAGE[x, y] = (double)((array<__int16, 2>^)ImageData)[x, y];
+			}
+
+			break;
+		}
+
+		case TypeCode::UInt32:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS2; x++)
+					DIMAGE[0, x] = (double)((array<unsigned __int32>^)ImageData)[x];
+			}
+			else
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS1; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						DIMAGE[x, y] = (double)((array<unsigned __int32, 2>^)ImageData)[x, y];
+			}
+
+			break;
+		}
+
+		case TypeCode::Int32:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS2; x++)
+					DIMAGE[0, x] = (double)((array<__int32>^)ImageData)[x];
+			}
+			else
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS1; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						DIMAGE[x, y] = (double)((array<__int32, 2>^)ImageData)[x, y];
+			}
+
+			break;
+		}
+
+		default:
+		{
+			throw gcnew Exception("Data of TypeCode:" + type.ToString() + " not suported.");
+			return;
+		}
+
+	}
+
+	FULLFILENAME = FullFileName;
+	int index = FULLFILENAME->LastIndexOf("\\");
+	FILENAME = FULLFILENAME->Substring(index + 1);
+	FILEPATH = FULLFILENAME->Substring(0, index + 1);
+
 	MIN = 0.0;
 	MAX = 0.0;
 	MEDIAN = 0.0;
@@ -137,391 +270,420 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, array<double,2>^ ImageData, b
 		StatsUpD(do_parallel);
 }
 
-JPFITS::FITSImage::FITSImage(String^ FullFileName, array<double>^ ImageData, bool Do_Stats, bool do_parallel)//create new fits image from new data array, using path_file filename
-{
-	int index;
-	FULLFILENAME = FullFileName;
-	index = FULLFILENAME->LastIndexOf("\\");
-	FILENAME = FULLFILENAME->Substring(index+1);
-	FILEPATH = FULLFILENAME->Substring(0,index+1);
-	NAXIS = 2;
-	NAXIS1 = 1;
-	NAXIS2 = ImageData->Length;
-	MIN = 0.0;
-	MAX = 0.0;
-	MEDIAN = 0.0;
-	MEAN = 0.0;
-	STD = 0.0;
-	SUM = 0.0;
-
-	//convert integer image to double image
-	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
-	#pragma omp parallel for if (do_parallel)
-	for (int i = 0; i < NAXIS2; i++)
-			DIMAGE[0,i] = (double)ImageData[i];
-
-	HEADER_POP = true;
-	DATA_POP = true;
-	STATS_POP = Do_Stats;
-
-	//create default header
-	MAKEDEFHEADER();
-
-	if (STATS_POP)
-		StatsUpD(do_parallel);
-}
-
-JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<unsigned __int32,2> ^ImageData, bool Do_Stats, bool do_parallel)
-{
-	int index;
-	FULLFILENAME = FullFileName;
-	index = FULLFILENAME->LastIndexOf("\\");
-	FILENAME = FULLFILENAME->Substring(index+1);
-	FILEPATH = FULLFILENAME->Substring(0,index+1);
-	NAXIS = 2;
-	NAXIS1 = ImageData->GetLength(0);
-	NAXIS2 = ImageData->GetLength(1);
-	MIN = 0.0;
-	MAX = 0.0;
-	MEDIAN = 0.0;
-	MEAN = 0.0;
-	STD = 0.0;
-	SUM = 0.0;
-
-	//convert integer image to double image
-	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
-	#pragma omp parallel for if (do_parallel)
-	for (int i = 0; i < NAXIS1; i++)
-		for (int j = 0; j < NAXIS2; j++)
-			DIMAGE[i, j] = (double)ImageData[i, j];
-
-	HEADER_POP = true;
-	DATA_POP = true;
-	STATS_POP = Do_Stats;
-
-	MAKEDEFHEADER();
-	BITPIX = 32;
-	SetKey("BITPIX",BITPIX.ToString(),false,-1);
-	BZERO = 2147483648;
-	SetKey("BZERO",BZERO.ToString(),false,-1);
-	BSCALE = 1;
-	SetKey("BSCALE",BSCALE.ToString(),false,-1);
-	if (STATS_POP)
-		StatsUpD(do_parallel);
-}
-
-JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<unsigned __int32> ^ImageData, bool Do_Stats, bool do_parallel)
-{
-	int index;
-	FULLFILENAME = FullFileName;
-	index = FULLFILENAME->LastIndexOf("\\");
-	FILENAME = FULLFILENAME->Substring(index+1);
-	FILEPATH = FULLFILENAME->Substring(0,index+1);
-	NAXIS = 2;
-	NAXIS1 = 1; 
-	NAXIS2 = ImageData->Length;
-	MIN = 0.0;
-	MAX = 0.0;
-	MEDIAN = 0.0;
-	MEAN = 0.0;
-	STD = 0.0;
-	SUM = 0.0;
-
-	//convert integer image to double image
-	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
-	#pragma omp parallel for if (do_parallel)
-	for (int i = 0; i < NAXIS2; i++)
-			DIMAGE[0,i] = (double)ImageData[i];
-
-	HEADER_POP = true;
-	DATA_POP = true;
-	STATS_POP = Do_Stats;
-
-	MAKEDEFHEADER();
-	BITPIX = 32;
-	SetKey("BITPIX",BITPIX.ToString(),false,-1);
-	BZERO = 2147483648;
-	SetKey("BZERO",BZERO.ToString(),false,-1);
-	BSCALE = 1;
-	SetKey("BSCALE",BSCALE.ToString(),false,-1);
-	if (STATS_POP)
-		StatsUpD(do_parallel);
-}
-
-JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<__int32,2> ^ImageData, bool Do_Stats, bool do_parallel)
-{
-	int index;
-	FULLFILENAME = FullFileName;
-	index = FULLFILENAME->LastIndexOf("\\");
-	FILENAME = FULLFILENAME->Substring(index+1);
-	FILEPATH = FULLFILENAME->Substring(0,index+1);
-	NAXIS = 2;
-	NAXIS1 = ImageData->GetLength(0);
-	NAXIS2 = ImageData->GetLength(1);
-	MIN = 0.0;
-	MAX = 0.0;
-	MEDIAN = 0.0;
-	MEAN = 0.0;
-	STD = 0.0;
-	SUM = 0.0;
-
-	//convert integer image to double image
-	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
-	#pragma omp parallel for if (do_parallel)
-	for (int i = 0; i < NAXIS1; i++)
-		for (int j = 0; j < NAXIS2; j++)
-			DIMAGE[i,j] = (double)ImageData[i,j];
-
-	HEADER_POP = true;
-	DATA_POP = true;
-	STATS_POP = Do_Stats;
-
-	MAKEDEFHEADER();
-	BITPIX = 32;
-	SetKey("BITPIX",BITPIX.ToString(),false,-1);
-	BZERO = 0;
-	SetKey("BZERO",BZERO.ToString(),false,-1);
-	BSCALE = 1;
-	SetKey("BSCALE",BSCALE.ToString(),false,-1);
-	if (STATS_POP)
-		StatsUpD(do_parallel);
-}
-
-JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<unsigned __int16,2> ^ImageData, bool Do_Stats, bool do_parallel)
-{
-	int index;
-	FULLFILENAME = FullFileName;
-	index = FULLFILENAME->LastIndexOf("\\");
-	FILENAME = FULLFILENAME->Substring(index+1);
-	FILEPATH = FULLFILENAME->Substring(0,index+1);
-	NAXIS = 2;
-	NAXIS1 = ImageData->GetLength(0);  
-	NAXIS2 = ImageData->GetLength(1);
-	MIN = 0.0;
-	MAX = 0.0;
-	MEDIAN = 0.0;
-	MEAN = 0.0;
-	STD = 0.0;
-	SUM = 0.0;
-
-	//convert integer image to double image
-	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
-	#pragma omp parallel for if (do_parallel)
-	for (int i = 0; i < NAXIS1; i++)
-		for (int j = 0; j < NAXIS2; j++)
-			DIMAGE[i,j] = (double)ImageData[i,j];
-
-	HEADER_POP = true;
-	DATA_POP = true;
-	STATS_POP = Do_Stats;
-
-	//to do...create dummy header
-	MAKEDEFHEADER();
-	BITPIX = 16;
-	SetKey("BITPIX",BITPIX.ToString(),false,-1);
-	BZERO = 32768;
-	SetKey("BZERO",BZERO.ToString(),false,-1);
-	BSCALE = 1;
-	SetKey("BSCALE",BSCALE.ToString(),false,-1);
-	if (STATS_POP)
-		StatsUpD(do_parallel);
-}
-
-JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<__int16,2> ^ImageData, bool Do_Stats, bool do_parallel)
-{
-	int index;
-	FULLFILENAME = FullFileName;
-	index = FULLFILENAME->LastIndexOf("\\");
-	FILENAME = FULLFILENAME->Substring(index+1);
-	FILEPATH = FULLFILENAME->Substring(0,index+1);
-	NAXIS = 2;
-	NAXIS1 = ImageData->GetLength(0);
-	NAXIS2 = ImageData->GetLength(1);
-	MIN = 0.0;
-	MAX = 0.0;
-	MEDIAN = 0.0;
-	MEAN = 0.0;
-	STD = 0.0;
-	SUM = 0.0;
-
-	//convert integer image to double image
-	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
-	#pragma omp parallel for if (do_parallel)
-	for (int i = 0; i < NAXIS1; i++)
-		for (int j = 0; j < NAXIS2; j++)
-			DIMAGE[i,j] = (double)ImageData[i,j];
-
-	HEADER_POP = true;
-	DATA_POP = true;
-	STATS_POP = Do_Stats;
-
-	//to do...create dummy header
-	MAKEDEFHEADER();
-	BITPIX = 16;
-	SetKey("BITPIX",BITPIX.ToString(),false,-1);
-	BZERO = 0;
-	SetKey("BZERO",BZERO.ToString(),false,-1);
-	BSCALE = 1;
-	SetKey("BSCALE",BSCALE.ToString(),false,-1);
-	if (STATS_POP)
-		StatsUpD(do_parallel);
-}
-
-JPFITS::FITSImage::FITSImage(String^ FullFileName, array<unsigned __int16>^ ImageData, bool Do_Stats, bool do_parallel)
-{
-	int index;
-	FULLFILENAME = FullFileName;
-	index = FULLFILENAME->LastIndexOf("\\");
-	FILENAME = FULLFILENAME->Substring(index+1);
-	FILEPATH = FULLFILENAME->Substring(0,index+1);
-	NAXIS = 2;
-	NAXIS1 = 1;
-	NAXIS2 = ImageData->Length;
-	MIN = 0.0;
-	MAX = 0.0;
-	MEDIAN = 0.0;
-	MEAN = 0.0;
-	STD = 0.0;
-	SUM = 0.0;
-
-	//convert integer image to double image
-	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
-	#pragma omp parallel for if (do_parallel)
-	for (int i = 0; i < NAXIS2; i++)
-			DIMAGE[0,i] = (double)ImageData[i];
-
-	HEADER_POP = true;
-	DATA_POP = true;
-	STATS_POP = Do_Stats;
-
-	MAKEDEFHEADER();
-	BITPIX = 16;
-	SetKey("BITPIX",BITPIX.ToString(),false,-1);
-	BZERO = 32768;
-	SetKey("BZERO",BZERO.ToString(),false,-1);
-	BSCALE = 1;
-	SetKey("BSCALE",BSCALE.ToString(),false,-1);
-	if (STATS_POP)
-		StatsUpD(do_parallel);
-}
-
-JPFITS::FITSImage::FITSImage(String^ FullFileName, array<__int16>^ ImageData, bool Do_Stats, bool do_parallel)
-{
-	int index;
-	FULLFILENAME = FullFileName;
-	index = FULLFILENAME->LastIndexOf("\\");
-	FILENAME = FULLFILENAME->Substring(index+1);
-	FILEPATH = FULLFILENAME->Substring(0,index+1);
-	NAXIS = 2;
-	NAXIS1 = 1;
-	NAXIS2 = ImageData->Length;
-	MIN = 0.0;
-	MAX = 0.0;
-	MEDIAN = 0.0;
-	MEAN = 0.0;
-	STD = 0.0;
-	SUM = 0.0;
-
-	//convert integer image to double image
-	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
-	#pragma omp parallel for if (do_parallel)
-	for (int i = 0; i < NAXIS2; i++)
-			DIMAGE[0,i] = (double)ImageData[i];
-
-	HEADER_POP = true;
-	DATA_POP = true;
-	STATS_POP = Do_Stats;
-
-	MAKEDEFHEADER();
-	BITPIX = 16;
-	SetKey("BITPIX",BITPIX.ToString(),false,-1);
-	BZERO = 0;
-	SetKey("BZERO",BZERO.ToString(),false,-1);
-	BSCALE = 1;
-	SetKey("BSCALE",BSCALE.ToString(),false,-1);
-	if (STATS_POP)
-		StatsUpD(do_parallel);
-}
-
-JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<__int8,2> ^ImageData, bool Do_Stats, bool do_parallel)
-{
-	int index;
-	FULLFILENAME = FullFileName;
-	index = FULLFILENAME->LastIndexOf("\\");
-	FILENAME = FULLFILENAME->Substring(index+1);
-	FILEPATH = FULLFILENAME->Substring(0,index+1);
-	NAXIS = 2;
-	NAXIS1 = ImageData->GetLength(0);
-	NAXIS2 = ImageData->GetLength(1);
-	MIN = 0.0;
-	MAX = 0.0;
-	MEDIAN = 0.0;
-	MEAN = 0.0;
-	STD = 0.0;
-	SUM = 0.0;
-
-	//convert integer image to double image
-	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
-	#pragma omp parallel for if (do_parallel)
-	for (int i = 0; i < NAXIS1; i++)
-		for (int j = 0; j < NAXIS2; j++)
-			DIMAGE[i,j] = (double)ImageData[i,j];
-
-	HEADER_POP = true;
-	DATA_POP = true;
-	STATS_POP = Do_Stats;
-
-	//to do...create dummy header
-	MAKEDEFHEADER();
-	BITPIX = 8;
-	SetKey("BITPIX",BITPIX.ToString(),false,-1);
-	BZERO = 0;
-	SetKey("BZERO",BZERO.ToString(),false,-1);
-	BSCALE = 1;
-	SetKey("BSCALE",BSCALE.ToString(),false,-1);
-	if (STATS_POP)
-		StatsUpD(do_parallel);
-}
-
-JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<unsigned __int8,2> ^ImageData, bool Do_Stats, bool do_parallel)
-{
-	int index;
-	FULLFILENAME = FullFileName;
-	index = FULLFILENAME->LastIndexOf("\\");
-	FILENAME = FULLFILENAME->Substring(index+1);
-	FILEPATH = FULLFILENAME->Substring(0,index+1);
-	NAXIS = 2;
-	NAXIS1 = ImageData->GetLength(0);
-	NAXIS2 = ImageData->GetLength(1);
-	MIN = 0.0;
-	MAX = 0.0;
-	MEDIAN = 0.0;
-	MEAN = 0.0;
-	STD = 0.0;
-	SUM = 0.0;
-
-	//convert integer image to double image
-	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
-	#pragma omp parallel for if (do_parallel)
-	for (int i = 0; i < NAXIS1; i++)
-		for (int j = 0; j < NAXIS2; j++)
-			DIMAGE[i,j] = (double)ImageData[i,j];
-
-	HEADER_POP = true;
-	DATA_POP = true;
-	STATS_POP = Do_Stats;
-
-	//to do...create dummy header
-	MAKEDEFHEADER();
-	BITPIX = 8;
-	SetKey("BITPIX",BITPIX.ToString(),false,-1);
-	BZERO = 128;
-	SetKey("BZERO",BZERO.ToString(),false,-1);
-	BSCALE = 1;
-	SetKey("BSCALE",BSCALE.ToString(),false,-1);
-	if (STATS_POP)
-		StatsUpD(do_parallel);
-}
+//JPFITS::FITSImage::FITSImage(String^ FullFileName, array<double,2>^ ImageData, bool Do_Stats, bool do_parallel)//create new fits image from new data array, using path_file filename
+//{
+//	int index;
+//	DIMAGE = ImageData;
+//	FULLFILENAME = FullFileName;
+//	index = FULLFILENAME->LastIndexOf("\\");
+//	FILENAME = FULLFILENAME->Substring(index+1);
+//	FILEPATH = FULLFILENAME->Substring(0,index+1);
+//	NAXIS = 2;
+//	NAXIS1 = ImageData->GetLength(0);
+//	NAXIS2 = ImageData->GetLength(1);
+//	MIN = 0.0;
+//	MAX = 0.0;
+//	MEDIAN = 0.0;
+//	MEAN = 0.0;
+//	STD = 0.0;
+//	SUM = 0.0;
+//
+//	HEADER_POP = true;
+//	DATA_POP = true;
+//	STATS_POP = Do_Stats;
+//
+//	//create default header
+//	MAKEDEFHEADER();
+//
+//	if (STATS_POP)
+//		StatsUpD(do_parallel);
+//}
+//
+//JPFITS::FITSImage::FITSImage(String^ FullFileName, array<double>^ ImageData, bool Do_Stats, bool do_parallel)//create new fits image from new data array, using path_file filename
+//{
+//	int index;
+//	FULLFILENAME = FullFileName;
+//	index = FULLFILENAME->LastIndexOf("\\");
+//	FILENAME = FULLFILENAME->Substring(index+1);
+//	FILEPATH = FULLFILENAME->Substring(0,index+1);
+//	NAXIS = 2;
+//	NAXIS1 = 1;
+//	NAXIS2 = ImageData->Length;
+//	MIN = 0.0;
+//	MAX = 0.0;
+//	MEDIAN = 0.0;
+//	MEAN = 0.0;
+//	STD = 0.0;
+//	SUM = 0.0;
+//
+//	//convert integer image to double image
+//	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
+//	#pragma omp parallel for if (do_parallel)
+//	for (int i = 0; i < NAXIS2; i++)
+//			DIMAGE[0,i] = (double)ImageData[i];
+//
+//	HEADER_POP = true;
+//	DATA_POP = true;
+//	STATS_POP = Do_Stats;
+//
+//	//create default header
+//	MAKEDEFHEADER();
+//
+//	if (STATS_POP)
+//		StatsUpD(do_parallel);
+//}
+//
+//JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<unsigned __int32,2> ^ImageData, bool Do_Stats, bool do_parallel)
+//{
+//	int index;
+//	FULLFILENAME = FullFileName;
+//	index = FULLFILENAME->LastIndexOf("\\");
+//	FILENAME = FULLFILENAME->Substring(index+1);
+//	FILEPATH = FULLFILENAME->Substring(0,index+1);
+//	NAXIS = 2;
+//	NAXIS1 = ImageData->GetLength(0);
+//	NAXIS2 = ImageData->GetLength(1);
+//	MIN = 0.0;
+//	MAX = 0.0;
+//	MEDIAN = 0.0;
+//	MEAN = 0.0;
+//	STD = 0.0;
+//	SUM = 0.0;
+//
+//	//convert integer image to double image
+//	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
+//	#pragma omp parallel for if (do_parallel)
+//	for (int i = 0; i < NAXIS1; i++)
+//		for (int j = 0; j < NAXIS2; j++)
+//			DIMAGE[i,j] = (double)ImageData[i,j];
+//
+//	HEADER_POP = true;
+//	DATA_POP = true;
+//	STATS_POP = Do_Stats;
+//
+//	MAKEDEFHEADER();
+//	BITPIX = 32;
+//	SetKey("BITPIX",BITPIX.ToString(),false,-1);
+//	BZERO = 2147483648;
+//	SetKey("BZERO",BZERO.ToString(),false,-1);
+//	BSCALE = 1;
+//	SetKey("BSCALE",BSCALE.ToString(),false,-1);
+//	if (STATS_POP)
+//		StatsUpD(do_parallel);
+//}
+//
+//JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<unsigned __int32> ^ImageData, bool Do_Stats, bool do_parallel)
+//{
+//	int index;
+//	FULLFILENAME = FullFileName;
+//	index = FULLFILENAME->LastIndexOf("\\");
+//	FILENAME = FULLFILENAME->Substring(index+1);
+//	FILEPATH = FULLFILENAME->Substring(0,index+1);
+//	NAXIS = 2;
+//	NAXIS1 = 1; 
+//	NAXIS2 = ImageData->Length;
+//	MIN = 0.0;
+//	MAX = 0.0;
+//	MEDIAN = 0.0;
+//	MEAN = 0.0;
+//	STD = 0.0;
+//	SUM = 0.0;
+//
+//	//convert integer image to double image
+//	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
+//	#pragma omp parallel for if (do_parallel)
+//	for (int i = 0; i < NAXIS2; i++)
+//			DIMAGE[0,i] = (double)ImageData[i];
+//
+//	HEADER_POP = true;
+//	DATA_POP = true;
+//	STATS_POP = Do_Stats;
+//
+//	MAKEDEFHEADER();
+//	BITPIX = 32;
+//	SetKey("BITPIX",BITPIX.ToString(),false,-1);
+//	BZERO = 2147483648;
+//	SetKey("BZERO",BZERO.ToString(),false,-1);
+//	BSCALE = 1;
+//	SetKey("BSCALE",BSCALE.ToString(),false,-1);
+//	if (STATS_POP)
+//		StatsUpD(do_parallel);
+//}
+//
+//JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<__int32,2> ^ImageData, bool Do_Stats, bool do_parallel)
+//{
+//	int index;
+//	FULLFILENAME = FullFileName;
+//	index = FULLFILENAME->LastIndexOf("\\");
+//	FILENAME = FULLFILENAME->Substring(index+1);
+//	FILEPATH = FULLFILENAME->Substring(0,index+1);
+//	NAXIS = 2;
+//	NAXIS1 = ImageData->GetLength(0);
+//	NAXIS2 = ImageData->GetLength(1);
+//	MIN = 0.0;
+//	MAX = 0.0;
+//	MEDIAN = 0.0;
+//	MEAN = 0.0;
+//	STD = 0.0;
+//	SUM = 0.0;
+//
+//	//convert integer image to double image
+//	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
+//	#pragma omp parallel for if (do_parallel)
+//	for (int i = 0; i < NAXIS1; i++)
+//		for (int j = 0; j < NAXIS2; j++)
+//			DIMAGE[i,j] = (double)ImageData[i,j];
+//
+//	HEADER_POP = true;
+//	DATA_POP = true;
+//	STATS_POP = Do_Stats;
+//
+//	MAKEDEFHEADER();
+//	BITPIX = 32;
+//	SetKey("BITPIX",BITPIX.ToString(),false,-1);
+//	BZERO = 0;
+//	SetKey("BZERO",BZERO.ToString(),false,-1);
+//	BSCALE = 1;
+//	SetKey("BSCALE",BSCALE.ToString(),false,-1);
+//	if (STATS_POP)
+//		StatsUpD(do_parallel);
+//}
+//
+//JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<unsigned __int16,2> ^ImageData, bool Do_Stats, bool do_parallel)
+//{
+//	int index;
+//	FULLFILENAME = FullFileName;
+//	index = FULLFILENAME->LastIndexOf("\\");
+//	FILENAME = FULLFILENAME->Substring(index+1);
+//	FILEPATH = FULLFILENAME->Substring(0,index+1);
+//	NAXIS = 2;
+//	NAXIS1 = ImageData->GetLength(0);  
+//	NAXIS2 = ImageData->GetLength(1);
+//	MIN = 0.0;
+//	MAX = 0.0;
+//	MEDIAN = 0.0;
+//	MEAN = 0.0;
+//	STD = 0.0;
+//	SUM = 0.0;
+//
+//	//convert integer image to double image
+//	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
+//	#pragma omp parallel for if (do_parallel)
+//	for (int i = 0; i < NAXIS1; i++)
+//		for (int j = 0; j < NAXIS2; j++)
+//			DIMAGE[i,j] = (double)ImageData[i,j];
+//
+//	HEADER_POP = true;
+//	DATA_POP = true;
+//	STATS_POP = Do_Stats;
+//
+//	//to do...create dummy header
+//	MAKEDEFHEADER();
+//	BITPIX = 16;
+//	SetKey("BITPIX",BITPIX.ToString(),false,-1);
+//	BZERO = 32768;
+//	SetKey("BZERO",BZERO.ToString(),false,-1);
+//	BSCALE = 1;
+//	SetKey("BSCALE",BSCALE.ToString(),false,-1);
+//	if (STATS_POP)
+//		StatsUpD(do_parallel);
+//}
+//
+//JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<__int16,2> ^ImageData, bool Do_Stats, bool do_parallel)
+//{
+//	int index;
+//	FULLFILENAME = FullFileName;
+//	index = FULLFILENAME->LastIndexOf("\\");
+//	FILENAME = FULLFILENAME->Substring(index+1);
+//	FILEPATH = FULLFILENAME->Substring(0,index+1);
+//	NAXIS = 2;
+//	NAXIS1 = ImageData->GetLength(0);
+//	NAXIS2 = ImageData->GetLength(1);
+//	MIN = 0.0;
+//	MAX = 0.0;
+//	MEDIAN = 0.0;
+//	MEAN = 0.0;
+//	STD = 0.0;
+//	SUM = 0.0;
+//
+//	//convert integer image to double image
+//	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
+//	#pragma omp parallel for if (do_parallel)
+//	for (int i = 0; i < NAXIS1; i++)
+//		for (int j = 0; j < NAXIS2; j++)
+//			DIMAGE[i,j] = (double)ImageData[i,j];
+//
+//	HEADER_POP = true;
+//	DATA_POP = true;
+//	STATS_POP = Do_Stats;
+//
+//	//to do...create dummy header
+//	MAKEDEFHEADER();
+//	BITPIX = 16;
+//	SetKey("BITPIX",BITPIX.ToString(),false,-1);
+//	BZERO = 0;
+//	SetKey("BZERO",BZERO.ToString(),false,-1);
+//	BSCALE = 1;
+//	SetKey("BSCALE",BSCALE.ToString(),false,-1);
+//	if (STATS_POP)
+//		StatsUpD(do_parallel);
+//}
+//
+//JPFITS::FITSImage::FITSImage(String^ FullFileName, array<unsigned __int16>^ ImageData, bool Do_Stats, bool do_parallel)
+//{
+//	int index;
+//	FULLFILENAME = FullFileName;
+//	index = FULLFILENAME->LastIndexOf("\\");
+//	FILENAME = FULLFILENAME->Substring(index+1);
+//	FILEPATH = FULLFILENAME->Substring(0,index+1);
+//	NAXIS = 2;
+//	NAXIS1 = 1;
+//	NAXIS2 = ImageData->Length;
+//	MIN = 0.0;
+//	MAX = 0.0;
+//	MEDIAN = 0.0;
+//	MEAN = 0.0;
+//	STD = 0.0;
+//	SUM = 0.0;
+//
+//	//convert integer image to double image
+//	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
+//	#pragma omp parallel for if (do_parallel)
+//	for (int i = 0; i < NAXIS2; i++)
+//			DIMAGE[0,i] = (double)ImageData[i];
+//
+//	HEADER_POP = true;
+//	DATA_POP = true;
+//	STATS_POP = Do_Stats;
+//
+//	MAKEDEFHEADER();
+//	BITPIX = 16;
+//	SetKey("BITPIX",BITPIX.ToString(),false,-1);
+//	BZERO = 32768;
+//	SetKey("BZERO",BZERO.ToString(),false,-1);
+//	BSCALE = 1;
+//	SetKey("BSCALE",BSCALE.ToString(),false,-1);
+//	if (STATS_POP)
+//		StatsUpD(do_parallel);
+//}
+//
+//JPFITS::FITSImage::FITSImage(String^ FullFileName, array<__int16>^ ImageData, bool Do_Stats, bool do_parallel)
+//{
+//	int index;
+//	FULLFILENAME = FullFileName;
+//	index = FULLFILENAME->LastIndexOf("\\");
+//	FILENAME = FULLFILENAME->Substring(index+1);
+//	FILEPATH = FULLFILENAME->Substring(0,index+1);
+//	NAXIS = 2;
+//	NAXIS1 = 1;
+//	NAXIS2 = ImageData->Length;
+//	MIN = 0.0;
+//	MAX = 0.0;
+//	MEDIAN = 0.0;
+//	MEAN = 0.0;
+//	STD = 0.0;
+//	SUM = 0.0;
+//
+//	//convert integer image to double image
+//	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
+//	#pragma omp parallel for if (do_parallel)
+//	for (int i = 0; i < NAXIS2; i++)
+//			DIMAGE[0,i] = (double)ImageData[i];
+//
+//	HEADER_POP = true;
+//	DATA_POP = true;
+//	STATS_POP = Do_Stats;
+//
+//	MAKEDEFHEADER();
+//	BITPIX = 16;
+//	SetKey("BITPIX",BITPIX.ToString(),false,-1);
+//	BZERO = 0;
+//	SetKey("BZERO",BZERO.ToString(),false,-1);
+//	BSCALE = 1;
+//	SetKey("BSCALE",BSCALE.ToString(),false,-1);
+//	if (STATS_POP)
+//		StatsUpD(do_parallel);
+//}
+//
+//JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<__int8,2> ^ImageData, bool Do_Stats, bool do_parallel)
+//{
+//	int index;
+//	FULLFILENAME = FullFileName;
+//	index = FULLFILENAME->LastIndexOf("\\");
+//	FILENAME = FULLFILENAME->Substring(index+1);
+//	FILEPATH = FULLFILENAME->Substring(0,index+1);
+//	NAXIS = 2;
+//	NAXIS1 = ImageData->GetLength(0);
+//	NAXIS2 = ImageData->GetLength(1);
+//	MIN = 0.0;
+//	MAX = 0.0;
+//	MEDIAN = 0.0;
+//	MEAN = 0.0;
+//	STD = 0.0;
+//	SUM = 0.0;
+//
+//	//convert integer image to double image
+//	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
+//	#pragma omp parallel for if (do_parallel)
+//	for (int i = 0; i < NAXIS1; i++)
+//		for (int j = 0; j < NAXIS2; j++)
+//			DIMAGE[i,j] = (double)ImageData[i,j];
+//
+//	HEADER_POP = true;
+//	DATA_POP = true;
+//	STATS_POP = Do_Stats;
+//
+//	//to do...create dummy header
+//	MAKEDEFHEADER();
+//	BITPIX = 8;
+//	SetKey("BITPIX",BITPIX.ToString(),false,-1);
+//	BZERO = 0;
+//	SetKey("BZERO",BZERO.ToString(),false,-1);
+//	BSCALE = 1;
+//	SetKey("BSCALE",BSCALE.ToString(),false,-1);
+//	if (STATS_POP)
+//		StatsUpD(do_parallel);
+//}
+//
+//JPFITS::FITSImage::FITSImage(System::String ^FullFileName, cli::array<unsigned __int8,2> ^ImageData, bool Do_Stats, bool do_parallel)
+//{
+//	int index;
+//	FULLFILENAME = FullFileName;
+//	index = FULLFILENAME->LastIndexOf("\\");
+//	FILENAME = FULLFILENAME->Substring(index+1);
+//	FILEPATH = FULLFILENAME->Substring(0,index+1);
+//	NAXIS = 2;
+//	NAXIS1 = ImageData->GetLength(0);
+//	NAXIS2 = ImageData->GetLength(1);
+//	MIN = 0.0;
+//	MAX = 0.0;
+//	MEDIAN = 0.0;
+//	MEAN = 0.0;
+//	STD = 0.0;
+//	SUM = 0.0;
+//
+//	//convert integer image to double image
+//	DIMAGE = gcnew array<double,2>(NAXIS1,NAXIS2);
+//	#pragma omp parallel for if (do_parallel)
+//	for (int i = 0; i < NAXIS1; i++)
+//		for (int j = 0; j < NAXIS2; j++)
+//			DIMAGE[i,j] = (double)ImageData[i,j];
+//
+//	HEADER_POP = true;
+//	DATA_POP = true;
+//	STATS_POP = Do_Stats;
+//
+//	//to do...create dummy header
+//	MAKEDEFHEADER();
+//	BITPIX = 8;
+//	SetKey("BITPIX",BITPIX.ToString(),false,-1);
+//	BZERO = 128;
+//	SetKey("BZERO",BZERO.ToString(),false,-1);
+//	BSCALE = 1;
+//	SetKey("BSCALE",BSCALE.ToString(),false,-1);
+//	if (STATS_POP)
+//		StatsUpD(do_parallel);
+//}
 
 void JPFITS::FITSImage::SetImage(array<double,2>^ ImageData, bool Do_Stats, bool do_parallel)//sometimes want to not bother with stats, so cant use property setter for images
 {
@@ -814,11 +976,5 @@ array<double, 2>^ JPFITS::FITSImage::GetSubImage(array<int, 1>^ Range)
 			result[x, y] = DIMAGE[Range[0] + x, Range[2] + y];
 
 	return result;
-}
-
-void JPFITS::FITSImage::ConvertToImage(String^ Source_FullFileName, String^ Destination_FullFileName, String^ contrast_scaling, bool invert_colormap, bool do_parallel)
-{
-	FITSImage^ fi = gcnew FITSImage(Source_FullFileName, nullptr, true, true, true, do_parallel);
-	//JPBitMap::ArrayToBmp(fi->Image, 0, 0, invert_colormap, )
 }
 

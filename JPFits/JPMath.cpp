@@ -2819,10 +2819,7 @@ array<double>^ JPFITS::JPMath::Interpolate1d(array<double>^ xdata, array<double>
 	array<double>^ result = gcnew array<double>(xinterp->Length);
 
 	if (style != "linear" && style != "cubic" && style != "mono" && style != "akima" && style != "catmullrom")
-	{
 		throw gcnew Exception("Interpolation style '" + style + "' not recognized.");
-		return nullptr;
-	}
 
 	alglib::spline1dinterpolant^ sp = gcnew alglib::spline1dinterpolant();
 
