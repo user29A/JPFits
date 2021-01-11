@@ -41,7 +41,7 @@ bool JPFITS::FITSImageSet::Write(TypeCode precision, bool do_parallel, bool show
 	{
 		#pragma omp parallel for if (do_parallel)
 		for (int i = 0; i < FITSLIST->Count; i++)
-			((FITSImage^)FITSLIST[i])->WriteFile(precision, !do_parallel);
+			((FITSImage^)FITSLIST[i])->WriteImage(precision, !do_parallel);
 		return true;
 	}
 	else
@@ -135,7 +135,7 @@ void JPFITS::FITSImageSet::BGWRKR_DoWork(System::Object^  sender, System::Compon
 				}
 			}
 
-			((FITSImage^)FITSLIST[i])->WriteFile(precision, !do_parallel);
+			((FITSImage^)FITSLIST[i])->WriteImage(precision, !do_parallel);
 		}
 		return;
 	}

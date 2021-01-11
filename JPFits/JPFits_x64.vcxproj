@@ -246,14 +246,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AssemblyInfo.cpp" />
-    <ClCompile Include="FileIO.cpp" />
+    <ClCompile Include="FileOPS.cpp" />
     <ClCompile Include="FITSBinTable.cpp" />
     <ClCompile Include="FitsExtensionTablePlotter.cpp" />
     <ClCompile Include="FitsExtensionTableViewer.cpp" />
     <ClCompile Include="FitsFinder.cpp" />
     <ClCompile Include="FitsFound.cpp" />
     <ClCompile Include="FitsSet.cpp" />
-    <ClCompile Include="Header.cpp" />
     <ClCompile Include="FitsImage.cpp" />
     <ClCompile Include="JPBitMap.cpp" />
     <ClCompile Include="JPMath.cpp" />

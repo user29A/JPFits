@@ -109,9 +109,15 @@ void JPFITS::WCS_AutoSolver::BGWRKR_DoWork(System::Object^ sender, System::Compo
 	{
 		//get catalogue RA, Dec, and mag's
 		BGWRKR->ReportProgress(0, "Reading the Catalogue FITS binary tables...");
-		CAT_CVAL1s = JPFITS::FITSBinTable::GetExtensionEntry(CAT_FILENAME, CAT_EXTNAME, CAT_CVAL1NAME);
+
+		JPFITS::FITSBinTable^ bt = gcnew JPFITS::FITSBinTable(CAT_FILENAME, CAT_EXTNAME);
+		CAT_CVAL1s = bt->GetTTYPEEntry(CAT_CVAL1NAME);
+		CAT_CVAL2s = bt->GetTTYPEEntry(CAT_CVAL2NAME);
+		CAT_MAGs = bt->GetTTYPEEntry(CAT_MAGNAME);
+
+		/*CAT_CVAL1s = JPFITS::FITSBinTable::GetExtensionEntry(CAT_FILENAME, CAT_EXTNAME, CAT_CVAL1NAME);
 		CAT_CVAL2s = JPFITS::FITSBinTable::GetExtensionEntry(CAT_FILENAME, CAT_EXTNAME, CAT_CVAL2NAME);
-		CAT_MAGs = JPFITS::FITSBinTable::GetExtensionEntry(CAT_FILENAME, CAT_EXTNAME, CAT_MAGNAME);
+		CAT_MAGs = JPFITS::FITSBinTable::GetExtensionEntry(CAT_FILENAME, CAT_EXTNAME, CAT_MAGNAME);*/
 
 		//need to check mag for NaN's and re-form ra dec mag
 		BGWRKR->ReportProgress(0, "Formatting the Catalogue FITS binary tables...");
@@ -827,18 +833,16 @@ int JPFITS::WCS_AutoSolver::AstroQuery(String^ catalogue, String^ ra_deg, String
 	res = proc->StandardOutput->ReadToEnd();
 	MessageBox::Show(errs + "\r\n" + res);*/
 
-	array<String^>^ ExtensionEntryLabels = FITSBinTable::GetExtensionEntryLabels(result_savepathfilename, "");
+	/*array<String^>^ ExtensionEntryLabels = FITSBinTable::GetExtensionEntryLabels(result_savepathfilename, "");
 	array<TypeCode>^ ExtensionEntryDataTypes = FITSBinTable::GetExtensionEntryDataTypes(result_savepathfilename, "");
 	array<String^>^ ExtensionEntryDataUnits = FITSBinTable::GetExtensionEntryUnits(result_savepathfilename, "");
 	array<double, 2>^ table = FITSBinTable::GetExtensionEntries(result_savepathfilename, "", ExtensionEntryLabels);
 	FITSImage^ fits = gcnew FITSImage(result_savepathfilename, nullptr, true, true, false, false);
-	//fits->AddKey("RA", ra_deg, "Right Ascension of query field center, degrees", -1);
-	//fits->AddKey("DEC", dec_deg, "Declination of query field center, degrees", -1);
 	fits->WriteFile(TypeCode::Double, false);
 	array<String^>^ exkeys = gcnew array<String^>(2) { "RA", "DEC" };
 	array<String^>^ exvals = gcnew array<String^>(2) { ra_deg->ToString(), dec_deg->ToString() };
 	array<String^>^ excoms = gcnew array<String^>(2) { "Right Ascension of query field center, degrees", "Declination of query field center, degrees" };
-	FITSBinTable::WriteExtension(result_savepathfilename, "", true, ExtensionEntryLabels, ExtensionEntryDataTypes, ExtensionEntryDataUnits, exkeys, exvals, excoms, table);
+	FITSBinTable::WriteExtension(result_savepathfilename, "", true, ExtensionEntryLabels, ExtensionEntryDataTypes, ExtensionEntryDataUnits, exkeys, exvals, excoms, table);*/
 
 	return res;
 }

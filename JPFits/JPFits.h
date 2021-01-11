@@ -55,511 +55,470 @@ namespace JPFITS
 		return result;
 	}
 
-	/*private ref class FITSFILEOPS
+	private ref class FITSFILEOPS
 	{
 		public:
-		static void READPRIMARYHEADER(FileStream^ fs, bool pop)//read and fromat new header keys/vals/comms and advance basestream to end of header card block
-		{
-		}
-	};*/
+
+		/// <summary>Scans the primary header unit and data of a FITS file. Returns false if the file is not a FITS file.</summary>
+		/// <param name="fs">The FileStream of the FITS file.</param>
+		/// <param name="scanpastprimarydata">True to set the FileStream fs position to the end of the data block, otherwise the fs position will be at the end of the primary header block, i.e. at the beginning of the primary data.</param>
+		/// <param name="header_return">Returns the header of the extension as an ArrayList with each 80-character header line being a String^ member of this list. Pass nullptr if not required.</param>
+		/// <param name="has_extensions">Returns whether or not the FITS file may contain extensions.</param>
+		static bool SCANPRIMARYUNIT(FileStream^ fs, bool scanpastprimarydata, ArrayList^ header_return, bool &has_extensions);
+
+		/// <summary>Find the FITS extension table of the given type and name. Returns false if the XTENSION type of the specified EXTNAME is not found.
+		/// <para>If EXTNAME is found the FileStream fs will be placed at the end of the specified extension's header block, i.e. at the beginning of the extension's data block, else it will be at the end of the file if the EXTNAME is not found.</para></summary>
+		/// <param name="fs">The FileStream of the FITS file.</param>
+		/// <param name="extension_type">The XTENSION extension type, either: &quot;BINTABLE&quot;, &quot;TABLE&quot;, or &quot;IMAGE&quot;.</param>
+		/// <param name="extension_name">The EXTNAME extension name. If the extension is known to have no EXTNAME keyword and name, then pass an empty String and the first nameless extension of the specified type will be seeked.</param>
+		/// <param name="header_return">Returns the header of the extension as an ArrayList with each 80-character header line being a String^ member of this list. Pass nullptr if not required.</param>
+		/// <param name="startposition">Returns the start position within the FileStream of the requested extension...i.e. at the start of its header.</param>
+		/// <param name="endposition">Returns the end position within the FileStream of the requested extension...i.e. at the end of its data.</param>
+		static bool SEEKEXTENSION(FileStream^ fs, String^ extension_type, String^ extension_name, ArrayList^ header_return, __int64 &startposition, __int64 &endposition);
+
+		/// <summary>Gets all extension names of a specified extension type in the FITS file.</summary>
+		/// <param name="FileName">The full file name to read from disk.</param>
+		/// <param name="extension_type">The XTENSION extension type, either: &quot;BINTABLE&quot;, &quot;TABLE&quot;, or &quot;IMAGE&quot;.</param>
+		static array<String^>^ GETALLEXTENSIONNAMES(String^ FileName, String^ extension_type);
+
+		/// <summary>Makes a formatted header block with the supplied keys, and sets the first key to either SIMPLE = T or XTENSION = "IMAGE".</summary>
+		static array<String^>^ GETFORMATTEDIMAGEHEADER(array<String^>^ imageHeaderKeys, array<String^>^ imageHeaderKeyValues, array<String^>^ imageHeaderKeyComments, bool isExtension);
+
+		/// <summary>Makes a basic formatted header block with NAXIS = 0, and EXTEND keyword as either true or false.</summary>
+		static array<String^>^ MAKEPRIMARYDEFFORMATTEDHEADER(bool containsExtensions);
+
+	};
 
 	/// <summary> FITSImage class to create, read, interact with, modify components of, and write FITS Primary image data and its Header.</summary>
 	public ref class FITSImage
 	{
 		public:
 
-			/// <summary>Create a dummy FITSImage object.</summary>
-			/// <param name="FullFileName">File name. May be anything for this dummy object.</param>
-			FITSImage(String^ FullFileName);
+		#pragma region CONSTRUCTORS
+		/// <summary>Create a dummy FITSImage object with a simple primary header.</summary>
+		/// <param name="FullFileName">File name. May be anything for this dummy object.</param>
+		FITSImage(String^ FullFileName, bool mayContainExtensions);
 
-			/// <summary>Create a FITSImage object from an array object containing existing data.
-			/// <para>Image data is maintained at or converted to double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data. The precision and rank of the underlying array will be automatically determined. Vectors will be converted to an array with column-rank.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, Object^ ImageData, bool Do_Stats, bool do_parallel);
+		/// <summary>Create a FITSImage object from an array object containing existing data.
+		/// <para>Image data is maintained at or converted to double precision.</para></summary>
+		/// <param name="FullFileName">File name.</param>
+		/// <param name="ImageData">The data array to use for the FITS image data. The precision and rank of the underlying array will be automatically determined. Vectors will be converted to an array with column-rank.</param>
+		/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
+		/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
+		FITSImage(String^ FullFileName, Object^ ImageData, bool Do_Stats, bool do_parallel);
 
-			/// <summary>Create a FITSImage object referencing raw UChar data on disk.</summary>
-			/// <param name="FullFileName">File name for the FITS object.</param>
-			/// <param name="DiskUCharBufferName">File name of the disk char data.</param>
-			/// <param name="Precision">Precision of the data stored in the disk char array.</param>
-			/// <param name="NAxis1">Length of the 1st axis (x-axis)</param>
-			/// <param name="NAxis2">Length of the 2nd axis (y-axis)</param>
-			FITSImage(String^ FullFileName, String^ DiskUCharBufferName, TypeCode Precision, int NAxis1, int NAxis2);
+		/// <summary>Create a FITSImage object with Primary image data loaded to RAM memory from disk.
+		/// <para>Image data is loaded as double precision independent of storage precision on disk.</para></summary>
+		/// <param name="FullFileName">File name.</param>
+		/// <param name="Range">Range is ZERO based 1-D int array [xmin xmax ymin ymax].  Pass nullptr or Range[0] = -1 to default to full image size.</param>
+		/// <param name="Populate_Header">Optionally populate the header - sometimes you just want the data, and can skip reading the non-essential header lines.</param>
+		/// <param name="Populate_Data">Optionally populate the image data array - sometimes you just want the header and don't need the data.</param>
+		/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data (if populated) - saves time if you don't need those.</param>
+		/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
+		FITSImage(String^ FullFileName, array<int, 1>^ Range, bool Populate_Header, bool Populate_Data, bool Do_Stats, bool do_parallel);
 
-			/*/// <summary>Create a FITSImage object with an existing __int8 (char) 2-D array.
-			/// <para>Image data is converted to double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<char, 2>^ ImageData, bool Do_Stats, bool do_parallel);
+		/// <summary>Create a FITSImage object with extension image data loaded to RAM memory from disk.
+		/// <para>Image data is loaded as double precision independent of storage precision on disk.</para></summary>
+		/// <param name="FullFileName">File name.</param>
+		/// <param name="extensionName">The EXTNAME extension name of the image. If an empty string is passed, the first nameless IMAGE extension will be read. Exception if no such extension exits.</param>
+		/// <param name="Range">Range is ZERO based 1-D int array [xmin xmax ymin ymax].  Pass nullptr or Range[0] = -1 to default to full image size.</param>
+		/// <param name="Populate_Header">Optionally populate the header - sometimes you just want the data, and can skip reading the non-essential header lines.</param>
+		/// <param name="Populate_Data">Optionally populate the image data array - sometimes you just want the header and don't need the data.</param>
+		/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data (if populated) - saves time if you don't need those.</param>
+		/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
+		FITSImage(String^ FullFileName, String^ extensionName, array<int, 1>^ Range, bool Populate_Header, bool Populate_Data, bool Do_Stats, bool do_parallel);
 
-			/// <summary>Create a FITSImage object with an existing double 1-D array
-			/// <para>Image data is converted to a 2-D array with a single row, maintaining double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<double>^ ImageData, bool Do_Stats, bool do_parallel);
+		/// <summary>Create a FITSImage object referencing raw UChar data on disk. Image data is loaded as double precision independent of storage precision on disk.</summary>
+		/// <param name="FullFileName">File name for the FITS object.</param>
+		/// <param name="DiskUCharBufferName">File name of the disk byte data.</param>
+		/// <param name="Precision">Precision of the data stored in the disk char array.</param>
+		/// <param name="NAxis1">Length of the 1st axis (x-axis)</param>
+		/// <param name="NAxis2">Length of the 2nd axis (y-axis)</param>
+		FITSImage(String^ FullFileName, String^ DiskUCharBufferName, TypeCode Precision, int NAxis1, int NAxis2);
 
-			/// <summary>Create a FITSImage object with an existing double 2-D array
-			/// <para>Image data is maintained at double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<double, 2>^ ImageData, bool Do_Stats, bool do_parallel);
+		~FITSImage();
+		#pragma endregion
 
-			/// <summary>Create a FITSImage object with an existing __int32 (int) 2-D array
-			/// <para>Image data is converted to double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<int,2>^ ImageData, bool Do_Stats, bool do_parallel);
+		#pragma region WRITING
+		/// <summary>Write a FITS image to disk as a primary header and primary image from the FITSImage object with its existing file name.
+		/// <para>If the file name already exists on disk, the primary unit will be overwritten, and any existing extensions will be appended to conserve the data file.</para></summary>
+		/// <param name="Precision">Byte precision at which to write the image data.</param>
+		/// <param name="do_parallel">Populate the underlying byte arrays for writing with parallelization.</param>
+		void WriteImage(TypeCode Precision, bool do_parallel);
 
-			/// <summary>Create a FITSImage object with an existing __int16 (short) 1-D array
-			/// <para>Image data is converted to a 2-D array with a single row at double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<short>^ ImageData, bool Do_Stats, bool do_parallel);
+		/// <summary>Write a FITS image to disk as a primary header and primary image from the FITSImage object with a given file name.
+		/// <para>If the file name already exists on disk, the primary unit will be overwritten, and any existing extensions will be appended to conserve the data file.</para></summary>
+		/// <param name="FullFileName">File name.</param>
+		/// <param name="Precision">Byte precision at which to write the image data.</param>
+		/// <param name="do_parallel">Populate the underlying byte arrays for writing with parallelization.</param>
+		void WriteImage(String^ FullFileName, TypeCode Precision, bool do_parallel);
 
-			/// <summary>Create a FITSImage object with an existing __int16 (short) 2-D array
-			/// <para>Image data is converted to double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<short, 2>^ ImageData, bool Do_Stats, bool do_parallel);
+		/// <summary>Write a FITS image to disk as an extension from the FITSImage object with a given file name.</summary>
+		/// <param name="FullFileName">File name. Pass the object&apos;s own FullFileName to write to its existing file name.
+		/// <para>If the file doesn't yet exist on disk, then a new file will be created with an empty Primary Unit, and the image will be written as an extension.</para>
+		/// <para>If the file does exist, then the extension will be written with the logic for the overwriteIfExists parameter, and</para>
+		/// <para>the existing primary unit and any other extensions will be conserved to the file.</para></param>
+		/// <param name="extensionName">The EXTNAME extension name of the IMAGE extension. 
+		/// <para>If an empty string is passed, the first nameless IMAGE extension will be written to.</para>
+		/// <para>If no such extension exists, the extension will be written as a new extension to the FITS file.</para></param>
+		/// <param name="overwriteIfExists">If the image extension already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
+		/// <param name="Precision">Byte precision at which to write the image data.</param>
+		/// <param name="do_parallel">Populate the underlying byte arrays for writing with parallelization.</param>
+		void WriteImage(String^ FullFileName, String^ extensionName, bool overwriteIfExists, TypeCode Precision, bool do_parallel);
 
-			/// <summary>Create a FITSImage object with an existing unsigned __int8 (char) 2-D array
-			/// <para>Image data is converted to double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<unsigned char, 2>^ ImageData, bool Do_Stats, bool do_parallel);
+		void WriteFileFromDiskBuffer(bool DeleteOrigDiskBuffer);
+		#pragma endregion
 
-			/// <summary>Create a FITSImage object with an existing unsigned __int32 (int) 2-D array
-			/// <para>Image data is converted to double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<unsigned int, 2>^ ImageData, bool Do_Stats, bool do_parallel);
+		#pragma region STATICFILEIO
+		/// <summary>Convert a (possibly poorly formatted) whitespace-delimited text file to a double array.
+		/// <para>If the text file is large (>2MB) the program may seem to hang...just let it run until control is returned.</para></summary>
+		/// <param name="FullFileName">File name.</param>
+		static array<double, 2>^ ConvertTxtToDblArray(String^ FullFileName, bool IsPoorlyFormatted);
 
-			/// <summary>Create a FITSImage object with an existing unsigned __int32 (int) 1-D array
-			/// <para>Image data is converted to a 2-D array with a single row at double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<unsigned int>^ ImageData, bool Do_Stats, bool do_parallel);
+		/// <summary>Return the primary image of the FITS file as a double 2-D array.</summary>
+		/// <param name="file">The full file name to read from disk.</param>
+		/// <param name="Range">Range is ZERO based 1-D int array [xmin xmax ymin ymax]. Pass nullptr or Range[0] = -1 to default to full image size.</param>
+		static array<double, 2>^ ReadImageArrayOnly(String^ file, array<int, 1>^ Range, bool do_parallel);
 
-			/// <summary>Create a FITSImage object with an existing unsigned __int16 (short) 2-D array
-			/// <para>Image data is converted to double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<unsigned short,2>^ ImageData, bool Do_Stats, bool do_parallel);
+		/// <summary>Return the primary image of the FITS file as a double 1-D array.</summary>
+		/// <param name="file">The full file name to read from disk.</param>
+		/// <param name="Range">Range is ZERO based 1-D int array [xmin xmax ymin ymax]. One of the axes ranges must be length equal to 1.
+		/// <para> Pass nullptr or Range[0] = -1 to default to full image size, assuming the image data is a vector.</para></param>
+		static array<double>^ ReadImageVectorOnly(String^ file, array<int, 1>^ Range, bool do_parallel);
 
-			/// <summary>Create a FITSImage object with an existing unsigned __int16 (short) 1-D array
-			/// <para>Image data is converted to a 2-D array with a single row at double precision.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="ImageData">The data array to use for the FITS image data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<unsigned short>^ ImageData, bool Do_Stats, bool do_parallel);*/
+		//static Object^ ReadPrimaryNDimensionalData(String^ fullFileName, TypeCode^ convertToTypeCode, int &nAaxis, array<int>^ &nAxisN);
 
-			/// <summary>Create a FITSImage object with image data loaded to RAM memory from disk.
-			/// <para>Image data is loaded as double precision independent of storage precision on disk.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="Range">Range is ZERO based 1-D int array [xmin xmax ymin ymax].  Pass nullptr or Range[0] = -1 to default to full image size.</param>
-			/// <param name="Populate_Header">Optionally populate the header - sometimes you just want the data, and can skip reading the non-essential header lines.</param>
-			/// <param name="Populate_Data">Optionally populate the image data array - sometimes you just want the header and don't need the data.</param>
-			/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data (if populated) - saves time if you don't need those.</param>
-			/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-			FITSImage(String^ FullFileName, array<int, 1>^ Range, bool Populate_Header, bool Populate_Data, bool Do_Stats, bool do_parallel);
-			
-			~FITSImage();
+		///// <summary>Convert a FITS image on disk to an image.</summary>
+		//static void ConvertToImage(String^ Source_FullFileName, String^ Destination_FullFileName, String^ file_type, String^ contrast_scaling, bool invert_colormap, bool do_parallel);  
+		#pragma endregion
 
-			//Writing FITS files
-
-			/// <summary>Write a FITS file to disk with the primary header and primary image from the FITSImage object.</summary>
-			/// <param name="FullFileName">File name.</param>
-			/// <param name="Precision">Byte precision at which to write the primary image data.</param>
-			void WriteFile(String^ FullFileName, TypeCode Precision, bool do_parallel);
-			
-			/// <summary>Write a FITS file to disk with the primary header and primary image from the FITSImage object with its existing file name.</summary>
-			/// <param name="Precision">Byte precision at which to write the primary image data.</param>
-			void WriteFile(TypeCode Precision, bool do_parallel);
-
-			void WriteFileFromDiskBuffer(bool DeleteOrigDiskBuffer);
-
-			//Class Static File I/O
-
-			/// <summary>Convert a (possibly poorly formatted) whitespace-delimited text file to a double array.
-			/// <para>If the text file is large (>2MB) the program may seem to hang...just let it run until control is returned.</para></summary>
-			/// <param name="FullFileName">File name.</param>
-			static array<double, 2>^ ConvertTxtToDblArray(String^ FullFileName, bool IsPoorlyFormatted);
-
-			/// <summary>Return the primary image of the FITS file as a double 2-D array.</summary>
-			/// <param name="file">The full file name to read from disk.</param>
-			/// <param name="Range">Range is ZERO based 1-D int array [xmin xmax ymin ymax]. Pass nullptr or Range[0] = -1 to default to full image size.</param>
-			static array<double, 2>^ ReadImageArrayOnly(String^ file, array<int, 1>^ Range, bool do_parallel);
-
-			/// <summary>Return the primary image of the FITS file as a double 1-D array.</summary>
-			/// <param name="file">The full file name to read from disk.</param>
-			/// <param name="Range">Range is ZERO based 1-D int array [xmin xmax ymin ymax]. One of the axes ranges must be length equal to 1.
-			/// <para> Pass nullptr or Range[0] = -1 to default to full image size, assuming the image data is a vector.</para></param>
-			static array<double>^ ReadImageVectorOnly(String^ file, array<int, 1>^ Range, bool do_parallel);
-
-			///// <summary>Return the primary image of the FITS file as a double 1-D array.</summary>
-			//static void ConvertToImage(String^ Source_FullFileName, String^ Destination_FullFileName, String^ file_type, String^ contrast_scaling, bool invert_colormap, bool do_parallel);
-
-			//Image Operations
-			
+		#pragma region IMAGEOPS
 			/// <summary>StatsUpD updates the statistics for the primary image: maximum, minimum, mean, median, and standard deviation.</summary>
-			void StatsUpD(bool do_parallel);
+		void StatsUpD(bool do_parallel);
 
-			/// <summary>Use SetImage to replace the existing double array for the FITSImage object with a new double array.</summary>
-			/// <param name="ImageData">The 2-D double array to set for the FITSImage object.</param>
-			/// <param name="Do_Stats">Optionally update the stats for the new array.</param>
-			void SetImage(array<double,2>^ ImageData, bool Do_Stats, bool do_parallel);
+		/// <summary>Use SetImage to replace the existing double array for the FITSImage object with a new double array.</summary>
+		/// <param name="ImageData">The 2-D double array to set for the FITSImage object.</param>
+		/// <param name="Do_Stats">Optionally update the stats for the new array.</param>
+		void SetImage(array<double, 2>^ ImageData, bool Do_Stats, bool do_parallel);
 
-			/// <summary>Returns a double array of a subset of coordinates from the primary image.</summary>
-			/// <param name="X_Center">The zero-based center-position of the primary x-axis of the subimage.</param>
-			/// <param name="Y_Center">The zero-based center-position of the primary y-axis of the subimage.</param>
-			/// <param name="X_HalfWidth">The +- half-width of the x-axis of the subimage.</param>
-			/// <param name="Y_HalfWidth">The +- half-width of the y-axis of the subimage.</param>
-			array<double,2>^ GetSubImage(int X_Center, int Y_Center, int X_HalfWidth, int Y_HalfWidth);
+		/// <summary>Returns a double array of a subset of coordinates from the primary image.</summary>
+		/// <param name="X_Center">The zero-based center-position of the primary x-axis of the subimage.</param>
+		/// <param name="Y_Center">The zero-based center-position of the primary y-axis of the subimage.</param>
+		/// <param name="X_HalfWidth">The +- half-width of the x-axis of the subimage.</param>
+		/// <param name="Y_HalfWidth">The +- half-width of the y-axis of the subimage.</param>
+		array<double, 2>^ GetSubImage(int X_Center, int Y_Center, int X_HalfWidth, int Y_HalfWidth);
 
-			/// <summary>Returns a double array of a subset of coordinates from the primary image.</summary>
-			/// <param name="X_Center">The zero-based center-position of the primary x-axis of the subimage.</param>
-			/// <param name="Y_Center">The zero-based center-position of the primary y-axis of the subimage.</param>
-			/// <param name="X_HalfWidth">The +- half-width of the x-axis of the subimage.</param>
-			/// <param name="Y_HalfWidth">The +- half-width of the y-axis of the subimage.</param>
-			/// <param name="xdata">The x-indices of the subimage.</param>
-			/// <param name="ydata">The y-indices of the subimage.</param>
-			array<double, 2>^ GetSubImage(int X_Center, int Y_Center, int X_HalfWidth, int Y_HalfWidth, array<int>^ &xdata, array<int>^& ydata);
+		/// <summary>Returns a double array of a subset of coordinates from the primary image.</summary>
+		/// <param name="X_Center">The zero-based center-position of the primary x-axis of the subimage.</param>
+		/// <param name="Y_Center">The zero-based center-position of the primary y-axis of the subimage.</param>
+		/// <param name="X_HalfWidth">The +- half-width of the x-axis of the subimage.</param>
+		/// <param name="Y_HalfWidth">The +- half-width of the y-axis of the subimage.</param>
+		/// <param name="xdata">The x-indices of the subimage.</param>
+		/// <param name="ydata">The y-indices of the subimage.</param>
+		array<double, 2>^ GetSubImage(int X_Center, int Y_Center, int X_HalfWidth, int Y_HalfWidth, array<int>^ &xdata, array<int>^& ydata);
 
-			/// <summary>Returns a double array of a subset of coordinates from the primary image.</summary>
-			/// <param name="Range">The zero-based start and end coordinates of the subimage in the primary image. Range is: [xmin xmax ymin ymax].</param>
-			array<double,2>^ GetSubImage(array<int, 1>^ Range);
+		/// <summary>Returns a double array of a subset of coordinates from the primary image.</summary>
+		/// <param name="Range">The zero-based start and end coordinates of the subimage in the primary image. Range is: [xmin xmax ymin ymax].</param>
+		array<double, 2>^ GetSubImage(array<int, 1>^ Range);
 
-			/// <summary>RotateCW rotates the primary image by 90 degrees.</summary>
-			/// <param name="CW">True to rotate clockwise, false to rotate counter-clock-wise.</param>
-			void RotateCW(bool CW);
+		/// <summary>RotateCW rotates the primary image by 90 degrees.</summary>
+		/// <param name="CW">True to rotate clockwise, false to rotate counter-clock-wise.</param>
+		void RotateCW(bool CW);
 
-			/// <summary>FlipVertical flips the image across the horizontal axis, i.e. up to down.</summary>
-			void FlipVertical();
+		/// <summary>FlipVertical flips the image across the horizontal axis, i.e. up to down.</summary>
+		void FlipVertical();
 
-			/// <summary>FlipVertical flips the image across the vertical axis, i.e. left to right.</summary>
-			void FlipHorizontal();
+		/// <summary>FlipVertical flips the image across the vertical axis, i.e. left to right.</summary>
+		void FlipHorizontal();
+		#pragma endregion
 
-
-			//Header Operations
-
+		#pragma region HEADEROPS
 			/// <summary>GetKeyValue returns the value of the primary header key named Key. Returns empty String if the key is not found.</summary>
-			/// <param name="Key">The header key to find the value of.</param>
-			String^ GetKeyValue(String^ Key);
+		/// <param name="Key">The header key to find the value of.</param>
+		String^ GetKeyValue(String^ Key);
 
-			/// <summary>GetKeyComment returns the comment of the primary header key named Key. Returns empty String if the key is not found.</summary>
-			/// <param name="Key">The header key to find the comment of.</param>
-			String^ GetKeyComment(String^ Key);
+		/// <summary>GetKeyComment returns the comment of the primary header key named Key. Returns empty String if the key is not found.</summary>
+		/// <param name="Key">The header key to find the comment of.</param>
+		String^ GetKeyComment(String^ Key);
 
-			/// <summary>GetKeyName returns the key of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
-			/// <param name="index">The zero-based line number to get the key name from.</param>
-			String^ GetKeyName(int index);
+		/// <summary>GetKeyName returns the key of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
+		/// <param name="index">The zero-based line number to get the key name from.</param>
+		String^ GetKeyName(int index);
 
-			/// <summary>GetKeyValue returns the value of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
-			/// <param name="index">The zero-based line number to get the key value from.</param>
-			String^ GetKeyValue(int index);
+		/// <summary>GetKeyValue returns the value of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
+		/// <param name="index">The zero-based line number to get the key value from.</param>
+		String^ GetKeyValue(int index);
 
-			/// <summary>GetKeyComment returns the comment of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
-			/// <param name="index">The zero-based line number to get the key comment from.</param>
-			String^ GetKeyComment(int index);
+		/// <summary>GetKeyComment returns the comment of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
+		/// <param name="index">The zero-based line number to get the key comment from.</param>
+		String^ GetKeyComment(int index);
 
-			/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key named Key. Returns -1 if the key is not found.</summary>
-			/// <param name="Key">The header key to find the index of.</param>
-			int	GetKeyIndex(String^ Key);
+		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key named Key. Returns -1 if the key is not found.</summary>
+		/// <param name="Key">The header key to find the index of.</param>
+		int	GetKeyIndex(String^ Key);
 
-			/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key with matching value. Returns -1 if the key and value combination is not found.</summary>
-			/// <param name="Key">The header key to find the index of.</param>
-			/// <param name="Value">The header key value to find the index of.</param>
-			int	GetKeyIndex(String^ Key, String^ Value);
+		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key with matching value. Returns -1 if the key and value combination is not found.</summary>
+		/// <param name="Key">The header key to find the index of.</param>
+		/// <param name="Value">The header key value to find the index of.</param>
+		int	GetKeyIndex(String^ Key, String^ Value);
 
-			/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key with matching value and comment. Returns -1 if the key, value and comment combination is not found.</summary>
-			/// <param name="Key">The header key to find the index of.</param>
-			/// <param name="Value">The header key value to find the index of.</param>
-			/// <param name="Comment">The header key comment to find the index of.</param>
-			int	GetKeyIndex(String^ Key, String^ Value, String^ Comment);
+		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key with matching value and comment. Returns -1 if the key, value and comment combination is not found.</summary>
+		/// <param name="Key">The header key to find the index of.</param>
+		/// <param name="Value">The header key value to find the index of.</param>
+		/// <param name="Comment">The header key comment to find the index of.</param>
+		int	GetKeyIndex(String^ Key, String^ Value, String^ Comment);
 
-			/// <summary>SetKey sets the value of the key. If the key already exists then the value will be replaced but the comment will remain the same.</summary>
-			/// <param name="Key">The header key to access.</param>
-			/// <param name="Value">The header key value to set.</param>
-			/// <param name="AddIfNotFound">Optionally add the key to the header if it isn't found.</param>
-			/// <param name="AddAtIndex">If the key wasn't found, add at this zero-based index.  Use -1 to append to the end of the header (before END key).</param>
-			void SetKey(String^ Key, String^ Value, bool AddIfNotFound, int AddAtIndex);
+		/// <summary>SetKey sets the value of the key. If the key already exists then the value will be replaced but the comment will remain the same.</summary>
+		/// <param name="Key">The header key to access.</param>
+		/// <param name="Value">The header key value to set.</param>
+		/// <param name="AddIfNotFound">Optionally add the key to the header if it isn't found.</param>
+		/// <param name="AddAtIndex">If the key wasn't found, add at this zero-based index.  Use -1 to append to the end of the header (before END key).</param>
+		void SetKey(String^ Key, String^ Value, bool AddIfNotFound, int AddAtIndex);
 
-			/// <summary>SetKey sets the value and comment of the key.</summary>
-			/// <param name="Key">The header key to access.</param>
-			/// <param name="Value">The header key value to set.</param>
-			/// <param name="Comment">The header key comment to set.</param>
-			/// <param name="AddIfNotFound">Optionally add the key to the header if it isn't found.</param>
-			/// <param name="AddAtIndex">If the key wasn't found, add at this zero-based index.  Use -1 to append to the end of the header (before END key).</param>
-			void SetKey(String^ Key, String^ Value, String^ Comment, bool AddIfNotFound, int AddAtIndex);
+		/// <summary>SetKey sets the value and comment of the key.</summary>
+		/// <param name="Key">The header key to access.</param>
+		/// <param name="Value">The header key value to set.</param>
+		/// <param name="Comment">The header key comment to set.</param>
+		/// <param name="AddIfNotFound">Optionally add the key to the header if it isn't found.</param>
+		/// <param name="AddAtIndex">If the key wasn't found, add at this zero-based index.  Use -1 to append to the end of the header (before END key).</param>
+		void SetKey(String^ Key, String^ Value, String^ Comment, bool AddIfNotFound, int AddAtIndex);
 
-			/// <summary>SetKey sets the key, value and comment of the key at the given header index.</summary>
-			/// <param name="index">The 0-based index of the header key to access. If the index does not occur within the header, then nothing happens.</param>
-			/// <param name="Key">The header key to set.</param>
-			/// <param name="Value">The header key value to set.</param>
-			/// <param name="Comment">The header key comment to set.</param>
-			void SetKey(int index, String^ Key, String^ Value, String^ Comment);
+		/// <summary>SetKey sets the key, value and comment of the key at the given header index.</summary>
+		/// <param name="index">The 0-based index of the header key to access. If the index does not occur within the header, then nothing happens.</param>
+		/// <param name="Key">The header key to set.</param>
+		/// <param name="Value">The header key value to set.</param>
+		/// <param name="Comment">The header key comment to set.</param>
+		void SetKey(int index, String^ Key, String^ Value, String^ Comment);
 
-			/// <summary>AddKey adds a new key with value and comment to the primary header.</summary>
-			/// <param name="NewKey">The header key to add.</param>
-			/// <param name="NewValue">The header key value to add.</param>
-			/// <param name="NewComment">The header key comment to add.</param>
-			/// <param name="KeyIndex">Add at this zero-based index.  Use -1 to append to the end of the header (before END key).</param>
-			void AddKey(String^ NewKey, String^ NewValue, String^ NewComment, int KeyIndex);
+		/// <summary>AddKey adds a new key with value and comment to the primary header.</summary>
+		/// <param name="NewKey">The header key to add.</param>
+		/// <param name="NewValue">The header key value to add.</param>
+		/// <param name="NewComment">The header key comment to add.</param>
+		/// <param name="KeyIndex">Add at this zero-based index.  Use -1 to append to the end of the header (before END key).</param>
+		void AddKey(String^ NewKey, String^ NewValue, String^ NewComment, int KeyIndex);
 
-			/// <summary>RemoveKey removes the key at the given index from the primary header.</summary>
-			/// <param name="KeyIndex">The zero-based index of the key to remove.  If the index is outside of the range of the header nothing happens.</param>
-			void RemoveKey(int KeyIndex);
+		/// <summary>RemoveKey removes the key at the given index from the primary header.</summary>
+		/// <param name="KeyIndex">The zero-based index of the key to remove.  If the index is outside of the range of the header nothing happens.</param>
+		void RemoveKey(int KeyIndex);
 
-			/// <summary>RemoveKey removes the given key from the primary header.  If there is more than one key with the given name, only the first occurence will be removed.</summary>
-			/// <param name="Key">The name of the header key to remove.</param>
-			void RemoveKey(String^ Key);
+		/// <summary>RemoveKey removes the given key from the primary header.  If there is more than one key with the given name, only the first occurence will be removed.</summary>
+		/// <param name="Key">The name of the header key to remove.</param>
+		void RemoveKey(String^ Key);
 
-			/// <summary>RemoveKey removes the given key with matching value from the primary header.  If there is more than one key with the given name and value, only the first occurence will be removed.</summary>
-			/// <param name="Key">The name of the header key to remove.</param>
-			/// <param name="Key">The corresponding header key value to remove.</param>
-			void RemoveKey(String^ Key, String^ Value);
+		/// <summary>RemoveKey removes the given key with matching value from the primary header.  If there is more than one key with the given name and value, only the first occurence will be removed.</summary>
+		/// <param name="Key">The name of the header key to remove.</param>
+		/// <param name="Key">The corresponding header key value to remove.</param>
+		void RemoveKey(String^ Key, String^ Value);
 
-			/// <summary>RemoveAllKeys clears all keys from the primary header.  Essential keywords will remain.</summary>
-			void RemoveAllKeys();
+		/// <summary>RemoveAllKeys clears all keys from the primary header.  Essential keywords will remain.</summary>
+		void RemoveAllKeys();
 
-			/// <summary>ValidKeyEdit returns whether the given key is an essential key and shouldn't be user-modified.</summary>
-			static bool	ValidKeyEdit(String^ EditingKey);
+		/// <summary>ValidKeyEdit returns whether the given key is an essential key and shouldn't be user-modified.</summary>
+		static bool	ValidKeyEdit(String^ EditingKey);
 
-			/// <summary>CopyHeader copies the header from the given source FITSImage to the current FITSImage object.</summary>
-			void CopyHeader(JPFITS::FITSImage^ source);
+		/// <summary>CopyHeader copies the header from the given source FITSImage to the current FITSImage object.</summary>
+		void CopyHeader(JPFITS::FITSImage^ source);
+		#pragma endregion
 
-			/// <summary>HeaderLines accesses a string array of all lines of the primary header.
-			/// <para>Individual String^ lines can be accessed by indexing HeaderLines[i].</para></summary>
-			property array<String^>^ HeaderLines
-			{
-				array<String^>^ get() { return HEADERLINES; }
-				void set(array<String^>^ hlines) { HEADERKEYS = hlines; }
-			}
+		#pragma region OPERATORS
+		static array<double, 2>^ operator +(FITSImage^ lhs_img, FITSImage^ rhs_img);
+		static array<double, 2>^ operator +(FITSImage^ lhs_img, double scalar);
+		static array<double, 2>^ operator -(FITSImage^ lhs_img, FITSImage^ rhs_img);
+		static array<double, 2>^ operator -(FITSImage^ lhs_img, double scalar);
+		static array<double, 2>^ operator /(FITSImage^ lhs_img, FITSImage^ rhs_img);
+		static array<double, 2>^ operator /(FITSImage^ lhs_img, double scalar);
+		static array<double, 2>^ operator *(FITSImage^ lhs_img, FITSImage^ rhs_img);
+		static array<double, 2>^ operator *(FITSImage^ lhs_img, double scalar);
+		static array<double, 2>^ operator ^(FITSImage^ lhs_img, FITSImage^ rhs_img);
+		static array<double, 2>^ operator ^(FITSImage^ lhs_img, double scalar);
+		#pragma endregion
 
-			/// <summary>HeaderKeys accesses a string array of all keys of the primary header.
-			/// <para>Individual String^ keys can be accessed by indexing HeaderKeys[i].</para></summary>
-			property array<String^>^ HeaderKeys
-			{
-				array<String^>^ get() { return HEADERKEYS; }
-				void set(array<String^>^ hkeys) { HEADERKEYS = hkeys; }
-			}
+		#pragma region PROPERTIES
 
-			/// <summary>HeaderKeyValues accesses a string array of all key values of the primary header.
-			/// <para>Individual String^ values can be accessed by indexing HeaderKeyValues[i].</para></summary>
-			property array<String^>^ HeaderKeyValues
-			{
-				array<String^>^ get() { return HEADERKEYVALS; }
-				void set(array<String^>^ hkeyvals) { HEADERKEYVALS = hkeyvals; }
-			}
+		/// <summary>Default indexer accesses the image element of the primary image of the FITSImage object.</summary>
+		property double default[int]
+		{
+			double get(int x) { return DIMAGE[0, x]; }
+			void set(int x, double val) { DIMAGE[0, x] = val; }
+		}
 
-			/// <summary>HeaderKeyComments accesses a string array of all key comments of the primary header.
-			/// <para>Individual String^ comments can be accessed by indexing HeaderKeyComments[i].</para></summary>
-			property array<String^>^ HeaderKeyComments
-			{
-				array<String^>^ get() { return HEADERKEYCOMS; }
-				void set(array<String^>^ hkeycoms) { HEADERKEYCOMS = hkeycoms; }
-			}
-
-			/// <summary>Header returns a fully formated header card(s).</summary>
-			property array<String^>^ Header
-			{
-				array<String^>^ get() { FORMATHEADER(); return HEADER; }
-			}
-
-
-			/*********************************Operators***********************************************/
-
-			//Class Static Primary Image Math Operators
-			static array<double,2>^ operator +(FITSImage^ lhs_img, FITSImage^ rhs_img);
-			static array<double,2>^ operator +(FITSImage^ lhs_img, double scalar);
-			static array<double,2>^ operator -(FITSImage^ lhs_img, FITSImage^ rhs_img);
-			static array<double,2>^ operator -(FITSImage^ lhs_img, double scalar);
-			static array<double,2>^ operator /(FITSImage^ lhs_img, FITSImage^ rhs_img);
-			static array<double,2>^ operator /(FITSImage^ lhs_img, double scalar);
-			static array<double,2>^ operator *(FITSImage^ lhs_img, FITSImage^ rhs_img);
-			static array<double,2>^ operator *(FITSImage^ lhs_img, double scalar);
-			static array<double,2>^ operator ^(FITSImage^ lhs_img, FITSImage^ rhs_img);
-			static array<double,2>^ operator ^(FITSImage^ lhs_img, double scalar);
-
-			
-			/*********************************Properties***********************************************/
-
-			/// <summary>Default indexer accesses the image element of the primary image of the FITSImage object.</summary>
-			property double default[int]
-			{
-				double get(int x) { return DIMAGE[0, x]; }
-				void set(int x, double val) { DIMAGE[0, x] = val; }
-			}
-
-			/// <summary>Default indexer accesses the image element of the primary image of the FITSImage object.</summary>
+		/// <summary>Default indexer accesses the image element of the primary image of the FITSImage object.</summary>
 			property double default[int, int]
-			{
-				double get(int x, int y) { return DIMAGE[x, y]; }
-				void set(int x, int y, double val) { DIMAGE[x, y] = val; }
-			}
+		{
+			double get(int x, int y) { return DIMAGE[x, y]; }
+			void set(int x, int y, double val) { DIMAGE[x, y] = val; }
+		}
 
-			/// <summary>Min returns the minimum of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
+		/// <summary>Min returns the minimum of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
 			property double Min
+		{
+			double get() { return MIN; }
+		}
+
+		/// <summary>Max returns the maximum of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
+		property double Max
+		{
+			double get() { return MAX; }
+		}
+
+		/// <summary>Median returns the median of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
+		property double Median
+		{
+			double get() { return MEDIAN; }
+		}
+
+		/// <summary>Mean returns the average of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
+		property double Mean
+		{
+			double get() { return MEAN; }
+		}
+
+		/// <summary>Std returns the standard deviation of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
+		property double Std
+		{
+			double get() { return STD; }
+		}
+
+		/// <summary>Sum returns the sum of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
+		property double Sum
+		{
+			double get() { return SUM; }
+		}
+
+		/// <summary>Width returns the width of the FITS image data array.  Returns zero if there is no array loaded.</summary>
+		property int Width
+		{
+			int get() { return NAXIS1; }
+		}
+
+		/// <summary>Height returns the height of the FITS image data array.  Returns zero if there is no array loaded.</summary>
+		property int Height
+		{
+			int get() { return NAXIS2; }
+		}
+
+		/// <summary>Length returns the total number of elements of the FITS image data array.  Returns zero if there is no array loaded.</summary>
+		property int Length
+		{
+			int get() { return NAXIS2 * NAXIS1; }
+		}
+
+		/// <summary>FileName accesses just the file name of the FITS object.</summary>
+		property String^ FileName
+		{
+			String^ get() { return FILENAME; }
+			void set(String^ newFileName)
 			{
-				double get() {return MIN;}
+				FILENAME = newFileName;
+				FULLFILENAME = FILEPATH + FILENAME;
 			}
+		}
 
-			/// <summary>Max returns the maximum of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
-			property double Max
+		/// <summary>FilePath accesses just the file path of the FITS object.</summary>
+		property String^ FilePath
+		{
+			String^ get() { return FILEPATH; }
+			void set(String^ newFilePath)
 			{
-				double get() {return MAX;}
+				FILEPATH = newFilePath + "\\";
+				FULLFILENAME = FILEPATH + FILENAME;
 			}
+		}
 
-			/// <summary>Median returns the median of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
-			property double Median
+		/// <summary>FullFileName accesses the full file path + name of the FITS object.</summary>
+		property String^ FullFileName
+		{
+			String^ get() { return FULLFILENAME; }
+			void set(String^ newFullFileName)
 			{
-				double get() {return MEDIAN;}
+				FULLFILENAME = newFullFileName;
+				int index = FULLFILENAME->LastIndexOf("\\");
+				FILENAME = FULLFILENAME->Substring(index + 1);
+				FILEPATH = FULLFILENAME->Substring(0, index + 1);
 			}
+		}
 
-			/// <summary>Mean returns the average of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
-			property double Mean
-			{
-				double get() {return MEAN;}
-			}
+		/// <summary>Image accesses the 2-D double array of the primary FITS object image.
+		/// <para>Individual elements of the array can be accessed by indexing -&gt;Image[x,y].</para>
+		/// <para>Property setter automatically performs image stats when Image is set.  Use -&gt;SetImage instead for option to not perform stats.</para></summary>
+		property array<double, 2>^ Image
+		{
+			array<double, 2>^ get() { return DIMAGE; }
+			void set(array<double, 2>^ img) { SetImage(img, true, true); }
+		}
 
-			/// <summary>Std returns the standard deviation of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
-			property double Std
-			{
-				double get() {return STD;}
-			}
+		/// <summary>HeaderKeys accesses a string array of all keys of the primary header.
+		/// <para>Individual String^ keys may be accessed by indexing HeaderKeys[i].</para></summary>
+		property array<String^>^ HeaderKeys
+		{
+			array<String^>^ get() { return HEADERKEYS; }
+			//void set(array<String^>^ hkeys) { HEADERKEYS = hkeys; }
+		}
 
-			/// <summary>Sum returns the sum of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
-			property double Sum
-			{
-				double get() {return SUM;}
-			}
+		/// <summary>HeaderKeyValues accesses a string array of all key values of the primary header.
+		/// <para>Individual String^ values may be accessed by indexing HeaderKeyValues[i].</para></summary>
+		property array<String^>^ HeaderKeyValues
+		{
+			array<String^>^ get() { return HEADERKEYVALS; }
+			//void set(array<String^>^ hkeyvals) { HEADERKEYVALS = hkeyvals; }
+		}
 
-			/// <summary>Width returns the width of the FITS image data array.  Returns zero if there is no array loaded.</summary>
-			property int Width
-			{
-				int get() {return NAXIS1;}
-			}
+		/// <summary>HeaderKeyComments accesses a string array of all key comments of the primary header.
+		/// <para>Individual String^ comments may be accessed by indexing HeaderKeyComments[i].</para></summary>
+		property array<String^>^ HeaderKeyComments
+		{
+			array<String^>^ get() { return HEADERKEYCOMS; }
+			//void set(array<String^>^ hkeycoms) { HEADERKEYCOMS = hkeycoms; }
+		}
 
-			/// <summary>Height returns the height of the FITS image data array.  Returns zero if there is no array loaded.</summary>
-			property int Height
-			{
-				int get() {return NAXIS2;}
-			}
+		/// <summary>Header returns a fully formated header card(s).</summary>
+		property array<String^>^ Header
+		{
+			array<String^>^ get() { return FITSFILEOPS::GETFORMATTEDIMAGEHEADER(HEADERKEYS, HEADERKEYVALS, HEADERKEYCOMS, ISEXTENSION); }
+		}
+		#pragma endregion
 
-			/// <summary>FileName accesses just the file name of the FITS object.</summary>
-			property String^ FileName
-			{
-				String^ get() {return FILENAME;}
-				void set(String^ newFileName)
-				{
-					FILENAME = newFileName;
-					FULLFILENAME = FILEPATH + FILENAME;
-				}
-			}
+		#pragma region PRIVATEMEMBERS
+		private:
+		//Image Conditions
+		bool HEADER_POP;
+		bool DATA_POP;
+		bool STATS_POP;
+		bool FROMDISKBUFFER;
+		bool ISEXTENSION;
+		String^ EXTNAME;
+		bool EXTNAMEOVERWRITE;
 
-			/// <summary>FilePath accesses just the file path of the FITS object.</summary>
-			property String^ FilePath
-			{
-				String^ get() {return FILEPATH;}
-				void set(String^ newFilePath)
-				{
-					FILEPATH = newFilePath + "\\";
-					FULLFILENAME = FILEPATH + FILENAME;
-				}
-			}
+		//Image
+		array<double, 2>^ DIMAGE;//double precision image
 
-			/// <summary>FullFileName accesses the full file path + name of the FITS object.</summary>
-			property String^ FullFileName
-			{
-				String^ get() {return FULLFILENAME;}
-				void set(String^ newFullFileName)
-				{
-					FULLFILENAME = newFullFileName;
-					int index = FULLFILENAME->LastIndexOf("\\");
-					FILENAME = FULLFILENAME->Substring(index+1);
-					FILEPATH = FULLFILENAME->Substring(0,index+1);
-				}
-			}
+		//Image Stats
+		double MIN, MAX, MEAN, MEDIAN, STD, SUM;
 
-			/// <summary>Image accesses the 2-D double array of the primary FITS object image.
-			/// <para>Individual elements of the array can be accessed by indexing -&gt;Image[x,y].</para>
-			/// <para>Property setter automatically performs image stats when Image is set.  Use -&gt;SetImage instead for option to not perform stats.</para></summary>
-			property array<double,2>^ Image
-			{
-				array<double,2>^ get() {return DIMAGE;}
-				void set(array<double, 2>^ img) { SetImage(img, true, true); }
-			}
+		//Fits Info
+		int NAXIS1 = -1, NAXIS2 = -1, BITPIX = -1, NAXIS = -1;
+		__int64 BZERO = -1, BSCALE = -1;
+		void SETBITPIX(TypeCode Precision);
 
+		//File Info
+		String^ FILENAME;
+		String^ FILEPATH;
+		String^ FULLFILENAME;
+		String^ DISKBUFFERFULLNAME;
 
-			/*********************************Members***********************************************/
+		//File IO
+		void READIMAGE(FileStream^ fs, array<int, 1>^ Range, bool do_parallel);
+		void EATRAWIMAGEHEADER(ArrayList^ header, bool populate_nonessential);
+		void WRITEIMAGE(TypeCode prec, bool do_parallel);
 
-			void FORMATHEADER();//for writing
-			array<String^>^ HEADER;//for writing
+		//Header
+		array<String^>^ HEADERKEYS;//for interaction
+		array<String^>^ HEADERKEYVALS;//for interaction
+		array<String^>^ HEADERKEYCOMS;//for interaction
+		void MAKEDEFHEADER();//make a default header
+		static bool VALIDKEYEDIT(String^ checkkey);
+		#pragma endregion
 
-			private:
-			//Image Conditions
-			bool HEADER_POP;
-			bool DATA_POP;
-			bool STATS_POP;
-			bool FROMDISKBUFFER;
-
-			//Image
-			array<double,2>^ DIMAGE;//double precision image
-
-			//Image Stats
-			double MIN, MAX, MEAN, MEDIAN, STD, SUM;
-
-			//Fits Info
-			int NAXIS1, NAXIS2, BITPIX, NAXIS;
-			__int64 BZERO = 0, BSCALE = 1;
-
-			//File Info
-			String^ FILENAME;
-			String^ FILEPATH;
-			String^ FULLFILENAME;
-			String^ DISKBUFFERFULLNAME;
-
-			//File IO
-			void READDATA(FileStream^ fs, array<int,1>^ Range, bool do_parallel);
-			void READHEADER(FileStream^ fs, bool pop);//read and fromat new header keys/vals/comms and advance basestream to end of header card block
-			void WRITEFILE(TypeCode prec, bool do_parallel);
-
-			//Header
-			array<String^>^ HEADERLINES;//for interaction
-			array<String^>^ HEADERKEYS;//for interaction
-			array<String^>^ HEADERKEYVALS;//for interaction
-			array<String^>^ HEADERKEYCOMS;//for interaction
-			void MAKEDEFHEADER();//make a default header
-
-			//for writing
-			//array<String^>^ BINARYTABLEEXTENSIONHEADER;//for writing
-			static bool VALIDKEYEDIT(String^ checkkey);
-
-			//Maths/misc
-			void SETBITPIX(TypeCode Precision);
 	};
 
 	/// <summary>FITSImageSet class is an ArrayList object to hold, manage, and perform operations on a set of FITSImage objects.</summary>
@@ -802,84 +761,42 @@ namespace JPFITS
 
 	};
 
-	/// <summary> FITSBinTable class to create, read, interact with, modify components of, and write FITS binary table data.</summary>
+	/// <summary> FITSBinTable class to create, read, interact with, modify components of, and write FITS BINTABLE binary table data extensions.</summary>
 	public ref class FITSBinTable
 	{
 		public:
 
-		/// <summary>Return a binary table header as a String array for each line of the header.</summary>
-		/// <param name="FileName">The full file name to read from disk.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If it has no name then just pass an empty string, and the first binary table will be read.</param>
-		static array<String^>^ GetExtensionHeader(String^ FileName, String^ ExtensionName);
+		FITSBinTable(String^ fileName, String^ extensionName);
 
 		/// <summary>Return a binary table entry as a double 1-D array.</summary>
+		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		/// <param name="width">If the entry has multiple instances, then the user may like to know the number of instances (columns) of the entry for reformatting the vector return.</param>
+		/// <param name="height">If the entry has multiple instances, then the user may like to know the number of rows in the entry for reformatting the vector return.</param>
+		array<double>^ GetTTYPEEntry(String^ ttypeEntryLabel, int& width, int& height);
+
+		/// <summary>Return a binary table entry as a double 1-D array, assuming it is a single colunmn entry. If the entry has more than one column, use the overload function.</summary>
+		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		array<double>^ GetTTYPEEntry(String^ ttypeEntryLabel);
+
+		/// <summary>Return multiple single-instance column binary table entries as a column-wise double 2-D array.</summary>
+		/// <param name="ttypeEntryLabels">The names of the binary table extension entries, i.e. the TTYPE values.</param>
+		array<double, 2>^ GetTTYPEEntries(array<String^>^ ttypeEntryLabels);
+
+		/// <summary>Read a binary table entry TTYPE of type BYTE into a byte array. If the requested entry is not of type BYTE an error will be thrown; use another fucntion instead for numeric value types.
+		/// <para>This method is useful for reading raw byte data which may have meaning other than numeric or is formatted as numeric but in a unique way. A byte array can still be read as numeric with another function if needed.</para></summary>
+		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value in the table to read.</param>
+		array<unsigned char, 2>^ GetTTYPEEntryByteArray(String^ ttypeEntryLabel);
+
+		/// <summary>Returns an array of all binary table extension names in a FITS file. If there are no binary table extensions, returns an empty array.</summary>
 		/// <param name="FileName">The full file name to read from disk.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If it has no name then just pass an empty string, and the first binary table will be read.</param>
-		/// <param name="ExtensionEntryLabel">The name of the binary table extension entry, i.e. the TTYPEn value.</param>
-		static array<double>^ GetExtensionEntry(String^ FileName, String^ ExtensionName, String^ ExtensionEntryLabel);
-
-		/// <summary>Return a binary table entry as a double 1-D array.</summary>
-		/// <param name="FileName">The full file name to read from disk.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If it has no name then just pass an empty string, and the first binary table will be read.</param>
-		/// <param name="ExtensionEntryLabel">The name of the binary table extension entry, i.e. the TTYPEn value.</param>
-		/// <param name="Width">If the entry has multiple instances, then the user may like to know the number of instances (columns) of the entry for reformatting the vector return.</param>
-		/// <param name="Height">If the entry has multiple instances, then the user may like to know the number of rows in the entry for reformatting the vector return.</param>
-		static array<double>^ GetExtensionEntry(String^ FileName, String^ ExtensionName, String^ ExtensionEntryLabel, int& Width, int& Height);
-
-		/// <summary>Return multiple single-instance binary table entries as a column-wise double 2-D array.</summary>
-		/// <param name="FileName">The full file name to read from disk.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If it has no name then just pass an empty string, and the first binary table will be read.</param>
-		/// <param name="ExtensionEntryLabels">The names of the binary table extension entries, i.e. the TTYPEn values.</param>
-		static array<double, 2>^ GetExtensionEntries(String^ FileName, String^ ExtensionName, array<String^>^ ExtensionEntryLabels);
-
-		/// <summary>Read a binary table entry of type BYTE into a byte array. If the requested entry is not of type BYTE an error will be thrown; use an overload instead for numeric value types.
-		/// <para>This method is useful for reading raw byte data which may have meaning other than numeric or is formatted as numeric but in a unique way. A byte array can still be read as numeric with an overload if needed.</para></summary>
-		/// <param name="FileName">The full file name to read from disk.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If it has no name then just pass an empty string, and the first binary table will be read.</param>
-		/// <param name="ExtensionEntryLabel">The name of the binary table extension entry, i.e. the TTYPEn value.</param>
-		static array<unsigned char, 2>^ GetExtensionEntryAsByteArray(String^ FileName, String^ ExtensionName, String^ ExtensionEntryLabel);
-
-		/// <summary>Read the entire binary table (excluding header) into a byte array.</summary>
-		/// <param name="FileName">The full file name to read from disk.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If it has no name then just pass an empty string, and the first binary table will be read.</param>
-		/// <param name="Width">A pass by reference variable to get the width (in bytes) of the binary table.</param>
-		/// <param name="Height">A pass by reference variable to get the height (number of rows) of the binary table.</param>
-		static array<unsigned char>^ GetExtensionAsByteArray(String^ FileName, String^ ExtensionName, int& Width, int & Height);
-
-		/// <summary>Returns the number of entries in the specified binary table, i.e. the TFIELDS value.</summary>
-		/// <param name="FileName">The full-path file name.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If the extension has no name then pass empty string. If the extension isn't found, an exception is thrown.</param>
-		static int GetExtensionNumberOfEntries(String^ FileName, String^ ExtensionName);
-
-		/// <summary>Returns an array of the TypeCode data types of all entries in the specified binary table, i.e. the TFORMn values.</summary>
-		/// <param name="FileName">The full-path file name.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If the extension has no name then pass empty string. If the extension isn't found, an exception is thrown.</param>
-		static array<TypeCode>^ GetExtensionEntryDataTypes(String^ FileName, String^ ExtensionName);
-
-		/// <summary>Returns an array of the number of instances of each TypeCode entry data types of all entries in the specified binary table.</summary>
-		/// <param name="FileName">The full-path file name.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If the extension has no name then pass empty string. If the extension isn't found, an exception is thrown.</param>
-		static array<int>^ GetExtensionEntryDataInstances(String^ FileName, String^ ExtensionName);
-
-		/// <summary>Returns an array of the entry labels in the specified binary table, i.e. the TTYPEn values.</summary>
-		/// <param name="FileName">The full-path file name.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If the extension has no name then pass empty string. If the extension isn't found, an exception is thrown.</param>
-		static array<String^>^ GetExtensionEntryLabels(String^ FileName, String^ ExtensionName);
-
-		/// <summary>Returns an array of the entry units in the specified binary table, i.e. the TUNITn values.</summary>
-		/// <param name="FileName">The full-path file name.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If the extension has no name then pass empty string. If the extension isn't found, an exception is thrown.</param>
-		static array<String^>^ GetExtensionEntryUnits(String^ FileName, String^ ExtensionName);
-
-		/// <summary>Returns an array of all binary table extension names in the FITS file. If there are no binary table extensions, returns an empty array.</summary>
 		static array<String^>^ GetAllExtensionNames(String^ FileName);
 
 		/// <summary>Write a binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be overwritten.</summary>
 		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
 		/// <param name="ExtensionName">The name of the binary table extension. If the table is to have no name then it will be written as the first binary table extension.</param>
 		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
-		/// <param name="ExtensionEntryLabels">A String array of the binary table extension entries, i.e. the TTYPEn values.</param>
-		/// <param name="ExtensionEntryDataUnits">A String array of the physical units for the table entries, i.e. the TUNITn values.</param>
+		/// <param name="ExtensionEntryLabels">A String array of the binary table extension entries, i.e. the TTYPE values.</param>
+		/// <param name="ExtensionEntryDataUnits">A String array of the physical units for the table entries, i.e. the TUNIT values.</param>
 		/// <param name="ExtensionHeaderExtraKeys">A String array of additional header keys for the table. Pass nullptr if not required.</param>
 		/// <param name="ExtensionHeaderExtraKeyValues">A String array of additional header key values for the table. Pass nullptr if not required.</param>
 		/// <param name="ExtensionHeaderExtraKeyComments">A String array of additional header key comments for the table. Pass nullptr if not required.</param>
@@ -894,9 +811,9 @@ namespace JPFITS
 		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
 		/// <param name="ExtensionName">The name of the binary table extension. If the table is to have no name then it will be written as the first binary table extension.</param>
 		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
-		/// <param name="ExtensionEntryLabels">A String array of the binary table extension entries, i.e. the TTYPEn values.</param>
-		/// <param name="ExtensionEntryDataTypes">A TypeCode array of the data formats for the table entries, i.e. the TFORMn values.</param>
-		/// <param name="ExtensionEntryDataUnits">A String array of the physical units for the table entries, i.e. the TUNITn values.</param>
+		/// <param name="ExtensionEntryLabels">A String array of the binary table extension entries, i.e. the TTYPE values.</param>
+		/// <param name="ExtensionEntryDataTypes">A TypeCode array of the data formats for the table entries, i.e. the TFORM values.</param>
+		/// <param name="ExtensionEntryDataUnits">A String array of the physical units for the table entries, i.e. the TUNIT values.</param>
 		/// <param name="ExtensionHeaderExtraKeys">A String array of additional header keys for the table. Pass nullptr if not required.</param>
 		/// <param name="ExtensionHeaderExtraKeyValues">A String array of additional header key values for the table. Pass nullptr if not required.</param>
 		/// <param name="ExtensionHeaderExtraKeyComments">A String array of additional header key comments for the table. Pass nullptr if not required.</param>
@@ -907,9 +824,9 @@ namespace JPFITS
 		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
 		/// <param name="ExtensionName">The name of the binary table extension. If the table is to have no name then it will be written as the first binary table extension.</param>
 		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
-		/// <param name="ExtensionEntryLabel">A String array of the binary table extension entries, i.e. the TTYPEn values.</param>
-		/// <param name="ExtensionEntryDataType">A TypeCode array of the data formats for the table entries, i.e. the TFORMn values.</param>
-		/// <param name="ExtensionEntryDataUnit">A String array of the physical units for the table entries, i.e. the TUNITn values.</param>
+		/// <param name="ExtensionEntryLabel">A String array of the binary table extension entries, i.e. the TTYPE values.</param>
+		/// <param name="ExtensionEntryDataType">A TypeCode array of the data formats for the table entries, i.e. the TFORM values.</param>
+		/// <param name="ExtensionEntryDataUnit">A String array of the physical units for the table entries, i.e. the TUNIT values.</param>
 		/// <param name="ExtensionHeaderExtraKeys">A String array of additional header keys for the table. Pass nullptr if not required.</param>
 		/// <param name="ExtensionHeaderExtraKeyValues">A String array of additional header key values for the table. Pass nullptr if not required.</param>
 		/// <param name="ExtensionHeaderExtraKeyComments">A String array of additional header key comments for the table. Pass nullptr if not required.</param>
@@ -926,22 +843,95 @@ namespace JPFITS
 		/// <param name="ExtensionName">The name of the binary table extension.</param>
 		static bool ExtensionExists(String^ FileName, String^ ExtensionName);
 
-
 		private:
-		static array<String^>^ FORMATBINARYTABLEEXTENSIONHEADER(String^ ExtensionName, array<Object^>^ ExtensionEntryData, array<String^>^ ExtensionEntryLabels, array<TypeCode>^ ExtensionEntryDataTypes, array<int>^ ExtensionEntryDataTypeInstances, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments);
+		static array<String^>^ FORMATBINARYTABLEEXTENSIONHEADER(String^ ExtensionName, array<Object^>^ ExtensionEntryData, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments);
 		static int TFORMTONBYTES(String^ tform, int& instances);
 		static TypeCode TFORMTYPECODE(String^ tform);
 		static String^ TYPECODETFORM(TypeCode typecode);
 		static String^ TYPECODESTRING(TypeCode typecode);
 		static int TYPECODETONBYTES(TypeCode typecode);
-		static array<int>^ EXTENSIONENTRYDATANROWS(array<Object^>^ ExtensionEntryData, array<TypeCode>^ ExtensionEntryDataTypes, array<int>^ ExtensionEntryDataTypeInstances);
+
+
+																			//////////////CLASS PROPERTIES///////////////////
+		public:
+		/// <summary>NumberOfTableEntries reports the number of fields in the extension, i.e. the TFIELDS value.</summary>
+		property int NumberOfTableEntriesTFIELDS
+		{
+			int get() { return TFIELDS; }
+		}
+
+		/// <summary>TableDataTypes reports the .NET typecodes for each entry in the table.</summary>
+		property array<TypeCode>^ TableDataTypes
+		{
+			array<TypeCode>^ get() { return TCODES; }
+		}
+
+		/// <summary>TableDataTypes reports the number of columns in each table entry.</summary>
+		property array<int>^ TableDataInstances
+		{
+			array<int>^ get() { return TINSTANCES; }
+		}
+
+		/// <summary>TableDataLabels reports the name of each table entry, i.e. the TTYPE values.</summary>
+		property array<String^>^ TableDataLabelsTTYPE
+		{
+			array<String^>^ get() { return TTYPES; }
+		}
+
+		/// <summary>TableDataLabels reports the units of each table entry, i.e. the TUNITS values.</summary>
+		property array<String^>^ GetExtensionEntryUnits
+		{
+			array<String^>^ get() { return TUNITS; }
+		}
+
+		/// <summary>Return the binary table header as an array of Strings for each line of the header.</summary>
+		property array<String^>^ Header
+		{
+			array<String^>^ get() { return HEADER; }
+		}
+
+		/// <summary>Return the width, in bytes, of the table.</summary>
+		property int Naxis1
+		{
+			int get() { return NAXIS1; }
+		}
+
+		/// <summary>Return the height, number of rows, of the table.</summary>
+		property int Naxis2
+		{
+			int get() { return NAXIS2; }
+		}
+
+		/// <summary>Return the BINTABLE data block, excluding header, as a (unsigned) byte array.</summary>
+		property array<unsigned char>^ BINTABLEByteArray
+		{
+			array<unsigned char>^ get() { return BINTABLE; }
+		}
+
+																		//////////////CLASS MEMBERS///////////////////
+
+		private:
+		__int64 EXTENSIONPOSITIONSTART, EXTENSIONPOSITIONEND, EXTENSIONPOSITIONDATA;
+		int BITPIX = 0, NAXIS = 0, NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
+		array<String^>^ TTYPES;//names of each table entry
+		array<String^>^ TFORMS;//FITS name for the table entry precisions
+		array<String^>^ TUNITS;//FITS name for the table entry units
+		array<int>^ TBYTES;//number of bytes for the table entry precisions
+		array<int>^ TINSTANCES;//number of instances (columns) of each table entry
+		array<TypeCode>^ TCODES;//.NET typcodes for each table entry
+		array<String^>^ HEADER;
+		String^ FILENAME;
+		String^ EXTENSIONNAME;
+		array<unsigned char>^ BINTABLE;
+
+		void EATRAWBINTABLEHEADER(ArrayList^ header);
 	};
 
-	/*/// <summary> FITSAsciiTable class to create, read, interact with, modify components of, and write FITS Ascii table data.</summary>
-	public ref class FITSAsciiTable
+	/// <summary> FITSTable class to create, read, interact with, modify components of, and write FITS TABLE Ascii table data extensions.</summary>
+	public ref class FITSTable
 	{
 		public:
-	};*/
+	};
 
 	/// <summary>JPMath class provides functionality for common mathematical operations.</summary>
 	public ref class JPMath

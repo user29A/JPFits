@@ -268,6 +268,17 @@ void JPFITS::FITSImage::StatsUpD(bool do_parallel)
 
 void JPFITS::FITSImage::SETBITPIX(System::TypeCode Precision)
 {
+	if (DIMAGE == nullptr || DIMAGE->Length == 0)
+	{
+		BITPIX = 8;
+		NAXIS = 0;
+		NAXIS1 = 0;
+		NAXIS2 = 0;
+		SetKey("BITPIX", BITPIX.ToString(), false, 1);
+		SetKey("NAXIS", NAXIS.ToString(), false, 2);
+		return;
+	}
+
 	switch (Precision)
 	{
 		case TypeCode::SByte:
@@ -344,8 +355,8 @@ void JPFITS::FITSImage::SETBITPIX(System::TypeCode Precision)
 	}
 
 	SetKey("BITPIX", BITPIX.ToString(), false, 0);
-	SetKey("BZERO", BZERO.ToString(), "Data Offset;  pixel = pixel*BSCALE+BZERO", true, 5);
-	SetKey("BSCALE", BSCALE.ToString(), "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 6);
+	SetKey("BZERO", BZERO.ToString(), "Data Offset; pixel = pixel*BSCALE+BZERO", true, 4);
+	SetKey("BSCALE", BSCALE.ToString(), "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 5);
 }
 
 void JPFITS::FITSImage::RotateCW(bool CW)

@@ -3,1651 +3,156 @@
 
 using namespace JPFITS;
 
-array<String^>^ JPFITS::FITSBinTable::GetExtensionHeader(String^ FileName, String^ ExtensionName)
+JPFITS::FITSBinTable::FITSBinTable(String^ fileName, String^ extensionName)
 {
-	array<String^>^ header;
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	array<unsigned char>^ charheaderblock;
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	while (!endheader)
+	FileStream^ fs = gcnew FileStream(fileName, IO::FileMode::Open);
+	bool hasext = false;
+	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
 	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
+		fs->Close();
+		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
+		return;
 	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
 
-	//now at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
+	ArrayList^ header = gcnew ArrayList();
+	__int64 extensionstartposition, extensionendposition;
+
+	if (!FITSFILEOPS::SEEKEXTENSION(fs, "BINTABLE", extensionName, header, extensionstartposition, extensionendposition))
 	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
+		fs->Close();
+		throw gcnew Exception("Could not find BINTABLE with name '" + extensionName + "'");
+		return;
 	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
 
-	endheader = false;//reset
-	bool extensionentryfound = false;
-	bool extensionfound = false;
+	FILENAME = fileName;
+	EXTENSIONNAME = extensionName;
 
-	bool endfile = false;
-	if (fs->Position >= fs->Length)
-		endfile = true;
+	EXTENSIONPOSITIONSTART = extensionstartposition;
+	EXTENSIONPOSITIONDATA = fs->Position;
+	EXTENSIONPOSITIONEND = extensionendposition;
+	
+	EATRAWBINTABLEHEADER(header);
 
-	while (!extensionfound && !endfile)
-	{
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
-		{
-			//read 80 byte line
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-			if (strheaderline->Substring(0, 8) == "END     ")//check if we're at the end of the header keys
-				endheader = true;
-		}
-		fs->Position -= (80 * headerlines);//go back to start of header
-		headerblocks = (headerlines - 1) / 36 + 1;
-		//read headernblocks 2880 byte blocks
-		charheaderblock = gcnew array<unsigned char>(2880 * headerblocks);
-		fs->Read(charheaderblock, 0, 2880 * headerblocks);//stream will be placed at end of header block, so that it can begin reading data values or 2ndry header later
-
-		header = gcnew array<String^>(headerlines);
-
-		for (int i = 0; i < headerlines; i++)
-		{
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderblock, i * 80, 80);
-			header[i] = strheaderline;
-
-			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		}
-
-		if (extensionfound == false)
-		{
-			//now at end of extension header, skip its data
-			if (naxis != 0)
-			{
-				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-				__int64 rem;
-				::Math::DivRem(Nbytes, 2880, rem);
-				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-			}
-
-			extensionentryfound = false;//re-find the table entry we want
-
-			if (fs->Position >= fs->Length)
-				endfile = true;
-		}
-	}
+	BINTABLE = gcnew array<unsigned char>(int(EXTENSIONPOSITIONEND - EXTENSIONPOSITIONDATA));
+	fs->Read(BINTABLE, 0, BINTABLE->Length);
 
 	fs->Close();
-
-	if (!extensionfound)
-		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
-
-	return header;
-}
-
-int JPFITS::FITSBinTable::GetExtensionNumberOfEntries(String^ FileName, String^ ExtensionName)
-{
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	while (!endheader)
-	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
-	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-	//now at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	int tfields;//number of field columns
-	endheader = false;//reset
-	bool extensionentryfound = false;
-	bool extensionfound = false;
-
-	bool endfile = false;
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	while (!extensionfound && !endfile)
-	{
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
-		{
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "TFIELDS ")
-				tfields = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "END     ")
-				endheader = true;
-		}
-		headerblocks = (headerlines - 1) / 36 + 1;
-		fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-		if (extensionfound == false)
-		{
-			//now at end of extension header, skip its data
-			if (naxis != 0)
-			{
-				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-				__int64 rem;
-				::Math::DivRem(Nbytes, 2880, rem);
-				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-			}
-
-			extensionentryfound = false;//re-find the table entry we want
-
-			if (fs->Position >= fs->Length)
-				endfile = true;
-		}
-	}
-
-	fs->Close();
-
-	if (!extensionfound)
-		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
-
-	return tfields;
-}
-
-array<TypeCode>^ JPFITS::FITSBinTable::GetExtensionEntryDataTypes(String^ FileName, String^ ExtensionName)
-{
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	while (!endheader)
-	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
-	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-	//now at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	int tfields;//number of field columns
-	endheader = false;//reset
-	bool extensionfound = false;
-	array<String^>^ ttypes;
-	array<String^>^ tforms;
-	array<int>^ tbytes;
-	array<int>^ tinstances;
-	array<::TypeCode>^ tcodes;
-	bool typesset = false;
-	int ttypeindex = -1;
-
-	bool endfile = false;
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	while (!extensionfound && !endfile)
-	{
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
-		{
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "END     ")
-				endheader = true;
-
-			if (strheaderline->Substring(0, 8) == "TFIELDS ")
-			{
-				tfields = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-				ttypes = gcnew array<String^>(tfields);
-				tforms = gcnew array<String^>(tfields);
-				tbytes = gcnew array<int>(tfields);
-				tinstances = gcnew array<int>(tfields);
-				tcodes = gcnew array<::TypeCode>(tfields);
-			}
-
-			if (strheaderline->Substring(0, 8)->Contains("TTYPE" + (ttypeindex + 2).ToString()) || strheaderline->Substring(0, 8)->Contains("TFORM" + (ttypeindex + 2).ToString()))
-				ttypeindex++;
-
-			if (strheaderline->Substring(0, 8)->Contains("TTYPE"))
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				ttypes[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1);
-			}
-
-			if (strheaderline->Substring(0, 8)->Contains("TFORM"))
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				tforms[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
-				int instances = 1;
-				tbytes[ttypeindex] = TFORMTONBYTES(tforms[ttypeindex], instances);//need to convert the tform to Nbytes
-				tinstances[ttypeindex] = instances;
-				tcodes[ttypeindex] = TFORMTYPECODE(tforms[ttypeindex]);
-			}
-
-			//need to determine if the TypeCode here is supposed to be for signed or unsigned IF the type is an integer (8, 16 or 32 bit)
-			//therefore find the TSCALE and TZERO for this entry...if they don't exist then it is signed, if they do exist
-			//then it is whatever values they are, for either determined signed or unsigned
-			//then set this current tcode[typeindex] to what it should be
-			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::SByte)//then get the value
-				if (Convert::ToByte(strheaderline->Substring(10, 20)->Trim()) == 128)//then it is an unsigned
-					tcodes[ttypeindex] = TypeCode::Byte;
-			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::Int16)//then get the value
-				if (Convert::ToUInt16(strheaderline->Substring(10, 20)->Trim()) == 32768)//then it is an unsigned
-					tcodes[ttypeindex] = TypeCode::UInt16;
-			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::Int32)//then get the value
-				if (Convert::ToUInt32(strheaderline->Substring(10, 20)->Trim()) == 2147483648)//then it is an unsigned
-					tcodes[ttypeindex] = TypeCode::UInt32;
-		}
-		headerblocks = (headerlines - 1) / 36 + 1;
-		fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-		if (extensionfound == false)
-		{
-			//now at end of extension header, skip its data
-			if (naxis != 0)
-			{
-				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-				__int64 rem;
-				::Math::DivRem(Nbytes, 2880, rem);
-				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-			}
-
-			endheader = false;//reset to scan next header
-			typesset = false;//reset the type arrays
-			ttypeindex = -1;
-
-			if (fs->Position >= fs->Length)
-				endfile = true;
-		}
-	}
-
-	fs->Close();
-
-	if (!extensionfound)
-		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
-
-	return tcodes;
-}
-
-array<int>^ JPFITS::FITSBinTable::GetExtensionEntryDataInstances(String^ FileName, String^ ExtensionName)
-{
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	while (!endheader)
-	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
-	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-	//at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	int tfields;//number of field columns
-	endheader = false;//reset
-	bool extensionfound = false;
-	array<String^>^ ttypes;
-	array<String^>^ tforms;
-	array<int>^ tbytes;
-	array<int>^ tinstances;
-	array<::TypeCode>^ tcodes;
-	bool typesset = false;
-	int ttypeindex = -1;
-
-	bool endfile = false;
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	while (!extensionfound && !endfile)
-	{
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
-		{
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "END     ")
-				endheader = true;
-
-			if (strheaderline->Substring(0, 8) == "TFIELDS ")
-			{
-				tfields = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-				ttypes = gcnew array<String^>(tfields);
-				tforms = gcnew array<String^>(tfields);
-				tbytes = gcnew array<int>(tfields);
-				tinstances = gcnew array<int>(tfields);
-				tcodes = gcnew array<::TypeCode>(tfields);
-			}
-
-			if (strheaderline->Substring(0, 8)->Contains("TTYPE" + (ttypeindex + 2).ToString()) || strheaderline->Substring(0, 8)->Contains("TFORM" + (ttypeindex + 2).ToString()))
-				ttypeindex++;
-
-			if (strheaderline->Substring(0, 8)->Contains("TTYPE"))
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				ttypes[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1);
-			}
-
-			if (strheaderline->Substring(0, 8)->Contains("TFORM"))
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				tforms[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
-				int instances = 1;
-				tbytes[ttypeindex] = TFORMTONBYTES(tforms[ttypeindex], instances);//need to convert the tform to Nbytes
-				tinstances[ttypeindex] = instances;
-				tcodes[ttypeindex] = TFORMTYPECODE(tforms[ttypeindex]);
-			}
-
-			//need to determine if the TypeCode here is supposed to be for signed or unsigned IF the type is an integer (8, 16 or 32 bit)
-			//therefore find the TSCALE and TZERO for this entry...if they don't exist then it is signed, if they do exist
-			//then it is whatever values they are, for either determined signed or unsigned
-			//then set this current tcode[typeindex] to what it should be
-			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::SByte)//then get the value
-				if (Convert::ToByte(strheaderline->Substring(10, 20)->Trim()) == 128)//then it is an unsigned
-					tcodes[ttypeindex] = TypeCode::Byte;
-			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::Int16)//then get the value
-				if (Convert::ToUInt16(strheaderline->Substring(10, 20)->Trim()) == 32768)//then it is an unsigned
-					tcodes[ttypeindex] = TypeCode::UInt16;
-			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::Int32)//then get the value
-				if (Convert::ToUInt32(strheaderline->Substring(10, 20)->Trim()) == 2147483648)//then it is an unsigned
-					tcodes[ttypeindex] = TypeCode::UInt32;
-		}
-		headerblocks = (headerlines - 1) / 36 + 1;
-		fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-		if (extensionfound == false)
-		{
-			//now at end of extension header, skip its data
-			if (naxis != 0)
-			{
-				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-				__int64 rem;
-				::Math::DivRem(Nbytes, 2880, rem);
-				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-			}
-
-			endheader = false;//reset to scan next header
-			typesset = false;//reset the type arrays
-			ttypeindex = -1;
-
-			if (fs->Position >= fs->Length)
-				endfile = true;
-		}
-	}
-
-	fs->Close();
-
-	if (!extensionfound)
-		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
-
-	return tinstances;
-}
-
-array<String^>^ JPFITS::FITSBinTable::GetExtensionEntryLabels(String^ FileName, String^ ExtensionName)
-{
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	while (!endheader)
-	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
-	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-	//now at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	int tfields;//number of field columns
-	endheader = false;//reset
-	bool extensionfound = false;
-	int extensionentry_index = -1;
-	array<String^>^ ttypes;
-	bool typesset = false;
-	int ttypeindex = -1;
-
-	bool endfile = false;
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	while (!extensionfound && !endfile)
-	{
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
-		{
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "END     ")
-				endheader = true;
-
-			if (strheaderline->Substring(0, 8) == "TFIELDS ")
-			{
-				tfields = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-				ttypes = gcnew array<String^>(tfields);
-				typesset = true;
-			}
-
-			if (strheaderline->Substring(0, 8)->Contains("TTYPE" + (ttypeindex + 2).ToString()) || strheaderline->Substring(0, 8)->Contains("TFORM" + (ttypeindex + 2).ToString()))
-				ttypeindex++;
-
-			if (strheaderline->Substring(0, 8)->Contains("TTYPE"))
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				ttypes[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
-			}
-		}
-		headerblocks = (headerlines - 1) / 36 + 1;
-		fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-		if (extensionfound == false)
-		{
-			//now at end of extension header, skip its data
-			if (naxis != 0)
-			{
-				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-				__int64 rem;
-				::Math::DivRem(Nbytes, 2880, rem);
-				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-			}
-
-			endheader = false;//reset to scan next header
-			extensionentry_index = -1;//re-find its index
-			typesset = false;//reset the type arrays
-			ttypeindex = -1;
-
-			if (fs->Position >= fs->Length)
-				endfile = true;
-		}
-	}
-	fs->Close();
-
-	if (!extensionfound)
-	{
-		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
-	}
-
-	return ttypes;
-}
-
-array<String^>^ JPFITS::FITSBinTable::GetExtensionEntryUnits(String^ FileName, String^ ExtensionName)
-{
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	while (!endheader)
-	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
-	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-	//now at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	int tfields;//number of field columns
-	endheader = false;//reset
-	bool extensionfound = false;
-	int extensionentry_index = -1;
-	array<String^>^ tunits;
-	bool typesset = false;
-	int ttypeindex = -1;
-
-	bool endfile = false;
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	while (!extensionfound && !endfile)
-	{
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
-		{
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "END     ")
-				endheader = true;
-
-			if (strheaderline->Substring(0, 8) == "TFIELDS ")
-			{
-				tfields = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-				tunits = gcnew array<String^>(tfields);
-				typesset = true;
-			}
-
-			if (strheaderline->Substring(0, 8)->Contains("TTYPE" + (ttypeindex + 2).ToString()) || strheaderline->Substring(0, 8)->Contains("TFORM" + (ttypeindex + 2).ToString()))
-				ttypeindex++;
-
-			if (strheaderline->Substring(0, 8)->Contains("TUNIT"))
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				tunits[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
-			}
-		}
-		headerblocks = (headerlines - 1) / 36 + 1;
-		fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-		if (extensionfound == false)
-		{
-			//now at end of extension header, skip its data
-			if (naxis != 0)
-			{
-				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-				__int64 rem;
-				::Math::DivRem(Nbytes, 2880, rem);
-				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-			}
-
-			endheader = false;//reset to scan next header
-			extensionentry_index = -1;//re-find its index
-			typesset = false;//reset the type arrays
-			ttypeindex = -1;
-
-			if (fs->Position >= fs->Length)
-				endfile = true;
-		}
-	}
-	fs->Close();
-
-	if (!extensionfound)
-	{
-		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
-	}
-
-	return tunits;
 }
 
 array<String^>^ JPFITS::FITSBinTable::GetAllExtensionNames(String^ FileName)
 {
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	while (!endheader)
-	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
-	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-	//now at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	endheader = false;//reset
-	bool extensionfound = false;
-	bool endfile = false;
-	ArrayList^ namelist = gcnew ArrayList();
-	String^ extname = "";
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	while (!endfile)
-	{
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
-		{
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-			if (strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				extname = strheaderline->Substring(f + 1, l - f - 1)->Trim();
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-
-			if (strheaderline->Substring(0, 8) == "END     ")//check if we're at the end of the header keys
-			{
-				if (extensionfound)
-					namelist->Add(extname);
-				extname = "";
-				extensionfound = false;
-				endheader = true;
-				break;
-			}
-		}
-		headerblocks = (headerlines - 1) / 36 + 1;
-		fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-		//now at end of extension header, skip its data
-		if (naxis != 0)
-		{
-			__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-			__int64 rem;
-			::Math::DivRem(Nbytes, 2880, rem);
-			fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-		}
-
-		endheader = false;//reset to scan next header
-
-		if (fs->Position >= fs->Length)
-			endfile = true;
-	}
-	fs->Close();
-
-	array<String^>^ list = gcnew array<String^>(namelist->Count);
-	for (int i = 0; i < namelist->Count; i++)
-		list[i] = (String^)namelist[i];
-
-	return list;
+	return FITSFILEOPS::GETALLEXTENSIONNAMES(FileName, "BINTABLE");
 }
 
-array<unsigned char>^ JPFITS::FITSBinTable::GetExtensionAsByteArray(String^ FileName, String^ ExtensionName, int& Width, int& Height)
+array<unsigned char, 2>^ JPFITS::FITSBinTable::GetTTYPEEntryByteArray(String^ ttypeEntryLabel)
 {
-	array<unsigned char>^ bytearray;
-
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	while (!endheader)
-	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
-	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-	//now at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	endheader = false;//reset
-	bool extensionfound = false;
-
-	bool endfile = false;
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	while (!extensionfound && !endfile)
-	{
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
-		{
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "END     ")
-				endheader = true;
-		}
-		headerblocks = (headerlines - 1) / 36 + 1;
-		fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-		if (extensionfound == false)
-		{
-			//now at end of extension header, skip its data
-			if (naxis != 0)
-			{
-				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-				__int64 rem;
-				::Math::DivRem(Nbytes, 2880, rem);
-				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-			}
-
-			endheader = false;//reset to scan next header
-
-			if (fs->Position >= fs->Length)
-				endfile = true;
-		}
-	}
-
-	if (!extensionfound)
-	{
-		fs->Close();
-		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
-	}
-
-	//now at end of found extension header, can read the table
-	int NBytes = naxis1 * naxis2;
-	Width = naxis1;
-	Height = naxis2;
-	bytearray = gcnew array<unsigned char>(NBytes);
-	fs->Read(bytearray, 0, NBytes);
-	fs->Close();
-
-	return bytearray;
-}
-
-array<unsigned char, 2>^ JPFITS::FITSBinTable::GetExtensionEntryAsByteArray(String^ FileName, String^ ExtensionName, String^ ExtensionEntryLabel)
-{
-	array<unsigned char, 2>^ bytearray;
-
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	while (!endheader)
-	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
-	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-	//now at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	int tfields;//number of field columns
-	endheader = false;//reset
-	bool extensionentryfound = false;
-	bool extensionfound = false;
 	int extensionentry_index = -1;
-	array<String^>^ ttypes;
-	array<String^>^ tforms;
-	array<int>^ tbytes;
-	array<int>^ tinstances;
-	array<::TypeCode>^ tcodes;
-	bool typesset = false;
-	int ttypeindex = -1;
-
-	bool endfile = false;
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	while (!extensionfound && !endfile)
-	{
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
+	for (int i = 0; i < TTYPES->Length; i++)
+		if (TTYPES[i] == ttypeEntryLabel)
 		{
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "END     ")
-				endheader = true;
-
-			if (strheaderline->Substring(0, 8) == "TFIELDS ")
-			{
-				tfields = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-				ttypes = gcnew array<String^>(tfields);
-				tforms = gcnew array<String^>(tfields);
-				tbytes = gcnew array<int>(tfields);
-				tinstances = gcnew array<int>(tfields);
-				tcodes = gcnew array<::TypeCode>(tfields);
-			}
-
-			if (strheaderline->Substring(0, 8)->Contains("TTYPE" + (ttypeindex + 2).ToString()) || strheaderline->Substring(0, 8)->Contains("TFORM" + (ttypeindex + 2).ToString()))
-				ttypeindex++;
-
-			if (strheaderline->Substring(0, 8)->Contains("TTYPE"))
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				ttypes[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1);
-			}
-
-			if (strheaderline->Substring(0, 8)->Contains("TFORM"))
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				tforms[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
-				int instances = 1;
-				tbytes[ttypeindex] = TFORMTONBYTES(tforms[ttypeindex], instances);//need to convert the tform to Nbytes
-				tinstances[ttypeindex] = instances;
-				tcodes[ttypeindex] = TFORMTYPECODE(tforms[ttypeindex]);
-			}
-
-			if (!extensionentryfound)
-			{
-				if (strheaderline->Substring(0, 8)->Contains("TTYPE"))
-				{
-					extensionentry_index++;
-					int f = strheaderline->IndexOf("'");
-					int l = strheaderline->LastIndexOf("'");
-					if (ExtensionEntryLabel == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-						extensionentryfound = true;
-				}
-			}
+			extensionentry_index = i;
+			break;
 		}
-		headerblocks = (headerlines - 1) / 36 + 1;
-		fs->Position += (headerblocks * 36 - headerlines) * 80;
 
-		if (extensionfound == false)
-		{
-			//now at end of extension header, skip its data
-			if (naxis != 0)
-			{
-				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-				__int64 rem;
-				::Math::DivRem(Nbytes, 2880, rem);
-				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-			}
-
-			endheader = false;//reset to scan next header
-			extensionentryfound = false;//re-find the table entry we want
-			extensionentry_index = -1;//re-find its index
-			typesset = false;//reset the type arrays
-			ttypeindex = -1;
-
-			if (fs->Position >= fs->Length)
-				endfile = true;
-		}
-	}
-
-	if (!extensionfound)
+	if (extensionentry_index == -1)
 	{
-		fs->Close();
-		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
+		throw gcnew Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntryLabel + "'");
+		return nullptr;
 	}
 
-	if (!extensionentryfound)
+	if (TCODES[extensionentry_index] != TypeCode::SByte)
 	{
-		fs->Close();
-		throw gcnew Exception("ExtensionEntryLabel wasn't found: '" + ExtensionEntryLabel + "'");
+		throw gcnew Exception("Requested entry '" + ttypeEntryLabel + "'" + " is not of type SBYTE. It is: '" + TCODES[extensionentry_index].ToString() + "'. Use an overload instead for numeric value types.");
+		return nullptr;
 	}
 
-	TypeCode extensionentrycode = tcodes[extensionentry_index];
-	if (extensionentrycode != TypeCode::SByte)
-	{
-		fs->Close();
-		throw gcnew Exception("Requested entry '" + ExtensionEntryLabel + "'" + " is not of type BYTE. Use an overload instead for numeric value types.");
-	}
-
-	//now at end of found extension header, can read the table
-	int NBytes = naxis1 * naxis2;
-	int extensionentryinstances = tinstances[extensionentry_index];
-	bytearray = gcnew array<unsigned char, 2>(extensionentryinstances, naxis2);
-	array<unsigned char>^ arr = gcnew array<unsigned char>(NBytes);
-	fs->Read(arr, 0, NBytes);
-	fs->Close();
+	int extensionentryinstances = TINSTANCES[extensionentry_index];
+	array<unsigned char, 2>^ bytearray = gcnew array<unsigned char, 2>(extensionentryinstances, NAXIS2);
 
 	int byteoffset = 0;
 	for (int i = 0; i < extensionentry_index; i++)
-		byteoffset += tbytes[i];
+		byteoffset += TBYTES[i];
 	int currentbyte;
 
 	#pragma omp parallel for private(currentbyte)
-	for (int i = 0; i < naxis2; i++)
+	for (int i = 0; i < NAXIS2; i++)
 		for (int j = 0; j < extensionentryinstances; j++)
 		{
-			currentbyte = byteoffset + i * naxis1 + j;
-			bytearray[j, i] = arr[currentbyte];
+			currentbyte = byteoffset + i * NAXIS1 + j;
+			bytearray[j, i] = BINTABLE[currentbyte];
 		}
 
 	return bytearray;
 }
 
-array<double, 2>^ JPFITS::FITSBinTable::GetExtensionEntries(String^ FileName, String^ ExtensionName, array<String^>^ ExtensionEntryLabels)
-{
-	int w = 0, h = 0;
-	array<double>^ instance = GetExtensionEntry(FileName, ExtensionName, ExtensionEntryLabels[0], w, h);
-	array<double, 2>^ result = gcnew array<double, 2>(ExtensionEntryLabels->Length, instance->Length);
-	int i = 0;
-	{
-		for (i = 0; i < instance->Length; i++)
-			result[0, i] = instance[i];
-
-		for (i = 1; i < ExtensionEntryLabels->Length; i++)
-		{
-			instance = GetExtensionEntry(FileName, ExtensionName, ExtensionEntryLabels[i], w, h);
-			for (int j = 0; j < instance->Length; j++)
-				result[i, j] = instance[j];
-		}
-		return result;
-	}
-}
-
-array<double>^ JPFITS::FITSBinTable::GetExtensionEntry(String^ FileName, String^ ExtensionName, String^ ExtensionEntryLabel)
+array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ExtensionEntryLabel)
 {
 	int w = 0, h = 0;
 
-	return GetExtensionEntry(FileName, ExtensionName, ExtensionEntryLabel, w, h);
+	return GetTTYPEEntry(ExtensionEntryLabel, w, h);
 }
 
-array<double>^ JPFITS::FITSBinTable::GetExtensionEntry(String^ FileName, String^ ExtensionName, String^ ExtensionEntryLabel, int& Width, int& Height)
+array<double, 2>^ JPFITS::FITSBinTable::GetTTYPEEntries(array<String^>^ ExtensionEntryLabels)
 {
-	array<double>^ result;
+	int w = 0, h = 0;
+	array<double>^ instance;
+	array<double, 2>^ result = gcnew array<double, 2>(ExtensionEntryLabels->Length, NAXIS2);
 
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	while (!endheader)
+	for (int i = 0; i < ExtensionEntryLabels->Length; i++)
 	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
+		instance = GetTTYPEEntry(ExtensionEntryLabels[i], w, h);
+		for (int j = 0; j < instance->Length; j++)
+			result[i, j] = instance[j];
 	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
+	return result;
+}
 
-	//at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	int tfields;//number of field columns
-	bool extensionentryfound = false;
-	bool extensionfound = false;
+array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, int& width, int& height)
+{
 	int extensionentry_index = -1;
-	array<String^>^ ttypes;
-	array<String^>^ tforms;
-	array<int>^ tbytes;
-	array<int>^ tinstances;
-	array<::TypeCode>^ tcodes;
-	bool typesset = false;
-	int ttypeindex = -1;
-
-	bool endfile = false;
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	while (!extensionfound && !endfile)
-	{
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
+	for (int i = 0; i < TTYPES->Length; i++)
+		if (TTYPES[i] == ttypeEntryLabel)
 		{
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "END     ")
-				endheader = true;
-
-			if (strheaderline->Substring(0, 8) == "TFIELDS ")
-			{
-				tfields = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-				ttypes = gcnew array<String^>(tfields);
-				tforms = gcnew array<String^>(tfields);
-				tbytes = gcnew array<int>(tfields);
-				tinstances = gcnew array<int>(tfields);
-				tcodes = gcnew array<::TypeCode>(tfields);
-			}
-
-			if (strheaderline->Substring(0, 8)->Contains("TTYPE" + (ttypeindex + 2).ToString()) || strheaderline->Substring(0, 8)->Contains("TFORM" + (ttypeindex + 2).ToString()))
-				ttypeindex++;
-
-			if (strheaderline->Substring(0, 8)->Contains("TTYPE"))
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				ttypes[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1);
-
-				if (!extensionentryfound)
-				{
-					extensionentry_index++;
-					if (ExtensionEntryLabel == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-						extensionentryfound = true;
-				}
-			}
-
-			if (strheaderline->Substring(0, 8)->Contains("TFORM"))
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				tforms[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
-				int instances = 1;
-				tbytes[ttypeindex] = TFORMTONBYTES(tforms[ttypeindex], instances);//need to convert the tform to Nbytes
-				tinstances[ttypeindex] = instances;
-				tcodes[ttypeindex] = TFORMTYPECODE(tforms[ttypeindex]);
-			}
-
-			//need to determine if the TypeCode here is supposed to be for signed or unsigned IF the type is an integer (8, 16 or 32 bit)
-			//therefore find the TSCALE and TZERO for this entry...if they don't exist then it is signed, if they do exist
-			//then it is whatever values they are, for either determined signed or unsigned
-			//then set this current tcode[typeindex] to what it should be
-			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::SByte)//then get the value
-				if (Convert::ToByte(strheaderline->Substring(10, 20)->Trim()) == 128)//then it is an unsigned
-					tcodes[ttypeindex] = TypeCode::Byte;
-			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::Int16)//then get the value
-				if (Convert::ToUInt16(strheaderline->Substring(10, 20)->Trim()) == 32768)//then it is an unsigned
-					tcodes[ttypeindex] = TypeCode::UInt16;
-			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::Int32)//then get the value
-				if (Convert::ToUInt32(strheaderline->Substring(10, 20)->Trim()) == 2147483648)//then it is an unsigned
-					tcodes[ttypeindex] = TypeCode::UInt32;
+			extensionentry_index = i;
+			break;
 		}
-		headerblocks = (headerlines - 1) / 36 + 1;
-		fs->Position += (headerblocks * 36 - headerlines) * 80;
 
-		if (extensionfound == false)
-		{
-			//now at end of extension header, skip its data
-			if (naxis != 0)
-			{
-				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-				__int64 rem;
-				::Math::DivRem(Nbytes, 2880, rem);
-				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-			}
-
-			endheader = false;//reset to scan next header
-			extensionentryfound = false;//re-find the table entry we want
-			extensionentry_index = -1;//re-find its index
-			typesset = false;//reset the type arrays
-			ttypeindex = -1;
-
-			if (fs->Position >= fs->Length)
-				endfile = true;
-		}
-	}
-
-	if (!extensionfound)
+	if (extensionentry_index == -1)
 	{
-		fs->Close();
-		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
-	}
-
-	if (!extensionentryfound)
-	{
-		fs->Close();
-		throw gcnew Exception("ExtensionEntryLabel wasn't found: '" + ExtensionEntryLabel + "'");
+		throw gcnew Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntryLabel + "'");
+		return nullptr;
 	}
 
 	//now at end of found extension header, can read the table
-	int NBytes = naxis1 * naxis2;
-	int extensionentryinstances = tinstances[extensionentry_index];
-	Width = extensionentryinstances;
-	Height = naxis2;
-	result = gcnew array<double>(naxis2 * extensionentryinstances);
-	array<unsigned char>^ arr = gcnew array<unsigned char>(NBytes);
-	fs->Read(arr, 0, NBytes);
-	fs->Close();
+	width = TINSTANCES[extensionentry_index];
+	height = NAXIS2;
+	array<double>^ result = gcnew array<double>(NAXIS2 * TINSTANCES[extensionentry_index]);
 
-	TypeCode extensionentrycode = tcodes[extensionentry_index];
 	int byteoffset = 0;
 	for (int i = 0; i < extensionentry_index; i++)
-		byteoffset += tbytes[i];
+		byteoffset += TBYTES[i];
 	int currentbyte;
 
-	switch (extensionentrycode)
+	switch (TCODES[extensionentry_index])
 	{
 		case ::TypeCode::Double:
 		{
 			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < naxis2; i++)
+			for (int i = 0; i < NAXIS2; i++)
 			{
 				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-				for (int j = 0; j < extensionentryinstances; j++)
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 				{
-					currentbyte = byteoffset + i * naxis1 + j * 8;
-					dbl[7] = arr[currentbyte];
-					dbl[6] = arr[currentbyte + 1];
-					dbl[5] = arr[currentbyte + 2];
-					dbl[4] = arr[currentbyte + 3];
-					dbl[3] = arr[currentbyte + 4];
-					dbl[2] = arr[currentbyte + 5];
-					dbl[1] = arr[currentbyte + 6];
-					dbl[0] = arr[currentbyte + 7];
-					result[i * extensionentryinstances + j] = BitConverter::ToDouble(dbl, 0);
+					currentbyte = byteoffset + i * NAXIS1 + j * 8;
+					dbl[7] = BINTABLE[currentbyte];
+					dbl[6] = BINTABLE[currentbyte + 1];
+					dbl[5] = BINTABLE[currentbyte + 2];
+					dbl[4] = BINTABLE[currentbyte + 3];
+					dbl[3] = BINTABLE[currentbyte + 4];
+					dbl[2] = BINTABLE[currentbyte + 5];
+					dbl[1] = BINTABLE[currentbyte + 6];
+					dbl[0] = BINTABLE[currentbyte + 7];
+					result[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToDouble(dbl, 0);
 				}
 			}
 			break;
@@ -1656,21 +161,21 @@ array<double>^ JPFITS::FITSBinTable::GetExtensionEntry(String^ FileName, String^
 		case (::TypeCode::Int64):
 		{
 			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < naxis2; i++)
+			for (int i = 0; i < NAXIS2; i++)
 			{
 				array<unsigned char>^ i64 = gcnew array<unsigned char>(8);
-				for (int j = 0; j < extensionentryinstances; j++)
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 				{
-					currentbyte = byteoffset + i * naxis1 + j * 8;
-					i64[7] = arr[currentbyte];
-					i64[6] = arr[currentbyte + 1];
-					i64[5] = arr[currentbyte + 2];
-					i64[4] = arr[currentbyte + 3];
-					i64[3] = arr[currentbyte + 4];
-					i64[2] = arr[currentbyte + 5];
-					i64[1] = arr[currentbyte + 6];
-					i64[0] = arr[currentbyte + 7];
-					result[i * extensionentryinstances + j] = (double)BitConverter::ToInt64(i64, 0);
+					currentbyte = byteoffset + i * NAXIS1 + j * 8;
+					i64[7] = BINTABLE[currentbyte];
+					i64[6] = BINTABLE[currentbyte + 1];
+					i64[5] = BINTABLE[currentbyte + 2];
+					i64[4] = BINTABLE[currentbyte + 3];
+					i64[3] = BINTABLE[currentbyte + 4];
+					i64[2] = BINTABLE[currentbyte + 5];
+					i64[1] = BINTABLE[currentbyte + 6];
+					i64[0] = BINTABLE[currentbyte + 7];
+					result[i * TINSTANCES[extensionentry_index] + j] = (double)BitConverter::ToInt64(i64, 0);
 				}
 			}
 			break;
@@ -1679,17 +184,17 @@ array<double>^ JPFITS::FITSBinTable::GetExtensionEntry(String^ FileName, String^
 		case ::TypeCode::Single:
 		{
 			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < naxis2; i++)
+			for (int i = 0; i < NAXIS2; i++)
 			{
 				array<unsigned char>^ sng = gcnew array<unsigned char>(4);
-				for (int j = 0; j < extensionentryinstances; j++)
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 				{
-					currentbyte = byteoffset + i * naxis1 + j * 4;
-					sng[3] = arr[currentbyte];
-					sng[2] = arr[currentbyte + 1];
-					sng[1] = arr[currentbyte + 2];
-					sng[0] = arr[currentbyte + 3];
-					result[i * extensionentryinstances + j] = (double)BitConverter::ToSingle(sng, 0);
+					currentbyte = byteoffset + i * NAXIS1 + j * 4;
+					sng[3] = BINTABLE[currentbyte];
+					sng[2] = BINTABLE[currentbyte + 1];
+					sng[1] = BINTABLE[currentbyte + 2];
+					sng[0] = BINTABLE[currentbyte + 3];
+					result[i * TINSTANCES[extensionentry_index] + j] = (double)BitConverter::ToSingle(sng, 0);
 				}
 			}
 			break;
@@ -1699,18 +204,18 @@ array<double>^ JPFITS::FITSBinTable::GetExtensionEntry(String^ FileName, String^
 		case ::TypeCode::Int32:
 		{
 			double bzero = 2147483648;
-			if (extensionentrycode == ::TypeCode::Int32)
+			if (TCODES[extensionentry_index] == ::TypeCode::Int32)
 				bzero = 0;
 			__int32 val;
 
 			#pragma omp parallel for private(val, currentbyte)
-			for (int i = 0; i < naxis2; i++)
+			for (int i = 0; i < NAXIS2; i++)
 			{
-				for (int j = 0; j < extensionentryinstances; j++)
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 				{
-					currentbyte = byteoffset + i * naxis1 + j * 4;
-					val = (arr[currentbyte] << 24) | (arr[currentbyte + 1] << 16) | (arr[currentbyte + 2] << 8) | arr[currentbyte + 3];
-					result[i * extensionentryinstances + j] = double(val) + bzero;
+					currentbyte = byteoffset + i * NAXIS1 + j * 4;
+					val = (BINTABLE[currentbyte] << 24) | (BINTABLE[currentbyte + 1] << 16) | (BINTABLE[currentbyte + 2] << 8) | BINTABLE[currentbyte + 3];
+					result[i * TINSTANCES[extensionentry_index] + j] = double(val) + bzero;
 				}
 			}
 			break;
@@ -1720,18 +225,18 @@ array<double>^ JPFITS::FITSBinTable::GetExtensionEntry(String^ FileName, String^
 		case ::TypeCode::Int16:
 		{
 			double bzero = 32768;
-			if (extensionentrycode == ::TypeCode::Int16)
+			if (TCODES[extensionentry_index] == ::TypeCode::Int16)
 				bzero = 0;
 			__int16 val;
 
 			#pragma omp parallel for private(val, currentbyte)
-			for (int i = 0; i < naxis2; i++)
+			for (int i = 0; i < NAXIS2; i++)
 			{
-				for (int j = 0; j < extensionentryinstances; j++)
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 				{
-					currentbyte = byteoffset + i * naxis1 + j * 2;
-					val = (arr[currentbyte] << 8) | arr[currentbyte + 1];
-					result[i * extensionentryinstances + j] = double(val) + bzero;
+					currentbyte = byteoffset + i * NAXIS1 + j * 2;
+					val = (BINTABLE[currentbyte] << 8) | BINTABLE[currentbyte + 1];
+					result[i * TINSTANCES[extensionentry_index] + j] = double(val) + bzero;
 				}
 			}
 			break;
@@ -1741,16 +246,16 @@ array<double>^ JPFITS::FITSBinTable::GetExtensionEntry(String^ FileName, String^
 		case ::TypeCode::SByte:
 		{
 			double bzero = 128;
-			if (extensionentrycode == ::TypeCode::SByte)
+			if (TCODES[extensionentry_index] == ::TypeCode::SByte)
 				bzero = 0;
 
 			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < naxis2; i++)
+			for (int i = 0; i < NAXIS2; i++)
 			{
-				for (int j = 0; j < extensionentryinstances; j++)
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 				{
-					currentbyte = byteoffset + i * naxis1 + j;
-					result[i * extensionentryinstances + j] = double(arr[currentbyte]) + bzero;
+					currentbyte = byteoffset + i * NAXIS1 + j;
+					result[i * TINSTANCES[extensionentry_index] + j] = double(BINTABLE[currentbyte]) + bzero;
 				}
 			}
 			break;
@@ -1759,157 +264,383 @@ array<double>^ JPFITS::FITSBinTable::GetExtensionEntry(String^ FileName, String^
 		case ::TypeCode::Boolean:
 		{
 			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < naxis2; i++)
+			for (int i = 0; i < NAXIS2; i++)
 			{
-				for (int j = 0; j < extensionentryinstances; j++)
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 				{
-					currentbyte = byteoffset + i * naxis1 + j;
-					result[i * extensionentryinstances + j] = double((bool)arr[currentbyte]);
+					currentbyte = byteoffset + i * NAXIS1 + j;
+					result[i * TINSTANCES[extensionentry_index] + j] = double((bool)BINTABLE[currentbyte]);
 				}
 			}
 			break;
 		}
 
 		default:
-			throw gcnew Exception("Unrecognized TypeCode: '" + extensionentrycode.ToString() + "'");
+			throw gcnew Exception("Unrecognized TypeCode: '" + TCODES[extensionentry_index].ToString() + "'");
 	}
 
 	return result;
 }
 
+//array<double>^ JPFITS::FITSBinTable::GetExtensionEntry(String^ FileName, String^ ExtensionName, String^ ExtensionEntryLabel, int& Width, int& Height)
+//{
+//	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
+//	bool hasext = false;
+//	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
+//	{
+//		fs->Close();
+//		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
+//		return nullptr;
+//	}
+//
+//	/*ArrayList^ header = gcnew ArrayList();
+//	__int64 startposition, endposition;
+//	if (!FITSFILEOPS::SEEKEXTENSION(fs, "BINTABLE", ExtensionName, header, startposition, endposition))
+//	{
+//		fs->Close();
+//		throw gcnew Exception("Could not find BINTABLE with name '" + ExtensionName + "'");
+//		return nullptr;
+//	}*/
+//	//EATRAWEXTENSIONHEADER(header);
+//	//check that entry exists
+//	//read array from fs->Currentposition to endposition
+//	//do stuff on array
+//
+//	array<double>^ result;
+//	int naxis, naxis1, naxis2, bitpix;
+//
+//	//read primary header
+//	bool endheader = false;
+//	int headerlines = 0, headerblocks = 0;
+//	String^ strheaderline;
+//	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
+//
+//	int tfields;//number of field columns
+//	bool extensionentryfound = false;
+//	bool extensionfound = false;
+//	int extensionentry_index = -1;
+//	array<String^>^ ttypes;
+//	array<String^>^ tforms;
+//	array<int>^ tbytes;
+//	array<int>^ tinstances;
+//	array<::TypeCode>^ tcodes;
+//	bool typesset = false;
+//	int ttypeindex = -1;
+//
+//	bool endfile = false;
+//	if (fs->Position >= fs->Length)
+//		endfile = true;
+//
+//	while (!extensionfound && !endfile)
+//	{
+//		headerblocks = 0;
+//		headerlines = 0;
+//		endheader = false;//reset
+//		while (!endheader)
+//		{
+//			headerlines++;
+//			fs->Read(charheaderline, 0, 80);
+//			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
+//
+//			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
+//			{
+//				int f = strheaderline->IndexOf("'");
+//				int l = strheaderline->LastIndexOf("'");
+//				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
+//					extensionfound = true;
+//			}
+//
+//			if (strheaderline->Substring(0, 8) == "EXTNAME ")
+//			{
+//				int f = strheaderline->IndexOf("'");
+//				int l = strheaderline->LastIndexOf("'");
+//				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
+//					extensionfound = true;
+//			}
+//
+//			if (strheaderline->Substring(0, 8) == "NAXIS   ")
+//				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+//			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
+//				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+//			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
+//				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+//			if (strheaderline->Substring(0, 8) == "BITPIX  ")
+//				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+//			if (strheaderline->Substring(0, 8) == "END     ")
+//				endheader = true;
+//
+//			if (strheaderline->Substring(0, 8) == "TFIELDS ")
+//			{
+//				tfields = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+//				ttypes = gcnew array<String^>(tfields);
+//				tforms = gcnew array<String^>(tfields);
+//				tbytes = gcnew array<int>(tfields);
+//				tinstances = gcnew array<int>(tfields);
+//				tcodes = gcnew array<::TypeCode>(tfields);
+//			}
+//
+//			if (strheaderline->Substring(0, 8)->Contains("TTYPE" + (ttypeindex + 2).ToString()) || strheaderline->Substring(0, 8)->Contains("TFORM" + (ttypeindex + 2).ToString()))
+//				ttypeindex++;
+//
+//			if (strheaderline->Substring(0, 8)->Contains("TTYPE"))
+//			{
+//				int f = strheaderline->IndexOf("'");
+//				int l = strheaderline->LastIndexOf("'");
+//				ttypes[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1);
+//
+//				if (!extensionentryfound)
+//				{
+//					extensionentry_index++;
+//					if (ExtensionEntryLabel == strheaderline->Substring(f + 1, l - f - 1)->Trim())
+//						extensionentryfound = true;
+//				}
+//			}
+//
+//			if (strheaderline->Substring(0, 8)->Contains("TFORM"))
+//			{
+//				int f = strheaderline->IndexOf("'");
+//				int l = strheaderline->LastIndexOf("'");
+//				tforms[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
+//				int instances = 1;
+//				tbytes[ttypeindex] = TFORMTONBYTES(tforms[ttypeindex], instances);//need to convert the tform to Nbytes
+//				tinstances[ttypeindex] = instances;
+//				tcodes[ttypeindex] = TFORMTYPECODE(tforms[ttypeindex]);
+//			}
+//
+//			//need to determine if the TypeCode here is supposed to be for signed or unsigned IF the type is an integer (8, 16 or 32 bit)
+//			//therefore find the TSCALE and TZERO for this entry...if they don't exist then it is signed, if they do exist
+//			//then it is whatever values they are, for either determined signed or unsigned
+//			//then set this current tcode[typeindex] to what it should be
+//			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::SByte)//then get the value
+//				if (Convert::ToByte(strheaderline->Substring(10, 20)->Trim()) == 128)//then it is an unsigned
+//					tcodes[ttypeindex] = TypeCode::Byte;
+//			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::Int16)//then get the value
+//				if (Convert::ToUInt16(strheaderline->Substring(10, 20)->Trim()) == 32768)//then it is an unsigned
+//					tcodes[ttypeindex] = TypeCode::UInt16;
+//			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::Int32)//then get the value
+//				if (Convert::ToUInt32(strheaderline->Substring(10, 20)->Trim()) == 2147483648)//then it is an unsigned
+//					tcodes[ttypeindex] = TypeCode::UInt32;
+//		}
+//		headerblocks = (headerlines - 1) / 36 + 1;
+//		fs->Position += (headerblocks * 36 - headerlines) * 80;
+//
+//		if (extensionfound == false)
+//		{
+//			//now at end of extension header, skip its data
+//			if (naxis != 0)
+//			{
+//				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
+//				__int64 rem;
+//				::Math::DivRem(Nbytes, 2880, rem);
+//				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
+//			}
+//
+//			endheader = false;//reset to scan next header
+//			extensionentryfound = false;//re-find the table entry we want
+//			extensionentry_index = -1;//re-find its index
+//			typesset = false;//reset the type arrays
+//			ttypeindex = -1;
+//
+//			if (fs->Position >= fs->Length)
+//				endfile = true;
+//		}
+//	}
+//
+//	if (!extensionfound)
+//	{
+//		fs->Close();
+//		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
+//	}
+//
+//	if (!extensionentryfound)
+//	{
+//		fs->Close();
+//		throw gcnew Exception("ExtensionEntryLabel wasn't found: '" + ExtensionEntryLabel + "'");
+//	}
+//
+//	//now at end of found extension header, can read the table
+//	int NBytes = naxis1 * naxis2;
+//	int extensionentryinstances = tinstances[extensionentry_index];
+//	Width = extensionentryinstances;
+//	Height = naxis2;
+//	result = gcnew array<double>(naxis2 * extensionentryinstances);
+//	array<unsigned char>^ arr = gcnew array<unsigned char>(NBytes);
+//	fs->Read(arr, 0, NBytes);
+//	fs->Close();
+//
+//	TypeCode extensionentrycode = tcodes[extensionentry_index];
+//	int byteoffset = 0;
+//	for (int i = 0; i < extensionentry_index; i++)
+//		byteoffset += tbytes[i];
+//	int currentbyte;
+//
+//	switch (extensionentrycode)
+//	{
+//		case ::TypeCode::Double:
+//		{
+//			#pragma omp parallel for private(currentbyte)
+//			for (int i = 0; i < naxis2; i++)
+//			{
+//				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+//				for (int j = 0; j < extensionentryinstances; j++)
+//				{
+//					currentbyte = byteoffset + i * naxis1 + j * 8;
+//					dbl[7] = arr[currentbyte];
+//					dbl[6] = arr[currentbyte + 1];
+//					dbl[5] = arr[currentbyte + 2];
+//					dbl[4] = arr[currentbyte + 3];
+//					dbl[3] = arr[currentbyte + 4];
+//					dbl[2] = arr[currentbyte + 5];
+//					dbl[1] = arr[currentbyte + 6];
+//					dbl[0] = arr[currentbyte + 7];
+//					result[i * extensionentryinstances + j] = BitConverter::ToDouble(dbl, 0);
+//				}
+//			}
+//			break;
+//		}
+//
+//		case (::TypeCode::Int64):
+//		{
+//			#pragma omp parallel for private(currentbyte)
+//			for (int i = 0; i < naxis2; i++)
+//			{
+//				array<unsigned char>^ i64 = gcnew array<unsigned char>(8);
+//				for (int j = 0; j < extensionentryinstances; j++)
+//				{
+//					currentbyte = byteoffset + i * naxis1 + j * 8;
+//					i64[7] = arr[currentbyte];
+//					i64[6] = arr[currentbyte + 1];
+//					i64[5] = arr[currentbyte + 2];
+//					i64[4] = arr[currentbyte + 3];
+//					i64[3] = arr[currentbyte + 4];
+//					i64[2] = arr[currentbyte + 5];
+//					i64[1] = arr[currentbyte + 6];
+//					i64[0] = arr[currentbyte + 7];
+//					result[i * extensionentryinstances + j] = (double)BitConverter::ToInt64(i64, 0);
+//				}
+//			}
+//			break;
+//		}
+//
+//		case ::TypeCode::Single:
+//		{
+//			#pragma omp parallel for private(currentbyte)
+//			for (int i = 0; i < naxis2; i++)
+//			{
+//				array<unsigned char>^ sng = gcnew array<unsigned char>(4);
+//				for (int j = 0; j < extensionentryinstances; j++)
+//				{
+//					currentbyte = byteoffset + i * naxis1 + j * 4;
+//					sng[3] = arr[currentbyte];
+//					sng[2] = arr[currentbyte + 1];
+//					sng[1] = arr[currentbyte + 2];
+//					sng[0] = arr[currentbyte + 3];
+//					result[i * extensionentryinstances + j] = (double)BitConverter::ToSingle(sng, 0);
+//				}
+//			}
+//			break;
+//		}
+//
+//		case ::TypeCode::UInt32:
+//		case ::TypeCode::Int32:
+//		{
+//			double bzero = 2147483648;
+//			if (extensionentrycode == ::TypeCode::Int32)
+//				bzero = 0;
+//			__int32 val;
+//
+//			#pragma omp parallel for private(val, currentbyte)
+//			for (int i = 0; i < naxis2; i++)
+//			{
+//				for (int j = 0; j < extensionentryinstances; j++)
+//				{
+//					currentbyte = byteoffset + i * naxis1 + j * 4;
+//					val = (arr[currentbyte] << 24) | (arr[currentbyte + 1] << 16) | (arr[currentbyte + 2] << 8) | arr[currentbyte + 3];
+//					result[i * extensionentryinstances + j] = double(val) + bzero;
+//				}
+//			}
+//			break;
+//		}
+//
+//		case ::TypeCode::UInt16:
+//		case ::TypeCode::Int16:
+//		{
+//			double bzero = 32768;
+//			if (extensionentrycode == ::TypeCode::Int16)
+//				bzero = 0;
+//			__int16 val;
+//
+//			#pragma omp parallel for private(val, currentbyte)
+//			for (int i = 0; i < naxis2; i++)
+//			{
+//				for (int j = 0; j < extensionentryinstances; j++)
+//				{
+//					currentbyte = byteoffset + i * naxis1 + j * 2;
+//					val = (arr[currentbyte] << 8) | arr[currentbyte + 1];
+//					result[i * extensionentryinstances + j] = double(val) + bzero;
+//				}
+//			}
+//			break;
+//		}
+//
+//		case ::TypeCode::Byte:
+//		case ::TypeCode::SByte:
+//		{
+//			double bzero = 128;
+//			if (extensionentrycode == ::TypeCode::SByte)
+//				bzero = 0;
+//
+//			#pragma omp parallel for private(currentbyte)
+//			for (int i = 0; i < naxis2; i++)
+//			{
+//				for (int j = 0; j < extensionentryinstances; j++)
+//				{
+//					currentbyte = byteoffset + i * naxis1 + j;
+//					result[i * extensionentryinstances + j] = double(arr[currentbyte]) + bzero;
+//				}
+//			}
+//			break;
+//		}
+//
+//		case ::TypeCode::Boolean:
+//		{
+//			#pragma omp parallel for private(currentbyte)
+//			for (int i = 0; i < naxis2; i++)
+//			{
+//				for (int j = 0; j < extensionentryinstances; j++)
+//				{
+//					currentbyte = byteoffset + i * naxis1 + j;
+//					result[i * extensionentryinstances + j] = double((bool)arr[currentbyte]);
+//				}
+//			}
+//			break;
+//		}
+//
+//		default:
+//			throw gcnew Exception("Unrecognized TypeCode: '" + extensionentrycode.ToString() + "'");
+//	}
+//
+//	return result;
+//}
+
 void JPFITS::FITSBinTable::RemoveExtension(String^ FileName, String^ ExtensionName)
 {
-	if (!File::Exists(FileName))
-		throw gcnew Exception("FileName '" + FileName + "'not found!");
-
 	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	array<unsigned char>^ charheaderblock;
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	while (!endheader)
+	bool hasext = false;
+	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
 	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
-	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-	//now at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	endheader = false;//reset
-	bool extensionfound = false;
-
-	bool endfile = false;
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	__int64 extensionstartposition = fs->Position;
-	__int64 extensionendposition;
-
-	while (!extensionfound && !endfile)
-	{
-		extensionstartposition = fs->Position;
-
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
-		{
-			//read 80 byte line
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-			if (strheaderline->Substring(0, 8) == "END     ")//check if we're at the end of the header keys
-				endheader = true;
-		}
-		fs->Position -= (80 * headerlines);//go back to start of header
-		headerblocks = (headerlines - 1) / 36 + 1;
-		//read headernblocks 2880 byte blocks
-		charheaderblock = gcnew array<unsigned char>(2880 * headerblocks);
-		fs->Read(charheaderblock, 0, 2880 * headerblocks);//stream will be placed at end of header block, so that it can begin reading data values or 2ndry header later
-
-		for (int i = 0; i < headerlines; i++)
-		{
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderblock, i * 80, 80);
-
-			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-					extensionfound = true;
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		}
-
-		//now at end of extension header, skip its data
-		if (naxis != 0)
-		{
-			__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-			__int64 rem;
-			::Math::DivRem(Nbytes, 2880, rem);
-			fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-		}
-
-		extensionendposition = fs->Position;
-
-		if (fs->Position >= fs->Length)
-			endfile = true;
+		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
+		fs->Close();
+		return;
 	}
 
-	if (!extensionfound)
+	__int64 extensionstartposition, extensionendposition;
+	bool exists = FITSFILEOPS::SEEKEXTENSION(fs, "BINTABLE", ExtensionName, nullptr, extensionstartposition, extensionendposition);
+	if (!exists)
 	{
 		fs->Close();
-		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
+		throw gcnew Exception("Could not find BINTABLE with name '" + ExtensionName + "'");
+		return;
 	}
 
 	//if here then we found the extension and can excise it given its start and end position
@@ -1930,336 +661,135 @@ void JPFITS::FITSBinTable::RemoveExtension(String^ FileName, String^ ExtensionNa
 
 bool JPFITS::FITSBinTable::ExtensionExists(String^ FileName, String^ ExtensionName)
 {
-	if (!File::Exists(FileName))
-		throw gcnew Exception("FileName '" + FileName + "'not found!");
-
 	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-	array<unsigned char>^ charheaderblock;
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false;
-	int headerlines = 0, headerblocks = 0;
-	String^ strheaderline;
-	while (!endheader)
+	bool hasext = false;
+	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
 	{
-		headerlines++;
-		fs->Read(charheaderline, 0, 80);
-		strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-
-		if (strheaderline->Substring(0, 8) == "NAXIS   ")
-		{
-			naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			naxisn = gcnew array<int>(naxis);
-		}
-		if (strheaderline->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-		{
-			naxisn[Nnaxisn - 1] = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			Nnaxisn++;
-		}
-		if (strheaderline->Substring(0, 8) == "BITPIX  ")
-			bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		if (strheaderline->Substring(0, 8) == "END     ")
-			endheader = true;
-	}
-	headerblocks = (headerlines - 1) / 36 + 1;
-	fs->Position += (headerblocks * 36 - headerlines) * 80;
-
-	//now at end of primary header; if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	endheader = false;//reset
-	bool extensionfound = false;
-
-	bool endfile = false;
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	while (!extensionfound && !endfile)
-	{
-		headerblocks = 0;
-		headerlines = 0;
-		endheader = false;//reset
-		while (!endheader)
-		{
-			//read 80 byte line
-			headerlines++;
-			fs->Read(charheaderline, 0, 80);
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-			if (strheaderline->Substring(0, 8) == "END     ")//check if we're at the end of the header keys
-				endheader = true;
-		}
-		fs->Position -= (80 * headerlines);//go back to start of header
-		headerblocks = (headerlines - 1) / 36 + 1;
-		//read headernblocks 2880 byte blocks
-		charheaderblock = gcnew array<unsigned char>(2880 * headerblocks);
-		fs->Read(charheaderblock, 0, 2880 * headerblocks);//stream will be placed at end of header block, so that it can begin reading data values or 2ndry header later
-
-		for (int i = 0; i < headerlines; i++)
-		{
-			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderblock, i * 80, 80);
-
-			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-					extensionfound = true;
-				return extensionfound;
-			}
-
-			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-			{
-				int f = strheaderline->IndexOf("'");
-				int l = strheaderline->LastIndexOf("'");
-				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-					extensionfound = true;
-				return extensionfound;
-			}
-
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-		}
-
-		//now at end of extension header, skip its data
-		if (naxis != 0)
-		{
-			__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-			__int64 rem;
-			::Math::DivRem(Nbytes, 2880, rem);
-			fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-		}
-
-		if (fs->Position >= fs->Length)
-			endfile = true;
+		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
+		fs->Close();
+		return false;
 	}
 
-	return extensionfound;
+	__int64 start, end;
+	bool exists = FITSFILEOPS::SEEKEXTENSION(fs, "BINTABLE", ExtensionName, nullptr, start, end);
+	fs->Close();
+	return exists;
 }
 
 void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData)
 {
 	if (!File::Exists(FileName))//then write a new file, otherwise check the existing file for existing table, etc.
 	{
-		JPFITS::FITSImage^ ff = gcnew FITSImage(FileName);
-		ff->WriteFile(TypeCode::Double, true);
+		JPFITS::FITSImage^ ff = gcnew FITSImage(FileName, true);
+		ff->WriteImage(TypeCode::Double, true);
 	}
+
+	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
+
+	bool hasext = false;
+	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext))
+	{
+		fs->Close();
+		throw gcnew Exception("File not formatted as FITS file. Use a new file.");
+		return;
+	}
+	if (!hasext)
+	{
+		fs->Position = 0;
+		FITSFILEOPS::SCANPRIMARYUNIT(fs, false, nullptr, hasext);
+		array<unsigned char>^ primarydataarr = gcnew array<unsigned char>((int)(fs->Length - fs->Position));
+		fs->Read(primarydataarr, 0, primarydataarr->Length);
+		fs->Close();
+
+		FITSImage^ ff = gcnew FITSImage(FileName, nullptr, true, false, false, false);
+		int n = ff->GetKeyIndex("NAXIS");
+		if (n == -1)
+		{
+			throw gcnew Exception("File not formatted as FITS file (NAXIS not present). Use a new file.");
+			return;
+		}
+		n = Convert::ToInt32(ff->GetKeyValue("NAXIS"));
+		if (n > 0)
+		{
+			n = ff->GetKeyIndex("NAXIS" + n.ToString());
+			if (ff->GetKeyIndex("BZERO") > n)
+				n = ff->GetKeyIndex("BZERO");
+			if (ff->GetKeyIndex("BSCALE") > n)
+				n = ff->GetKeyIndex("BSCALE");
+		}
+		else
+			n = ff->GetKeyIndex("NAXIS");
+		ff->SetKey("EXTEND", "T", "FITS file may contain extensions", true, n + 1);
+		array<String^>^ HEADER = FITSFILEOPS::GETFORMATTEDIMAGEHEADER(ff->HeaderKeys, ff->HeaderKeyValues, ff->HeaderKeyComments, false);
+
+		array<unsigned char>^ headarr = gcnew array<unsigned char>(HEADER->Length * 80);
+		for (int i = 0; i < HEADER->Length; i++)
+			for (int j = 0; j < 80; j++)
+				headarr[i * 80 + j] = (unsigned char)HEADER[i][j];
+
+		fs = gcnew FileStream(FileName, IO::FileMode::Create);
+		fs->Write(headarr, 0, headarr->Length);
+		fs->Write(primarydataarr, 0, primarydataarr->Length);
+		fs->Close();
+
+		fs = gcnew FileStream(FileName, IO::FileMode::Open);
+		FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext);
+	}
+
+	__int64 startpos, endpos;
+	bool extensionfound = FITSFILEOPS::SEEKEXTENSION(fs, "BINTABLE", ExtensionName, nullptr, startpos, endpos);
+	if (extensionfound && !OverWriteExtensionIfExists)
+	{
+		fs->Close();
+		throw gcnew Exception("ExtensionName '" + ExtensionName + "' already exists and was told to not overwrite it...");
+		return;
+	}
+	array<unsigned char>^ arr_append;
+	if (extensionfound && endpos != fs->Length)//then this was not the end of the file...get the appendage data
+	{
+		fs->Position = endpos;
+		arr_append = gcnew array<unsigned char>(int(fs->Length - endpos));
+		fs->Read(arr_append, 0, arr_append->Length);
+	}
+	if (extensionfound)
+		fs->Position = startpos;
 
 	array<TypeCode>^ ExtensionEntryDataTypes = gcnew array<TypeCode>(ExtensionEntryData->Length);
 	for (int i = 0; i < ExtensionEntryData->Length; i++)
 		ExtensionEntryDataTypes[i] = Type::GetTypeCode((((Array^)ExtensionEntryData[i])->GetType())->GetElementType());
 
 	array<int>^ ExtensionEntryDataTypeInstances = gcnew array<int>(ExtensionEntryData->Length);
+	array<int>^ datanaxes2 = gcnew array<int>(ExtensionEntryData->Length);
 	for (int i = 0; i < ExtensionEntryData->Length; i++)
 	{
+		datanaxes2[i] = ((Array^)ExtensionEntryData[i])->Length;
 		int rank = ((Array^)ExtensionEntryData[i])->Rank;
 		if (rank == 1)
 			ExtensionEntryDataTypeInstances[i] = 1;
 		else
+		{
 			ExtensionEntryDataTypeInstances[i] = ((Array^)ExtensionEntryData[i])->GetLength(0);
-	}
-
-	added_extension:;
-
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-
-	array<unsigned char>^ c = gcnew array<unsigned char>(2880);
-	int naxis, naxis1, naxis2, bitpix, Nnaxisn = 1;
-	array<int>^ naxisn;
-
-	//read primary header
-	bool endheader = false, extendkeyexists = false;
-	int ncards = 0;
-	while (endheader == false)
-	{
-		//read 2880 block
-		ncards++;
-		fs->Read(c, 0, 2880);//stream will be placed at end of header block, so that it can begin reading data values or 2ndry header
-		for (int i = 0; i < 36; i++)
-		{
-			String^ line = System::Text::Encoding::ASCII->GetString(c, i * 80, 80);
-
-			if (line->Substring(0, 8) == "EXTEND  ")
-				extendkeyexists = true;//if it doesn't exist, then it needs to be added
-
-			if (line->Substring(0, 8) == "NAXIS   ")
-			{
-				naxis = ::Convert::ToInt32(line->Substring(10, 20));
-				naxisn = gcnew array<int>(naxis);
-			}
-			if (line->Substring(0, 8)->Trim() == "NAXIS" + Nnaxisn.ToString() && naxis >= Nnaxisn)
-			{
-				naxisn[Nnaxisn - 1] = ::Convert::ToInt32(line->Substring(10, 20));
-				Nnaxisn++;
-			}
-			if (line->Substring(0, 8) == "BITPIX  ")
-				bitpix = ::Convert::ToInt32(line->Substring(10, 20));
-			if (line->Substring(0, 8) == "END     ")//check if we're at the end of the header keys
-			{
-				endheader = true;
-				break;
-			}
-		}
-	}
-	//now at end of primary header
-
-	//if the primary header didn't contain the EXTEND keyword, it now needs it
-	if (!extendkeyexists)
-	{
-		array<unsigned char>^ arr = gcnew array<unsigned char>((int)fs->Length - ncards * 2880);
-		fs->Read(arr, 0, arr->Length);
-		fs->Close();
-
-		FITSImage^ ff = gcnew FITSImage(FileName, nullptr, true, false, false, false);
-		ff->AddKey("EXTEND", "T", "FITS file may contain extensions", -1);
-		ff->FORMATHEADER();
-
-		array<unsigned char>^ newarr = gcnew array<unsigned char>(arr->Length + ff->HEADER->Length * 80);
-
-		for (int i = 0; i < ff->HEADER->Length; i++)
-			for (int j = 0; j < 80; j++)
-				newarr[i * 80 + j] = (unsigned char)ff->HEADER[i][j];
-
-		Array::Copy(arr, 0, newarr, ff->HEADER->Length * 80, arr->Length);
-
-		fs = gcnew FileStream(FileName, IO::FileMode::Create);
-		fs->Write(newarr, 0, newarr->Length);
-		fs->Close();
-
-		goto added_extension;
-	}
-
-	//if primary header has image data, must skip past it
-	if (naxis != 0)
-	{
-		__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
-		for (int i = 0; i < naxisn->Length; i++)
-			NBytes *= naxisn[i];
-		__int64 rem;
-		::Math::DivRem(NBytes, 2880, rem);
-		fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
-	}
-	//should now be at the 1st header extension
-	//read it until it is at its end, and check to see if it is the extension we want
-
-	endheader = false;//reset
-	bool extensionfound = false;
-	bool endfile = false;
-	__int64 extensionstartposition = fs->Position;
-	__int64 extensionendposition = extensionstartposition;
-	if (fs->Position >= fs->Length)
-		endfile = true;
-
-	while (!extensionfound && !endfile)
-	{
-		extensionstartposition = fs->Position;
-		while (endheader == false)
-		{
-			//read 2880 block
-			fs->Read(c, 0, 2880);//stream will be placed at end of header block, so that it can begin reading data values or 2ndry header
-			for (int i = 0; i < 36; i++)
-			{
-				String^ line = System::Text::Encoding::ASCII->GetString(c, i * 80, 80);
-
-				if (line->Substring(0, 8) == "EXTNAME ")
-				{
-					int f = line->IndexOf("'");
-					int l = line->LastIndexOf("'");
-					if (ExtensionName == line->Substring(f + 1, l - f - 1)->Trim())
-						extensionfound = true;
-				}
-				if (line->Substring(0, 8) == "NAXIS   ")
-					naxis = ::Convert::ToInt32(line->Substring(10, 20));
-				if (line->Substring(0, 8) == "NAXIS1  ")
-					naxis1 = ::Convert::ToInt32(line->Substring(10, 20));
-				if (line->Substring(0, 8) == "NAXIS2  ")
-					naxis2 = ::Convert::ToInt32(line->Substring(10, 20));
-				if (line->Substring(0, 8) == "BITPIX  ")
-					bitpix = ::Convert::ToInt32(line->Substring(10, 20));
-				if (line->Substring(0, 8) == "END     ")//check if we're at the end of the header keys
-				{
-					endheader = true;
-					break;
-				}
-			}
-		}
-
-		if (extensionfound == false)
-		{
-			//now at end of extension header, skip its data
-			if (naxis != 0)
-			{
-				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-				__int64 rem;
-				::Math::DivRem(Nbytes, 2880, rem);
-				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-			}
-
-			endheader = false;//reset to scan next header
-
-			extensionendposition = fs->Position;
-
-			if (fs->Position >= fs->Length)
-				endfile = true;
+			datanaxes2[i] /= ExtensionEntryDataTypeInstances[i];
 		}
 	}
 
-	if (!OverWriteExtensionIfExists && extensionfound)
-	{
-		fs->Close();
-		throw gcnew Exception("ExtensionName '" + ExtensionName + "' already exists and was told to not overwrite it...");
-	}
-
-	//if extension is found (already exists) then will need to write the updated extension data over top of it, and then append on whatever remained in the original file (other extensions) if any
-
-	array<unsigned char>^ arr_append;
-	if (extensionfound && !endfile)
-	{
-		//skip to end of this extension data cards and see if we're at the end of the file; if not, then there is data to append
-		__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-		__int64 rem;
-		::Math::DivRem(Nbytes, 2880, rem);
-		fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-		if (fs->Position != fs->Length)//then this was not the end of the file...get the appendage data
+	//need to get the table width in bytes and height number of rows
+	int naxis1 = 0;
+	for (int i = 0; i < ExtensionEntryDataTypes->Length; i++)
+		naxis1 += TYPECODETONBYTES(ExtensionEntryDataTypes[i]) * ExtensionEntryDataTypeInstances[i];
+	int naxis2 = datanaxes2[0];
+	for (int i = 1; i < datanaxes2->Length; i++)
+		if (naxis2 != datanaxes2[i])
 		{
-			arr_append = gcnew array<unsigned char>(int(fs->Length - fs->Position));
-			fs->Read(arr_append, 0, arr_append->Length);
+			fs->Close();
+			throw gcnew Exception("ExtensionEntryData do not all have the same number of rows, NAXES2. Cannot continue;");
+			return;
 		}
-	}
-
-	//can now write the extension at the extension start position...append remaining data if needed afterwards
-	if (!endfile)
-		fs->Position = extensionstartposition;
 
 	//format the header for writing
-	array<String^>^ header = FORMATBINARYTABLEEXTENSIONHEADER(ExtensionName, ExtensionEntryData, ExtensionEntryLabels, ExtensionEntryDataTypes, ExtensionEntryDataTypeInstances, ExtensionEntryDataUnits, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments);
+	array<String^>^ header = FORMATBINARYTABLEEXTENSIONHEADER(ExtensionName, ExtensionEntryData, ExtensionEntryLabels, ExtensionEntryDataUnits, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments);
 
-	//now format the data array
-	//need to get the table width in bytes and height number of rows
-	int rownbytes = 0, nrows = 0;
-	for (int i = 0; i < ExtensionEntryDataTypes->Length; i++)
-		rownbytes += TYPECODETONBYTES(ExtensionEntryDataTypes[i]) * ExtensionEntryDataTypeInstances[i];
-	array<int>^ dataNrows = EXTENSIONENTRYDATANROWS(ExtensionEntryData, ExtensionEntryDataTypes, ExtensionEntryDataTypeInstances);
-	nrows = JPMath::Max(dataNrows, false);
-	int NbytesExtension = nrows * rownbytes;//number of bytes in table
+	int NbytesExtension = naxis2 * naxis1;//number of bytes in table
 	int NbytesHead = header->Length * 80;//number of bytes in extension header...should always be multiple of 2880.
 	int NbytesHeadExtension = NbytesHead + NbytesExtension;//this is the number of bytes in the header + extension data...but need to write file so multiple of 2880 bytes
 	int Ncards = int(Math::Ceiling(double(NbytesHeadExtension) / 2880.0));
@@ -2273,14 +803,14 @@ void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionNam
 
 	int nthread = omp_get_max_threads();
 	bool parallel_top = false;
-	if (nrows >= nthread)
+	if (naxis2 >= nthread)
 		parallel_top = true;
 	bool exception = false;
 	TypeCode exceptiontypecode;
 
 	//now write the table data into the array
 	#pragma omp parallel for if(parallel_top)
-	for (int i = 0; i < nrows; i++)
+	for (int i = 0; i < naxis2; i++)
 	{
 		if (exception)
 			break;
@@ -2291,7 +821,7 @@ void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionNam
 			for (int jj = 0; jj < j; jj++)
 				jtps += TYPECODETONBYTES(ExtensionEntryDataTypes[jj]) * ExtensionEntryDataTypeInstances[jj];
 
-			int cc = NbytesHead + i * rownbytes + jtps;
+			int cc = NbytesHead + i * naxis1 + jtps;
 
 			switch (ExtensionEntryDataTypes[j])
 			{
@@ -2496,10 +1026,6 @@ void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionNam
 void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<TypeCode>^ ExtensionEntryDataTypes, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<double, 2>^ ExtensionEntryData)
 {
 	array<Object^>^ dataobj = gcnew array<Object^>(ExtensionEntryData->GetLength(0));
-	
-	/*array<int>^ ExtensionEntryDataTypeInstances = gcnew array<int>(dataobj->Length);
-	for (int i = 0; i < dataobj->Length; i++)
-		ExtensionEntryDataTypeInstances[i] = 1;*/
 
 	int nthread = omp_get_max_threads();
 	bool parallel_top = false;
@@ -2654,7 +1180,7 @@ void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionNam
 		return;
 	}
 
-	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, ExtensionEntryLabels, /*ExtensionEntryDataTypes, ExtensionEntryDataTypeInstances,*/ ExtensionEntryDataUnits, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments, dataobj);
+	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, ExtensionEntryLabels, ExtensionEntryDataUnits, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments, dataobj);
 }
 
 void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, String^ ExtensionEntryLabel, TypeCode ExtensionEntryDataType, String^ ExtensionEntryDataUnit, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<double>^ ExtensionEntryData)
@@ -2803,22 +1329,46 @@ void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionNam
 	array<TypeCode>^ ExtensionEntryDataTypes = gcnew array<TypeCode>(1) { ExtensionEntryDataType };
 	array<String^>^ ExtensionEntryDataUnits = gcnew array<String^>(1) { ExtensionEntryDataUnit };
 
-	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, ExtensionEntryLabels, /*ExtensionEntryDataTypes, ExtensionEntryDataTypeInstances,*/ ExtensionEntryDataUnits, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments, dataobj);
+	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, ExtensionEntryLabels, ExtensionEntryDataUnits, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments, dataobj);
 }
 
 
-array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ ExtensionName, array<Object^>^ ExtensionEntryData, array<String^>^ ExtensionEntryLabels, array<TypeCode>^ ExtensionEntryDataTypes, array<int>^ ExtensionEntryDataTypeInstances, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments)
+array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ ExtensionName, array<Object^>^ ExtensionEntryData, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments)
 {
 	ArrayList^ hkeyslist = gcnew ArrayList();
 	ArrayList^ hvalslist = gcnew ArrayList();
 	ArrayList^ hcomslist = gcnew ArrayList();
 
+	array<TypeCode>^ ExtensionEntryDataTypes = gcnew array<TypeCode>(ExtensionEntryData->Length);
+	for (int i = 0; i < ExtensionEntryData->Length; i++)
+		ExtensionEntryDataTypes[i] = Type::GetTypeCode((((Array^)ExtensionEntryData[i])->GetType())->GetElementType());
+
+	array<int>^ ExtensionEntryDataTypeInstances = gcnew array<int>(ExtensionEntryData->Length);
+	array<int>^ datanaxes2 = gcnew array<int>(ExtensionEntryData->Length);
+	for (int i = 0; i < ExtensionEntryData->Length; i++)
+	{
+		datanaxes2[i] = ((Array^)ExtensionEntryData[i])->Length;
+		int rank = ((Array^)ExtensionEntryData[i])->Rank;
+		if (rank == 1)
+			ExtensionEntryDataTypeInstances[i] = 1;
+		else
+		{
+			ExtensionEntryDataTypeInstances[i] = ((Array^)ExtensionEntryData[i])->GetLength(0);
+			datanaxes2[i] /= ExtensionEntryDataTypeInstances[i];
+		}
+	}
+
 	//need to get the table width in bytes and height number of rows
-	int rownbytes = 0, nrows = 0;
+	int naxis1 = 0;
 	for (int i = 0; i < ExtensionEntryDataTypes->Length; i++)
-		rownbytes += TYPECODETONBYTES(ExtensionEntryDataTypes[i]) * ExtensionEntryDataTypeInstances[i];
-	array<int>^ dataNrows = EXTENSIONENTRYDATANROWS(ExtensionEntryData, ExtensionEntryDataTypes, ExtensionEntryDataTypeInstances);
-	nrows = JPMath::Max(dataNrows, false);
+		naxis1 += TYPECODETONBYTES(ExtensionEntryDataTypes[i]) * ExtensionEntryDataTypeInstances[i];
+	int naxis2 = datanaxes2[0];
+	for (int i = 1; i < datanaxes2->Length; i++)
+		if (naxis2 != datanaxes2[i])
+		{
+			throw gcnew Exception("ExtensionEntryData do not all have the same number of rows, NAXES2. Cannot continue;");
+			return nullptr;
+		}
 
 	hkeyslist->Add("XTENSION");
 	hvalslist->Add("BINTABLE");
@@ -2830,10 +1380,10 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ E
 	hvalslist->Add("2");
 	hcomslist->Add("2-dimensional binary table");
 	hkeyslist->Add("NAXIS1");
-	hvalslist->Add(rownbytes.ToString());
+	hvalslist->Add(naxis1.ToString());
 	hcomslist->Add("width of table in bytes");
 	hkeyslist->Add("NAXIS2");
-	hvalslist->Add(nrows.ToString());
+	hvalslist->Add(naxis2.ToString());
 	hcomslist->Add("number of rows in table");
 	hkeyslist->Add("PCOUNT");
 	hvalslist->Add("0");
@@ -2895,7 +1445,7 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ E
 			hvalslist->Add("1");
 			hcomslist->Add("data are not scaled");
 		}
-		if (ExtensionEntryDataTypes[i] == TypeCode::Int16)
+		if (ExtensionEntryDataTypes[i] == TypeCode::Int32)
 		{
 			hkeyslist->Add("TZERO" + (i + 1).ToString());
 			hvalslist->Add("0");
@@ -3176,86 +1726,103 @@ int JPFITS::FITSBinTable::TYPECODETONBYTES(TypeCode typecode)
 	}
 }
 
-array<int>^ JPFITS::FITSBinTable::EXTENSIONENTRYDATANROWS(array<Object^>^ ExtensionEntryData, array<TypeCode>^ ExtensionEntryDataTypes, array<int>^ ExtensionEntryDataTypeInstances)
+void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 {
-	array<int>^ lengths = gcnew array<int>(ExtensionEntryData->Length);
+	HEADER = gcnew array<String^>(header->Count);
+	String^ strheaderline;
+	int ttypeindex = -1;
 
-	for (int i = 0; i < ExtensionEntryData->Length; i++)
+	for (int i = 0; i < header->Count; i++)
 	{
-		switch (ExtensionEntryDataTypes[i])
+		strheaderline = (String^)header[i];
+		HEADER[i] = strheaderline;
+		//do keys, values, and comments???????
+
+		if (NAXIS == 0)
+			if (strheaderline->Substring(0, 8) == "NAXIS   ")
+			{
+				NAXIS = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+				continue;
+			}
+		if (NAXIS1 == 0)
+			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
+			{
+				NAXIS1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+				continue;
+			}
+		if (NAXIS2 == 0)
+			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
+			{
+				NAXIS2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+				continue;
+			}
+		if (BITPIX == 0)
+			if (strheaderline->Substring(0, 8) == "BITPIX  ")
+			{
+				BITPIX = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+				continue;
+			}
+
+		if (TFIELDS == 0)
+			if (strheaderline->Substring(0, 8) == "TFIELDS ")
+			{
+				TFIELDS = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+				TTYPES = gcnew array<String^>(TFIELDS);
+				TFORMS = gcnew array<String^>(TFIELDS);
+				TBYTES = gcnew array<int>(TFIELDS);
+				TINSTANCES = gcnew array<int>(TFIELDS);
+				TCODES = gcnew array<::TypeCode>(TFIELDS);
+				TUNITS = gcnew array<String^>(TFIELDS);
+				continue;
+			}
+
+		if (strheaderline->Substring(0, 8)->Contains("TTYPE" + (ttypeindex + 2).ToString()) || strheaderline->Substring(0, 8)->Contains("TFORM" + (ttypeindex + 2).ToString()))
+			ttypeindex++;
+
+		if (strheaderline->Substring(0, 8)->Contains("TTYPE"))
 		{
-			case TypeCode::Double:
-			{
-				if (ExtensionEntryDataTypeInstances[i] == 1)
-					lengths[i] = ((array<double>^)ExtensionEntryData[i])->Length;
-				else
-					lengths[i] = ((array<double, 2>^)ExtensionEntryData[i])->Length / ExtensionEntryDataTypeInstances[i];
-				break;
-			}
+			int f = strheaderline->IndexOf("'");
+			int l = strheaderline->LastIndexOf("'");
+			TTYPES[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
+			continue;
+		}
 
-			case TypeCode::Single:
-			{
-				if (ExtensionEntryDataTypeInstances[i] == 1)
-					lengths[i] = ((array<float>^)ExtensionEntryData[i])->Length;
-				else
-					lengths[i] = ((array<float, 2>^)ExtensionEntryData[i])->Length / ExtensionEntryDataTypeInstances[i];
-				break;
-			}
+		if (strheaderline->Substring(0, 8)->Contains("TFORM"))
+		{
+			int f = strheaderline->IndexOf("'");
+			int l = strheaderline->LastIndexOf("'");
+			TFORMS[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
+			int instances = 1;
+			TBYTES[ttypeindex] = TFORMTONBYTES(TFORMS[ttypeindex], instances);//need to convert the tform to Nbytes
+			TINSTANCES[ttypeindex] = instances;
+			TCODES[ttypeindex] = TFORMTYPECODE(TFORMS[ttypeindex]);
+			continue;
+		}
 
-			case TypeCode::Int64:
-			case TypeCode::UInt64:
-			{
-				if (ExtensionEntryDataTypeInstances[i] == 1)
-					lengths[i] = ((array<__int64>^)ExtensionEntryData[i])->Length;
-				else
-					lengths[i] = ((array<__int64, 2>^)ExtensionEntryData[i])->Length / ExtensionEntryDataTypeInstances[i];
-				break;
-			}
+		if (strheaderline->Substring(0, 8)->Contains("TUNIT"))
+		{
+			int f = strheaderline->IndexOf("'");
+			int l = strheaderline->LastIndexOf("'");
+			TUNITS[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
+			continue;
+		}
 
-			case TypeCode::Int32:
-			case TypeCode::UInt32:
-			{
-				if (ExtensionEntryDataTypeInstances[i] == 1)
-					lengths[i] = ((array<__int32>^)ExtensionEntryData[i])->Length;
-				else
-					lengths[i] = ((array<__int32, 2>^)ExtensionEntryData[i])->Length / ExtensionEntryDataTypeInstances[i];
-				break;
-			}
-
-			case TypeCode::Int16:
-			case TypeCode::UInt16:
-			{
-				if (ExtensionEntryDataTypeInstances[i] == 1)
-					lengths[i] = ((array<__int16>^)ExtensionEntryData[i])->Length;
-				else
-					lengths[i] = ((array<__int16, 2>^)ExtensionEntryData[i])->Length / ExtensionEntryDataTypeInstances[i];
-				break;
-			}
-
-			case TypeCode::Byte:
-			case TypeCode::SByte:
-			{
-				if (ExtensionEntryDataTypeInstances[i] == 1)
-					lengths[i] = ((array<char>^)ExtensionEntryData[i])->Length;
-				else
-					lengths[i] = ((array<char, 2>^)ExtensionEntryData[i])->Length / ExtensionEntryDataTypeInstances[i];
-				break;
-			}
-
-			case TypeCode::Boolean:
-			{
-				if (ExtensionEntryDataTypeInstances[i] == 1)
-					lengths[i] = ((array<bool>^)ExtensionEntryData[i])->Length;
-				else
-					lengths[i] = ((array<bool, 2>^)ExtensionEntryData[i])->Length / ExtensionEntryDataTypeInstances[i];
-				break;
-			}
-
-			default:
-				throw gcnew Exception("Unrecognized typecode: '" + ExtensionEntryDataTypes[i].ToString() + "'");
+		//need to determine if the TypeCode here is supposed to be for signed or unsigned IF the type is an integer (8, 16 or 32 bit)
+		//therefore find the TSCALE and TZERO for this entry...if they don't exist then it is signed, if they do exist
+		//then it is whatever values they are, for either determined signed or unsigned
+		//then set this current tcode[typeindex] to what it should be
+		if (strheaderline->Substring(0, 8)->Contains("TZERO"))
+		{
+			if (TCODES[ttypeindex] == TypeCode::SByte)//then get the value
+				if (Convert::ToByte(strheaderline->Substring(10, 20)->Trim()) == 128)//then it is an unsigned
+					TCODES[ttypeindex] = TypeCode::Byte;
+			if (TCODES[ttypeindex] == TypeCode::Int16)//then get the value
+				if (Convert::ToUInt16(strheaderline->Substring(10, 20)->Trim()) == 32768)//then it is an unsigned
+					TCODES[ttypeindex] = TypeCode::UInt16;
+			if (TCODES[ttypeindex] == TypeCode::Int32)//then get the value
+				if (Convert::ToUInt32(strheaderline->Substring(10, 20)->Trim()) == 2147483648)//then it is an unsigned
+					TCODES[ttypeindex] = TypeCode::UInt32;
 		}
 	}
-
-	return lengths;
 }
 

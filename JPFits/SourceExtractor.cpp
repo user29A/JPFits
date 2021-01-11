@@ -144,7 +144,7 @@ void JPFITS::SourceExtractor::Extract_Sources(array<double, 2>^ image, array<dou
 			file = String::Concat(file->Substring(0, ind), "_", (i + 1).ToString("00000000"), ".fits");
 
 			JPFITS::FITSImage^ f = gcnew ::JPFITS::FITSImage(file, kernel, false, false);
-			f->WriteFile(TypeCode::Double, false);
+			f->WriteImage(TypeCode::Double, false);
 		}
 	}
 }
@@ -284,7 +284,7 @@ void JPFITS::SourceExtractor::BGWRKR_DoWork(System::Object^  sender, System::Com
 								file = String::Concat(file->Substring(0, ind), "_", Xs->Count.ToString("00000000"), ".fits");
 
 								JPFITS::FITSImage^ f = gcnew JPFITS::FITSImage(file, kernel, false, false);
-								f->WriteFile(TypeCode::Double, false);
+								f->WriteImage(TypeCode::Double, false);
 							}
 						}
 					}
@@ -457,7 +457,7 @@ void JPFITS::SourceExtractor::BGWRKR_DoWork(System::Object^  sender, System::Com
 						file = String::Concat(file->Substring(0, ind), "_", Xs->Count.ToString("00000000"), ".fits");
 
 						JPFITS::FITSImage^ f = gcnew JPFITS::FITSImage(file, kernel, false, false);
-						f->WriteFile(TypeCode::Double, false);
+						f->WriteImage(TypeCode::Double, false);
 					}
 				}
 			}

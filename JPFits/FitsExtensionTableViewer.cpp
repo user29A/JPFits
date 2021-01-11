@@ -45,8 +45,10 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 
 		EXTENSIONNAME = ExtensionName;
 
-		array<String^>^ labels = JPFITS::FITSBinTable::GetExtensionEntryLabels(FILENAME, EXTENSIONNAME);
-		array<int>^ instances = JPFITS::FITSBinTable::GetExtensionEntryDataInstances(FILENAME, EXTENSIONNAME);
+		FITSBinTable^ bt = gcnew FITSBinTable(FILENAME, EXTENSIONNAME);
+		array<String^>^ labels = bt->TableDataLabelsTTYPE;
+
+		//array<String^>^ labels = JPFITS::FITSBinTable::GetExtensionEntryLabels(FILENAME, EXTENSIONNAME);
 
 		for (int i = 0; i < labels->Length; i++)
 			labels[i] = labels[i]->Trim();
@@ -70,7 +72,7 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 
 		//DATATABLE = FITSImage::ReadBinaryTableExtensionEntries(FILENAME, EXTENSIONNAME, labels);
 		int width = 0, height = 0;
-		array<double>^ entry = JPFITS::FITSBinTable::GetExtensionEntry(FILENAME, EXTENSIONNAME, labels[0], width, height);
+		array<double>^ entry = bt->GetTTYPEEntry(labels[0], width, height);
 		ExtensionTableGrid->RowCount = height;
 
 		/*#pragma omp parallel for
@@ -86,7 +88,7 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 		DATATABLE = gcnew array<double, 2>(labels->Length, height);
 		for (int i = 0; i < labels->Length; i++)
 		{
-			entry = JPFITS::FITSBinTable::GetExtensionEntry(FILENAME, EXTENSIONNAME, labels[i], width, height);
+			entry = bt->GetTTYPEEntry(labels[i], width, height);
 			if (width != 1)
 				for (int j = 0; j < height; j++)
 				{
@@ -331,9 +333,11 @@ void JPFITS::FitsExtensionTableViewer::ViewHeaderMenu_Click(System::Object^  sen
 {
 	HeaderListBox->Items->Clear();
 
-	array<String^>^ header = JPFITS::FITSBinTable::GetExtensionHeader(FILENAME, EXTENSIONNAME);
-	for (int i = 0; i < header->Length; i++)
-		HeaderListBox->Items->Add(header[i]);
+	FITSBinTable^ bt = gcnew FITSBinTable(FILENAME, EXTENSIONNAME);
+	//array<String^>^ header = JPFITS::FITSBinTable::GetExtensionHeader(FILENAME, EXTENSIONNAME);
+	
+	for (int i = 0; i < bt->Header->Length; i++)
+		HeaderListBox->Items->Add(bt->Header[i]);
 
 	if (!headerfront)
 		HeaderListBox->BringToFront();
