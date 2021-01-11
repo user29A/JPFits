@@ -1,4 +1,4 @@
-/*Copyright 2017 Joseph Edwin Postma
+/*Copyright 2021 Joseph Edwin Postma
 
 Contact email: joepostma@live.ca
 
@@ -14,8 +14,7 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with JPFITS. If not, see http://www.gnu.org/licenses/. */
+See http://www.gnu.org/licenses/. */
 
 
 #include "stdafx.h"
