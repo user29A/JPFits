@@ -119,9 +119,7 @@ bool JPFITS::FITSFILEOPS::SCANPRIMARYUNIT(FileStream^ fs, bool scanpastprimaryda
 			__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
 			for (int i = 0; i < naxisn->Length; i++)
 				NBytes *= naxisn[i];
-			__int64 rem;
-			::Math::DivRem(NBytes, 2880, rem);
-			fs->Seek(NBytes + (2880 - rem), ::SeekOrigin::Current);
+			fs->Seek(__int64(Math::Ceiling(double(NBytes) / 2880) * 2880), ::SeekOrigin::Current);
 		}
 
 	return true;
@@ -206,10 +204,8 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 
 		if (naxis != 0)
 		{
-			__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-			__int64 rem;
-			::Math::DivRem(Nbytes, 2880, rem);
-			fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
+			__int64 NBytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
+			fs->Seek(__int64(Math::Ceiling(double(NBytes) / 2880) * 2880), ::SeekOrigin::Current);
 		}
 
 		if (fs->Position >= fs->Length)
@@ -308,13 +304,11 @@ bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, 
 		endposition = fs->Position;
 		if (naxis != 0)
 		{
-			__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-			__int64 rem;
-			::Math::DivRem(Nbytes, 2880, rem);
+			__int64 NBytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
 			if (!extensionfound)
-				fs->Seek(Nbytes + 2880 - rem, ::SeekOrigin::Current);
+				fs->Seek(__int64(Math::Ceiling(double(NBytes) / 2880) * 2880), ::SeekOrigin::Current);
 			else
-				endposition = fs->Position + Nbytes + 2880 - rem;
+				endposition = fs->Position + __int64(Math::Ceiling(double(NBytes) / 2880) * 2880);
 		}	
 	}
 	
@@ -361,6 +355,60 @@ array<String^>^ JPFITS::FITSFILEOPS::GETFORMATTEDIMAGEHEADER(array<String^>^ ima
 		imageHeaderKeys[0] = "XTENSION";
 		imageHeaderKeyValues[0] = "IMAGE";
 		imageHeaderKeyComments[0] = "Image extension";
+
+		bool pcountkey = false, gcountkey = false;
+		for (int i = 0; i < imageHeaderKeys->Length; i++)
+			if (!pcountkey || !gcountkey)
+			{
+				if (imageHeaderKeys[i]->Trim() == "PCOUNT")
+					pcountkey = true;
+				if (imageHeaderKeys[i]->Trim() == "GCOUNT")
+					pcountkey = true;
+			}
+		if (!pcountkey && !gcountkey)//they would BOTH not be present if things are being done correctly...need to add them
+		{
+			int naxis = -1;
+			for (int i = 0; i < imageHeaderKeys->Length; i++)
+				if (imageHeaderKeys[i]->Trim() == "NAXIS")
+				{
+					naxis = Convert::ToInt32(imageHeaderKeyValues[i]->Trim());
+					break;
+				}
+			int naxisNindex = -1;
+			for (int i = 0; i < imageHeaderKeys->Length; i++)
+				if (imageHeaderKeys[i]->Trim() == "NAXIS" + naxis.ToString())
+				{
+					naxisNindex = i;
+					break;
+				}
+			array<String^>^ keys = gcnew array<String^>(imageHeaderKeys->Length + 2);
+			array<String^>^ vals = gcnew array<String^>(imageHeaderKeys->Length + 2);
+			array<String^>^ coms = gcnew array<String^>(imageHeaderKeys->Length + 2);
+
+			for (int i = 0; i <= naxisNindex; i++)
+			{
+				keys[i] = imageHeaderKeys[i];
+				vals[i] = imageHeaderKeyValues[i];
+				coms[i] = imageHeaderKeyComments[i];
+			}
+			keys[naxisNindex + 1] = "PCOUNT";
+			vals[naxisNindex + 1] = "0";
+			coms[naxisNindex + 1] = "";
+			keys[naxisNindex + 2] = "GCOUNT";
+			vals[naxisNindex + 2] = "1";
+			coms[naxisNindex + 2] = "";
+
+			for (int i = naxisNindex + 3; i < keys->Length; i++)
+			{
+				keys[i] = imageHeaderKeys[i - 2];
+				vals[i] = imageHeaderKeyValues[i - 2];
+				coms[i] = imageHeaderKeyComments[i - 2];
+			}
+
+			imageHeaderKeys = keys;
+			imageHeaderKeyValues = vals;
+			imageHeaderKeyComments = coms;
+		}
 	}
 	else
 	{

@@ -254,6 +254,7 @@
     <ClCompile Include="FitsFound.cpp" />
     <ClCompile Include="FitsSet.cpp" />
     <ClCompile Include="FitsImage.cpp" />
+    <ClCompile Include="FITSTable.cpp" />
     <ClCompile Include="JPBitMap.cpp" />
     <ClCompile Include="JPMath.cpp" />
     <ClCompile Include="Maths.cpp" />

@@ -356,11 +356,11 @@ void JPFITS::FITSImage::WriteImage(System::String ^FullFileName, System::TypeCod
 	WRITEIMAGE(Precision, do_parallel);
 }
 
-void JPFITS::FITSImage::WriteImage(String^ FullFileName, String^ extensionName, bool overwriteIfExists, TypeCode Precision, bool do_parallel)
+void JPFITS::FITSImage::WriteImage(String^ FullFileName, String^ extensionName, bool overwriteExtensionIfExists, TypeCode Precision, bool do_parallel)
 {
 	ISEXTENSION = true;
 	EXTNAME = extensionName;
-	EXTNAMEOVERWRITE = overwriteIfExists;
+	EXTNAMEOVERWRITE = overwriteExtensionIfExists;
 
 	FULLFILENAME = FullFileName;
 	int index = FULLFILENAME->LastIndexOf("\\");
@@ -635,7 +635,6 @@ array<double, 2>^ JPFITS::FITSImage::GetSubImage(array<int, 1>^ Range)
 
 void JPFITS::FITSImage::EATRAWIMAGEHEADER(ArrayList^ header, bool populate_nonessential)
 {
-	//HEADERLINES = gcnew array<String^>(header->Count);
 	HEADERKEYS = gcnew array<String^>(header->Count);
 	HEADERKEYVALS = gcnew array<String^>(header->Count);
 	HEADERKEYCOMS = gcnew array<String^>(header->Count);
@@ -675,8 +674,6 @@ void JPFITS::FITSImage::EATRAWIMAGEHEADER(ArrayList^ header, bool populate_nones
 
 		if (populate_nonessential)
 		{
-			//HEADERLINES[i] = line;
-
 			HEADERKEYS[i] = line->Substring(0, 8)->Trim();
 
 			if (HEADERKEYS[i] == "COMMENT")
@@ -935,23 +932,14 @@ void JPFITS::FITSImage::READIMAGE(FileStream^ fs, array<int, 1>^ Range, bool do_
 }
 
 void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
-{
-	//FileStream^ fs = gcnew FileStream(FULLFILENAME, IO::FileMode::Create);
-	
-	
-	
-	
-	
-	
-	
-	
+{	
 	FileStream^ fs;
 	bool filexists = File::Exists(FULLFILENAME);
 	array<unsigned char>^ prependdata;
 	array<unsigned char>^ appenddata;
 	if (!filexists && !ISEXTENSION)//then just write to a new file
 		fs = gcnew FileStream(FULLFILENAME, IO::FileMode::Create);
-	if (filexists && !ISEXTENSION)//then write the primary unit, and append any extensions if they already exist on the existing file
+	else if (filexists && !ISEXTENSION)//then write the primary unit, and append any extensions if they already exist on the existing file
 	{
 		fs = gcnew FileStream(FULLFILENAME, IO::FileMode::Open);
 		//check for extensions
@@ -965,7 +953,7 @@ void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 		fs->Close();
 		fs = gcnew FileStream(FULLFILENAME, IO::FileMode::Create);//write the primary unit, don't forget to append the extensions after if it isn't null
 	}
-	if (filexists && ISEXTENSION)//then get the primary data unit and also check for other extensions, etc
+	else if (filexists && ISEXTENSION)//then get the primary data unit and also check for other extensions, etc
 	{
 		fs = gcnew FileStream(FULLFILENAME, IO::FileMode::Open);
 		bool hasext = false;
@@ -1006,7 +994,7 @@ void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 			fs->Write(prependdata, 0, prependdata->Length);
 		}
 	}
-	if (!filexists && ISEXTENSION)//then write the extension to a new file with an empty primary unit
+	else if (!filexists && ISEXTENSION)//then write the extension to a new file with an empty primary unit
 	{
 		array<String^>^ pheader = FITSFILEOPS::MAKEPRIMARYDEFFORMATTEDHEADER(true);
 		int NHead = pheader->Length * 80;
@@ -1017,14 +1005,6 @@ void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 		fs = gcnew FileStream(FULLFILENAME, IO::FileMode::Create);
 		fs->Write(prependdata, 0, prependdata->Length);
 	}
-
-
-
-
-
-
-
-
 
 	//set header BZERO and BCSALE key values depending on prec type.
 	SETBITPIX(Precision);
@@ -1448,7 +1428,7 @@ array<double>^ JPFITS::FITSImage::ReadImageVectorOnly(System::String ^file, cli:
 	return result;
 }
 
-/*Object^ JPFITS::FITSImage::ReadPrimaryNDimensionalData(String^ fullFileName, TypeCode^ convertToTypeCode, int &nAaxis, array<int>^ &nAxisN)
+array<double>^ JPFITS::FITSImage::ReadPrimaryNDimensionalData(String^ fullFileName, array<int>^ &nAxisN)
 {
 	FileStream^ fs = gcnew FileStream(fullFileName, FileMode::Open);
 	ArrayList^ header = gcnew ArrayList();
@@ -1460,14 +1440,15 @@ array<double>^ JPFITS::FITSImage::ReadImageVectorOnly(System::String ^file, cli:
 		return nullptr;
 	}
 
-	int BITPIX = -1, nAxis = -1 , nAxisn = 1;
+	int bitpix = -1, nAxis = -1, nAxisn = 1;
+	double bscale = 1, bzero = 0;
 	for (int i = 0; i < header->Count; i++)
 	{
 		String^ line = (String^)header[i];
 
-		if (BITPIX == -1)
+		if (bitpix == -1)
 			if (line->Substring(0, 8)->Trim() == "BITPIX")
-				BITPIX = ::Convert::ToInt32(line->Substring(10, 20));
+				bitpix = ::Convert::ToInt32(line->Substring(10, 20));
 
 		if (nAxis == -1)
 			if (line->Substring(0, 8)->Trim() == "NAXIS")
@@ -1482,15 +1463,103 @@ array<double>^ JPFITS::FITSImage::ReadImageVectorOnly(System::String ^file, cli:
 				nAxisN[nAxisn - 1] = ::Convert::ToInt32(line->Substring(10, 20));
 				nAxisn++;
 			}
+
+		if (line->Substring(0, 8) == "BZERO   ")
+			bzero = ::Convert::ToDouble(line->Substring(10, 20));
+
+		if (line->Substring(0, 8) == "BSCALE  ")
+			bscale = ::Convert::ToDouble(line->Substring(10, 20));
 	}
 
+	int NBytes = Math::Abs(bitpix) / 8;
+	for (int i = 0; i < nAxisN->Length; i++)
+		NBytes *= nAxisN[i];
+	
+	array<unsigned char>^ arr = gcnew array<unsigned char>(NBytes);
+	fs->Read(arr, 0, NBytes);
+	fs->Close();
 
+	array<double>^ result = gcnew array<double>(NBytes / Math::Abs(bitpix));
 
+	if (bitpix == 8)
+	{
+		#pragma omp parallel for
+		for (int i = 0; i < result->Length; i++)
+			result[i] = (double)arr[i] * bscale + bzero;
+	}
 
+	if (bitpix == 16)
+	{
+		int cc = 0;
+		__int16 val = 0;
 
+		#pragma omp parallel for private(cc, val)
+		for (int i = 0; i < result->Length; i++)
+		{
+			cc = i * 2;
+			val = (arr[cc] << 8) | arr[cc + 1];
+			result[i] = (double)val * bscale + bzero;
+		}
+	}
 
-	return gcnew Object();
-}*/
+	if (bitpix == 32)
+	{
+		int cc = 0;
+		__int32 val = 0;
+
+		#pragma omp parallel for private(cc, val)
+		for (int i = 0; i < result->Length; i++)
+		{
+			cc = i * 4;
+			val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
+			result[i] = double(val) * bscale + bzero;
+		}
+	}
+
+	if (bitpix == -32)
+	{
+		float val = 0;
+		int cc = 0;
+
+		#pragma omp parallel for private(cc, val)
+		for (int i = 0; i < result->Length; i++)
+		{
+			array<unsigned char>^ flt = gcnew array<unsigned char>(4);
+			cc = i * 4;
+			flt[3] = arr[cc];
+			flt[2] = arr[cc + 1];
+			flt[1] = arr[cc + 2];
+			flt[0] = arr[cc + 3];
+			val = BitConverter::ToSingle(flt, 0);
+			result[i] = double(val) * bscale + bzero;
+		}
+	}
+
+	if (bitpix == -64)
+	{
+		double val = 0;
+		int cc = 0;
+
+		#pragma omp parallel for private(cc, val)
+		for (int i = 0; i < result->Length; i++)
+		{
+			cc = i * 8;
+			array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+			dbl[7] = arr[cc];
+			dbl[6] = arr[cc + 1];
+			dbl[5] = arr[cc + 2];
+			dbl[4] = arr[cc + 3];
+			dbl[3] = arr[cc + 4];
+			dbl[2] = arr[cc + 5];
+			dbl[1] = arr[cc + 6];
+			dbl[0] = arr[cc + 7];
+			val = BitConverter::ToDouble(dbl, 0);
+			result[i] = val * bscale + bzero;
+		}
+	}
+
+	return result;
+}
 
 void JPFITS::FITSImage::MAKEDEFHEADER()
 {
@@ -1765,6 +1834,50 @@ void JPFITS::FITSImage::CopyHeader(JPFITS::FITSImage ^source)
 			continue;
 
 		this->AddKey(source->HeaderKeys[i], source->HeaderKeyValues[i], source->HeaderKeyComments[i], -1);
+	}
+}
+
+void JPFITS::FITSImage::ExtendizePrimaryImageLayerCube(String^ sourceFullFileName, String^ destFullFileName, array<String^>^ layerExtensionNames)
+{
+	for (int i = 0; i < layerExtensionNames->Length - 1; i++)
+		for (int j = i + 1; j < layerExtensionNames->Length; j++)
+			if (layerExtensionNames[i] == layerExtensionNames[j])
+			{
+				throw gcnew Exception("layerExtensionNames are not all unique");
+				return;
+			}
+	for (int i = 0; i < layerExtensionNames->Length; i++)
+		if (layerExtensionNames[i] == "")
+		{
+			throw gcnew Exception("layerExtensionNames cannot contain a nameless extension (empty string)");
+			return;
+		}
+
+	array<int>^ axesN;
+	array<double>^ cube = FITSImage::ReadPrimaryNDimensionalData(sourceFullFileName, axesN);
+
+	if (layerExtensionNames->Length != axesN->Length)
+	{
+		throw gcnew Exception("layerExtensionNames array not equal in length to the number of layers");
+		return;
+	}
+
+	if (destFullFileName == sourceFullFileName)
+		File::Delete(destFullFileName);
+	JPFITS::FITSImage^ fi = gcnew JPFITS::FITSImage(destFullFileName, true);
+	fi->WriteImage(TypeCode::Double, false);
+
+	for (int z = 0; z < axesN[2]; z++)//z is each layer of the cube
+	{
+		array<double, 2>^ layer = gcnew array<double, 2>(axesN[0], axesN[1]);
+
+		#pragma omp parallel for
+		for (int x = 0; x < axesN[0]; x++)
+			for (int y = 0; y < axesN[1]; y++)
+				layer[x, y] = cube[z * axesN[0] * axesN[1] + x * axesN[1] + y];
+
+		fi = gcnew FITSImage(destFullFileName, layer, false, true);
+		fi->WriteImage(destFullFileName, layerExtensionNames[z], false, TypeCode::Double, true);
 	}
 }
 

@@ -38,7 +38,6 @@ namespace JPFITS {
 		FitsExtensionTableViewer(String^ FileName)
 		{
 			InitializeComponent();
-			
 			OpenFITSImage(FileName);
 		}
 

@@ -21,6 +21,11 @@ See http://www.gnu.org/licenses/. */
 
 using namespace JPFITS;
 
+JPFITS::FITSBinTable::FITSBinTable()
+{
+	//EXTENSIONNAME = extensionName;
+}
+
 JPFITS::FITSBinTable::FITSBinTable(String^ fileName, String^ extensionName)
 {
 	FileStream^ fs = gcnew FileStream(fileName, IO::FileMode::Open);
@@ -45,13 +50,13 @@ JPFITS::FITSBinTable::FITSBinTable(String^ fileName, String^ extensionName)
 	FILENAME = fileName;
 	EXTENSIONNAME = extensionName;
 
-	EXTENSIONPOSITIONSTART = extensionstartposition;
+	/*EXTENSIONPOSITIONSTART = extensionstartposition;
 	EXTENSIONPOSITIONDATA = fs->Position;
-	EXTENSIONPOSITIONEND = extensionendposition;
+	EXTENSIONPOSITIONEND = extensionendposition;*/
 	
 	EATRAWBINTABLEHEADER(header);
 
-	BINTABLE = gcnew array<unsigned char>(int(EXTENSIONPOSITIONEND - EXTENSIONPOSITIONDATA));
+	BINTABLE = gcnew array<unsigned char>(int(extensionendposition - fs->Position));
 	fs->Read(BINTABLE, 0, BINTABLE->Length);
 
 	fs->Close();
@@ -110,22 +115,214 @@ array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ExtensionEntryLabel)
 	return GetTTYPEEntry(ExtensionEntryLabel, w, h);
 }
 
-array<double, 2>^ JPFITS::FITSBinTable::GetTTYPEEntries(array<String^>^ ExtensionEntryLabels)
+array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, int& width, int& height)
 {
-	int w = 0, h = 0;
-	array<double>^ instance;
-	array<double, 2>^ result = gcnew array<double, 2>(ExtensionEntryLabels->Length, NAXIS2);
-
-	for (int i = 0; i < ExtensionEntryLabels->Length; i++)
+	TypeCode tcode;
+	int rank;
+	Object^ obj = GetTTYPEEntry(ttypeEntryLabel, tcode, rank);
+	int naxis1 = 0, naxis2 = 0;
+	if (rank == 1)
 	{
-		instance = GetTTYPEEntry(ExtensionEntryLabels[i], w, h);
-		for (int j = 0; j < instance->Length; j++)
-			result[i, j] = instance[j];
+		width = 1;
+		height = ((Array^)obj)->Length;
 	}
+	else
+	{
+		width = ((Array^)obj)->GetLength(0);
+		height = ((Array^)obj)->GetLength(1);
+	}
+	array<double>^ result = gcnew array<double>(width * height);
+
+	switch (tcode)
+	{
+		case TypeCode::Double:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for
+				for (int y = 0; y < height; y++)
+					result[y] = ((array<double>^)(obj))[y];
+			}
+			else
+			{
+				#pragma omp parallel for
+				for (int x = 0; x < width; x++)
+					for (int y = 0; y < height; y++)
+						result[x * height + y] = ((array<double, 2>^)(obj))[x, y];
+			}
+			break;
+		}
+
+		case (TypeCode::Int64):
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for
+				for (int y = 0; y < height; y++)
+					result[y] = (double)((array<__int64>^)(obj))[y];
+			}
+			else
+			{
+				#pragma omp parallel for
+				for (int x = 0; x < width; x++)
+					for (int y = 0; y < height; y++)
+						result[x * height + y] = (double)((array<__int64, 2>^)(obj))[x, y];
+			}
+			break;
+		}
+
+		case TypeCode::Single:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for
+				for (int y = 0; y < height; y++)
+					result[y] = (double)((array<float>^)(obj))[y];
+			}
+			else
+			{
+				#pragma omp parallel for
+				for (int x = 0; x < width; x++)
+					for (int y = 0; y < height; y++)
+						result[x * height + y] = (double)((array<float, 2>^)(obj))[x, y];
+			}
+			break;
+		}
+
+		case TypeCode::UInt32:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for
+				for (int y = 0; y < height; y++)
+					result[y] = (double)((array<unsigned __int32>^)(obj))[y];
+			}
+			else
+			{
+				#pragma omp parallel for
+				for (int x = 0; x < width; x++)
+					for (int y = 0; y < height; y++)
+						result[x * height + y] = (double)((array<unsigned __int32, 2>^)(obj))[x, y];
+			}
+			break;
+		}
+
+		case TypeCode::Int32:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for
+				for (int y = 0; y < height; y++)
+					result[y] = (double)((array<__int32>^)(obj))[y];
+			}
+			else
+			{
+				#pragma omp parallel for
+				for (int x = 0; x < width; x++)
+					for (int y = 0; y < height; y++)
+						result[x * height + y] = (double)((array<__int32, 2>^)(obj))[x, y];
+			}
+			break;
+		}
+
+		case TypeCode::UInt16:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for
+				for (int y = 0; y < height; y++)
+					result[y] = (double)((array<unsigned __int16>^)(obj))[y];
+			}
+			else
+			{
+				#pragma omp parallel for
+				for (int x = 0; x < width; x++)
+					for (int y = 0; y < height; y++)
+						result[x * height + y] = (double)((array<unsigned __int16, 2>^)(obj))[x, y];
+			}
+			break;
+		}
+
+		case TypeCode::Int16:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for
+				for (int y = 0; y < height; y++)
+					result[y] = (double)((array<__int16>^)(obj))[y];
+			}
+			else
+			{
+				#pragma omp parallel for
+				for (int x = 0; x < width; x++)
+					for (int y = 0; y < height; y++)
+						result[x * height + y] = (double)((array<__int16, 2>^)(obj))[x, y];
+			}
+			break;
+		}
+
+		case TypeCode::Byte:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for
+				for (int y = 0; y < height; y++)
+					result[y] = (double)((array<unsigned __int8>^)(obj))[y];
+			}
+			else
+			{
+				#pragma omp parallel for
+				for (int x = 0; x < width; x++)
+					for (int y = 0; y < height; y++)
+						result[x * height + y] = (double)((array<unsigned __int8, 2>^)(obj))[x, y];
+			}
+			break;
+		}
+
+		case TypeCode::SByte:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for
+				for (int y = 0; y < height; y++)
+					result[y] = (double)((array<__int8>^)(obj))[y];
+			}
+			else
+			{
+				#pragma omp parallel for
+				for (int x = 0; x < width; x++)
+					for (int y = 0; y < height; y++)
+						result[x * height + y] = (double)((array<__int8, 2>^)(obj))[x, y];
+			}
+			break;
+		}
+
+		case TypeCode::Boolean:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for
+				for (int y = 0; y < height; y++)
+					result[y] = (double)((array<bool>^)(obj))[y];
+			}
+			else
+			{
+				#pragma omp parallel for
+				for (int x = 0; x < width; x++)
+					for (int y = 0; y < height; y++)
+						result[x * height + y] = (double)((array<bool, 2>^)(obj))[x, y];
+			}
+			break;
+		}
+
+		default:
+			throw gcnew Exception("Unrecognized TypeCode: '" + tcode.ToString() + "'");
+	}
+
 	return result;
 }
 
-array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, int& width, int& height)
+Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &objectTypeCode, int &objectArrayRank)
 {
 	int extensionentry_index = -1;
 	for (int i = 0; i < TTYPES->Length; i++)
@@ -141,10 +338,11 @@ array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, int&
 		return nullptr;
 	}
 
-	//now at end of found extension header, can read the table
-	width = TINSTANCES[extensionentry_index];
-	height = NAXIS2;
-	array<double>^ result = gcnew array<double>(NAXIS2 * TINSTANCES[extensionentry_index]);
+	objectTypeCode = TCODES[extensionentry_index];
+	if (TINSTANCES[extensionentry_index] == 1)
+		objectArrayRank = 1;
+	else
+		objectArrayRank = 2;
 
 	int byteoffset = 0;
 	for (int i = 0; i < extensionentry_index; i++)
@@ -155,6 +353,8 @@ array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, int&
 	{
 		case ::TypeCode::Double:
 		{
+			array<double>^ vector = gcnew array<double>(TINSTANCES[extensionentry_index] * NAXIS2);
+
 			#pragma omp parallel for private(currentbyte)
 			for (int i = 0; i < NAXIS2; i++)
 			{
@@ -170,14 +370,29 @@ array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, int&
 					dbl[2] = BINTABLE[currentbyte + 5];
 					dbl[1] = BINTABLE[currentbyte + 6];
 					dbl[0] = BINTABLE[currentbyte + 7];
-					result[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToDouble(dbl, 0);
+					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToDouble(dbl, 0);
 				}
 			}
+
+			if (objectArrayRank == 2)
+			{
+				array<double, 2>^ arrya = gcnew array<double, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for
+				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						arrya[x, y] = vector[x * NAXIS2 + y];
+				return arrya;
+			}
+			else
+				return vector;
+
 			break;
 		}
 
 		case (::TypeCode::Int64):
 		{
+			array<__int64>^ vector = gcnew array<__int64>(TINSTANCES[extensionentry_index] * NAXIS2);
+
 			#pragma omp parallel for private(currentbyte)
 			for (int i = 0; i < NAXIS2; i++)
 			{
@@ -193,14 +408,29 @@ array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, int&
 					i64[2] = BINTABLE[currentbyte + 5];
 					i64[1] = BINTABLE[currentbyte + 6];
 					i64[0] = BINTABLE[currentbyte + 7];
-					result[i * TINSTANCES[extensionentry_index] + j] = (double)BitConverter::ToInt64(i64, 0);
+					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt64(i64, 0);
 				}
 			}
+
+			if (objectArrayRank == 2)
+			{
+				array<__int64, 2>^ arrya = gcnew array<__int64, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for
+				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						arrya[x, y] = vector[x * NAXIS2 + y];
+				return arrya;
+			}
+			else
+				return vector;
+
 			break;
 		}
 
 		case ::TypeCode::Single:
 		{
+			array<float>^ vector = gcnew array<float>(TINSTANCES[extensionentry_index] * NAXIS2);
+
 			#pragma omp parallel for private(currentbyte)
 			for (int i = 0; i < NAXIS2; i++)
 			{
@@ -212,60 +442,165 @@ array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, int&
 					sng[2] = BINTABLE[currentbyte + 1];
 					sng[1] = BINTABLE[currentbyte + 2];
 					sng[0] = BINTABLE[currentbyte + 3];
-					result[i * TINSTANCES[extensionentry_index] + j] = (double)BitConverter::ToSingle(sng, 0);
+					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToSingle(sng, 0);
 				}
 			}
+
+			if (objectArrayRank == 2)
+			{
+				array<float, 2>^ arrya = gcnew array<float, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for
+				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						arrya[x, y] = vector[x * NAXIS2 + y];
+				return arrya;
+			}
+			else
+				return vector;
+
 			break;
 		}
 
 		case ::TypeCode::UInt32:
-		case ::TypeCode::Int32:
 		{
-			double bzero = 2147483648;
-			if (TCODES[extensionentry_index] == ::TypeCode::Int32)
-				bzero = 0;
-			__int32 val;
+			//unsigned __int32 bzero = 2147483648;// + bzero somewhere or does bitcoverter do it all???
+			array<unsigned __int32>^ vector = gcnew array<unsigned __int32>(TINSTANCES[extensionentry_index] * NAXIS2);
 
-			#pragma omp parallel for private(val, currentbyte)
+			#pragma omp parallel for private(currentbyte)
 			for (int i = 0; i < NAXIS2; i++)
 			{
+				array<unsigned char>^ uint32 = gcnew array<unsigned char>(4);
 				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 				{
 					currentbyte = byteoffset + i * NAXIS1 + j * 4;
-					val = (BINTABLE[currentbyte] << 24) | (BINTABLE[currentbyte + 1] << 16) | (BINTABLE[currentbyte + 2] << 8) | BINTABLE[currentbyte + 3];
-					result[i * TINSTANCES[extensionentry_index] + j] = double(val) + bzero;
+					uint32[3] = BINTABLE[currentbyte];
+					uint32[2] = BINTABLE[currentbyte + 1];
+					uint32[1] = BINTABLE[currentbyte + 2];
+					uint32[0] = BINTABLE[currentbyte + 3];
+					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToUInt32(uint32, 0); // + bzero somewhere or does bitcoverter do it all???
 				}
 			}
+
+			if (objectArrayRank == 2)
+			{
+				array<unsigned __int32, 2>^ arrya = gcnew array<unsigned __int32, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for
+				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						arrya[x, y] = vector[x * NAXIS2 + y];
+				return arrya;
+			}
+			else
+				return vector;
+
+			break;
+		}
+
+		case ::TypeCode::Int32:
+		{
+			//unsigned __int32 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
+			array<__int32>^ vector = gcnew array<__int32>(TINSTANCES[extensionentry_index] * NAXIS2);
+
+			#pragma omp parallel for private(currentbyte)
+			for (int i = 0; i < NAXIS2; i++)
+			{
+				array<unsigned char>^ int32 = gcnew array<unsigned char>(4);
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + i * NAXIS1 + j * 4;
+					int32[3] = BINTABLE[currentbyte];
+					int32[2] = BINTABLE[currentbyte + 1];
+					int32[1] = BINTABLE[currentbyte + 2];
+					int32[0] = BINTABLE[currentbyte + 3];
+					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt32(int32, 0); // + bzero somewhere or does bitcoverter do it all???
+				}
+			}
+
+			if (objectArrayRank == 2)
+			{
+				array<__int32, 2>^ arrya = gcnew array<__int32, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for
+				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						arrya[x, y] = vector[x * NAXIS2 + y];
+				return arrya;
+			}
+			else
+				return vector;
+
 			break;
 		}
 
 		case ::TypeCode::UInt16:
-		case ::TypeCode::Int16:
 		{
-			double bzero = 32768;
-			if (TCODES[extensionentry_index] == ::TypeCode::Int16)
-				bzero = 0;
-			__int16 val;
+			//unsigned __int32 bzero = 32768;// + bzero somewhere or does bitcoverter do it all???
+			array<unsigned __int16>^ vector = gcnew array<unsigned __int16>(TINSTANCES[extensionentry_index] * NAXIS2);
 
-			#pragma omp parallel for private(val, currentbyte)
+			#pragma omp parallel for private(currentbyte)
 			for (int i = 0; i < NAXIS2; i++)
 			{
+				array<unsigned char>^ uint16 = gcnew array<unsigned char>(2);
 				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 				{
 					currentbyte = byteoffset + i * NAXIS1 + j * 2;
-					val = (BINTABLE[currentbyte] << 8) | BINTABLE[currentbyte + 1];
-					result[i * TINSTANCES[extensionentry_index] + j] = double(val) + bzero;
+					uint16[1] = BINTABLE[currentbyte];
+					uint16[0] = BINTABLE[currentbyte + 1];
+					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToUInt16(uint16, 0); // + bzero somewhere or does bitcoverter do it all???
 				}
 			}
+
+			if (objectArrayRank == 2)
+			{
+				array<unsigned __int16, 2>^ arrya = gcnew array<unsigned __int16, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for
+				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						arrya[x, y] = vector[x * NAXIS2 + y];
+				return arrya;
+			}
+			else
+				return vector;
+
+			break;
+		}
+
+		case ::TypeCode::Int16:
+		{
+			//unsigned __int32 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
+			array<__int16>^ vector = gcnew array<__int16>(TINSTANCES[extensionentry_index] * NAXIS2);
+
+			#pragma omp parallel for private(currentbyte)
+			for (int i = 0; i < NAXIS2; i++)
+			{
+				array<unsigned char>^ int16 = gcnew array<unsigned char>(2);
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + i * NAXIS1 + j * 2;
+					int16[1] = BINTABLE[currentbyte];
+					int16[0] = BINTABLE[currentbyte + 1];
+					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt16(int16, 0); // + bzero somewhere or does bitcoverter do it all???
+				}
+			}
+
+			if (objectArrayRank == 2)
+			{
+				array<__int16, 2>^ arrya = gcnew array<__int16, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for
+				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						arrya[x, y] = vector[x * NAXIS2 + y];
+				return arrya;
+			}
+			else
+				return vector;
+
 			break;
 		}
 
 		case ::TypeCode::Byte:
-		case ::TypeCode::SByte:
 		{
-			double bzero = 128;
-			if (TCODES[extensionentry_index] == ::TypeCode::SByte)
-				bzero = 0;
+			//unsigned __int8 bzero = 128;// + bzero somewhere or does bitcoverter do it all???
+			array<unsigned __int8>^ vector = gcnew array<unsigned __int8>(TINSTANCES[extensionentry_index] * NAXIS2);
 
 			#pragma omp parallel for private(currentbyte)
 			for (int i = 0; i < NAXIS2; i++)
@@ -273,373 +608,260 @@ array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, int&
 				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 				{
 					currentbyte = byteoffset + i * NAXIS1 + j;
-					result[i * TINSTANCES[extensionentry_index] + j] = double(BINTABLE[currentbyte]) + bzero;
+					vector[i * TINSTANCES[extensionentry_index] + j] = (unsigned __int8)BINTABLE[currentbyte] + 128; // + bzero somewhere or does bitcoverter do it all???
 				}
 			}
+
+			if (objectArrayRank == 2)
+			{
+				array<unsigned __int8, 2>^ arrya = gcnew array<unsigned __int8, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for
+				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						arrya[x, y] = vector[x * NAXIS2 + y];
+				return arrya;
+			}
+			else
+				return vector;
+
+			break;
+		}
+
+		case ::TypeCode::SByte:
+		{
+			//unsigned __int8 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
+			array<__int8>^ vector = gcnew array<__int8>(TINSTANCES[extensionentry_index] * NAXIS2);
+
+			#pragma omp parallel for private(currentbyte)
+			for (int i = 0; i < NAXIS2; i++)
+			{
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + i * NAXIS1 + j;
+					vector[i * TINSTANCES[extensionentry_index] + j] = (__int8)BINTABLE[currentbyte]; // + bzero somewhere or does bitcoverter do it all???
+				}
+			}
+
+			if (objectArrayRank == 2)
+			{
+				array<__int8, 2>^ arrya = gcnew array<__int8, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for
+				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						arrya[x, y] = vector[x * NAXIS2 + y];
+				return arrya;
+			}
+			else
+				return vector;
+
 			break;
 		}
 
 		case ::TypeCode::Boolean:
 		{
+			array<bool>^ vector = gcnew array<bool>(TINSTANCES[extensionentry_index] * NAXIS2);
+
 			#pragma omp parallel for private(currentbyte)
 			for (int i = 0; i < NAXIS2; i++)
 			{
 				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 				{
 					currentbyte = byteoffset + i * NAXIS1 + j;
-					result[i * TINSTANCES[extensionentry_index] + j] = double((bool)BINTABLE[currentbyte]);
+					vector[i * TINSTANCES[extensionentry_index] + j] = Convert::ToBoolean(BINTABLE[currentbyte]);
 				}
 			}
+
+			if (objectArrayRank == 2)
+			{
+				array<bool, 2>^ arrya = gcnew array<bool, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for
+				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						arrya[x, y] = vector[x * NAXIS2 + y];
+				return arrya;
+			}
+			else
+				return vector;
+
 			break;
 		}
 
 		default:
+		{
 			throw gcnew Exception("Unrecognized TypeCode: '" + TCODES[extensionentry_index].ToString() + "'");
+			return nullptr;
+		}
 	}
-
-	return result;
 }
 
-//array<double>^ JPFITS::FITSBinTable::GetExtensionEntry(String^ FileName, String^ ExtensionName, String^ ExtensionEntryLabel, int& Width, int& Height)
-//{
-//	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
-//	bool hasext = false;
-//	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
-//	{
-//		fs->Close();
-//		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
-//		return nullptr;
-//	}
-//
-//	/*ArrayList^ header = gcnew ArrayList();
-//	__int64 startposition, endposition;
-//	if (!FITSFILEOPS::SEEKEXTENSION(fs, "BINTABLE", ExtensionName, header, startposition, endposition))
-//	{
-//		fs->Close();
-//		throw gcnew Exception("Could not find BINTABLE with name '" + ExtensionName + "'");
-//		return nullptr;
-//	}*/
-//	//EATRAWEXTENSIONHEADER(header);
-//	//check that entry exists
-//	//read array from fs->Currentposition to endposition
-//	//do stuff on array
-//
-//	array<double>^ result;
-//	int naxis, naxis1, naxis2, bitpix;
-//
-//	//read primary header
-//	bool endheader = false;
-//	int headerlines = 0, headerblocks = 0;
-//	String^ strheaderline;
-//	array<unsigned char>^ charheaderline = gcnew array<unsigned char>(80);
-//
-//	int tfields;//number of field columns
-//	bool extensionentryfound = false;
-//	bool extensionfound = false;
-//	int extensionentry_index = -1;
-//	array<String^>^ ttypes;
-//	array<String^>^ tforms;
-//	array<int>^ tbytes;
-//	array<int>^ tinstances;
-//	array<::TypeCode>^ tcodes;
-//	bool typesset = false;
-//	int ttypeindex = -1;
-//
-//	bool endfile = false;
-//	if (fs->Position >= fs->Length)
-//		endfile = true;
-//
-//	while (!extensionfound && !endfile)
-//	{
-//		headerblocks = 0;
-//		headerlines = 0;
-//		endheader = false;//reset
-//		while (!endheader)
-//		{
-//			headerlines++;
-//			fs->Read(charheaderline, 0, 80);
-//			strheaderline = System::Text::Encoding::ASCII->GetString(charheaderline);
-//
-//			if (ExtensionName == "" && strheaderline->Substring(0, 8) == "XTENSION")
-//			{
-//				int f = strheaderline->IndexOf("'");
-//				int l = strheaderline->LastIndexOf("'");
-//				if (strheaderline->Substring(f + 1, l - f - 1) == "BINTABLE")
-//					extensionfound = true;
-//			}
-//
-//			if (strheaderline->Substring(0, 8) == "EXTNAME ")
-//			{
-//				int f = strheaderline->IndexOf("'");
-//				int l = strheaderline->LastIndexOf("'");
-//				if (ExtensionName == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-//					extensionfound = true;
-//			}
-//
-//			if (strheaderline->Substring(0, 8) == "NAXIS   ")
-//				naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-//			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-//				naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-//			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-//				naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-//			if (strheaderline->Substring(0, 8) == "BITPIX  ")
-//				bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-//			if (strheaderline->Substring(0, 8) == "END     ")
-//				endheader = true;
-//
-//			if (strheaderline->Substring(0, 8) == "TFIELDS ")
-//			{
-//				tfields = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-//				ttypes = gcnew array<String^>(tfields);
-//				tforms = gcnew array<String^>(tfields);
-//				tbytes = gcnew array<int>(tfields);
-//				tinstances = gcnew array<int>(tfields);
-//				tcodes = gcnew array<::TypeCode>(tfields);
-//			}
-//
-//			if (strheaderline->Substring(0, 8)->Contains("TTYPE" + (ttypeindex + 2).ToString()) || strheaderline->Substring(0, 8)->Contains("TFORM" + (ttypeindex + 2).ToString()))
-//				ttypeindex++;
-//
-//			if (strheaderline->Substring(0, 8)->Contains("TTYPE"))
-//			{
-//				int f = strheaderline->IndexOf("'");
-//				int l = strheaderline->LastIndexOf("'");
-//				ttypes[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1);
-//
-//				if (!extensionentryfound)
-//				{
-//					extensionentry_index++;
-//					if (ExtensionEntryLabel == strheaderline->Substring(f + 1, l - f - 1)->Trim())
-//						extensionentryfound = true;
-//				}
-//			}
-//
-//			if (strheaderline->Substring(0, 8)->Contains("TFORM"))
-//			{
-//				int f = strheaderline->IndexOf("'");
-//				int l = strheaderline->LastIndexOf("'");
-//				tforms[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
-//				int instances = 1;
-//				tbytes[ttypeindex] = TFORMTONBYTES(tforms[ttypeindex], instances);//need to convert the tform to Nbytes
-//				tinstances[ttypeindex] = instances;
-//				tcodes[ttypeindex] = TFORMTYPECODE(tforms[ttypeindex]);
-//			}
-//
-//			//need to determine if the TypeCode here is supposed to be for signed or unsigned IF the type is an integer (8, 16 or 32 bit)
-//			//therefore find the TSCALE and TZERO for this entry...if they don't exist then it is signed, if they do exist
-//			//then it is whatever values they are, for either determined signed or unsigned
-//			//then set this current tcode[typeindex] to what it should be
-//			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::SByte)//then get the value
-//				if (Convert::ToByte(strheaderline->Substring(10, 20)->Trim()) == 128)//then it is an unsigned
-//					tcodes[ttypeindex] = TypeCode::Byte;
-//			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::Int16)//then get the value
-//				if (Convert::ToUInt16(strheaderline->Substring(10, 20)->Trim()) == 32768)//then it is an unsigned
-//					tcodes[ttypeindex] = TypeCode::UInt16;
-//			if (strheaderline->Substring(0, 8)->Contains("TZERO") && tcodes[ttypeindex] == TypeCode::Int32)//then get the value
-//				if (Convert::ToUInt32(strheaderline->Substring(10, 20)->Trim()) == 2147483648)//then it is an unsigned
-//					tcodes[ttypeindex] = TypeCode::UInt32;
-//		}
-//		headerblocks = (headerlines - 1) / 36 + 1;
-//		fs->Position += (headerblocks * 36 - headerlines) * 80;
-//
-//		if (extensionfound == false)
-//		{
-//			//now at end of extension header, skip its data
-//			if (naxis != 0)
-//			{
-//				__int64 Nbytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-//				__int64 rem;
-//				::Math::DivRem(Nbytes, 2880, rem);
-//				fs->Seek(Nbytes + (2880 - rem), ::SeekOrigin::Current);
-//			}
-//
-//			endheader = false;//reset to scan next header
-//			extensionentryfound = false;//re-find the table entry we want
-//			extensionentry_index = -1;//re-find its index
-//			typesset = false;//reset the type arrays
-//			ttypeindex = -1;
-//
-//			if (fs->Position >= fs->Length)
-//				endfile = true;
-//		}
-//	}
-//
-//	if (!extensionfound)
-//	{
-//		fs->Close();
-//		throw gcnew Exception("ExtensionName wasn't found: '" + ExtensionName + "'");
-//	}
-//
-//	if (!extensionentryfound)
-//	{
-//		fs->Close();
-//		throw gcnew Exception("ExtensionEntryLabel wasn't found: '" + ExtensionEntryLabel + "'");
-//	}
-//
-//	//now at end of found extension header, can read the table
-//	int NBytes = naxis1 * naxis2;
-//	int extensionentryinstances = tinstances[extensionentry_index];
-//	Width = extensionentryinstances;
-//	Height = naxis2;
-//	result = gcnew array<double>(naxis2 * extensionentryinstances);
-//	array<unsigned char>^ arr = gcnew array<unsigned char>(NBytes);
-//	fs->Read(arr, 0, NBytes);
-//	fs->Close();
-//
-//	TypeCode extensionentrycode = tcodes[extensionentry_index];
-//	int byteoffset = 0;
-//	for (int i = 0; i < extensionentry_index; i++)
-//		byteoffset += tbytes[i];
-//	int currentbyte;
-//
-//	switch (extensionentrycode)
-//	{
-//		case ::TypeCode::Double:
-//		{
-//			#pragma omp parallel for private(currentbyte)
-//			for (int i = 0; i < naxis2; i++)
-//			{
-//				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-//				for (int j = 0; j < extensionentryinstances; j++)
-//				{
-//					currentbyte = byteoffset + i * naxis1 + j * 8;
-//					dbl[7] = arr[currentbyte];
-//					dbl[6] = arr[currentbyte + 1];
-//					dbl[5] = arr[currentbyte + 2];
-//					dbl[4] = arr[currentbyte + 3];
-//					dbl[3] = arr[currentbyte + 4];
-//					dbl[2] = arr[currentbyte + 5];
-//					dbl[1] = arr[currentbyte + 6];
-//					dbl[0] = arr[currentbyte + 7];
-//					result[i * extensionentryinstances + j] = BitConverter::ToDouble(dbl, 0);
-//				}
-//			}
-//			break;
-//		}
-//
-//		case (::TypeCode::Int64):
-//		{
-//			#pragma omp parallel for private(currentbyte)
-//			for (int i = 0; i < naxis2; i++)
-//			{
-//				array<unsigned char>^ i64 = gcnew array<unsigned char>(8);
-//				for (int j = 0; j < extensionentryinstances; j++)
-//				{
-//					currentbyte = byteoffset + i * naxis1 + j * 8;
-//					i64[7] = arr[currentbyte];
-//					i64[6] = arr[currentbyte + 1];
-//					i64[5] = arr[currentbyte + 2];
-//					i64[4] = arr[currentbyte + 3];
-//					i64[3] = arr[currentbyte + 4];
-//					i64[2] = arr[currentbyte + 5];
-//					i64[1] = arr[currentbyte + 6];
-//					i64[0] = arr[currentbyte + 7];
-//					result[i * extensionentryinstances + j] = (double)BitConverter::ToInt64(i64, 0);
-//				}
-//			}
-//			break;
-//		}
-//
-//		case ::TypeCode::Single:
-//		{
-//			#pragma omp parallel for private(currentbyte)
-//			for (int i = 0; i < naxis2; i++)
-//			{
-//				array<unsigned char>^ sng = gcnew array<unsigned char>(4);
-//				for (int j = 0; j < extensionentryinstances; j++)
-//				{
-//					currentbyte = byteoffset + i * naxis1 + j * 4;
-//					sng[3] = arr[currentbyte];
-//					sng[2] = arr[currentbyte + 1];
-//					sng[1] = arr[currentbyte + 2];
-//					sng[0] = arr[currentbyte + 3];
-//					result[i * extensionentryinstances + j] = (double)BitConverter::ToSingle(sng, 0);
-//				}
-//			}
-//			break;
-//		}
-//
-//		case ::TypeCode::UInt32:
-//		case ::TypeCode::Int32:
-//		{
-//			double bzero = 2147483648;
-//			if (extensionentrycode == ::TypeCode::Int32)
-//				bzero = 0;
-//			__int32 val;
-//
-//			#pragma omp parallel for private(val, currentbyte)
-//			for (int i = 0; i < naxis2; i++)
-//			{
-//				for (int j = 0; j < extensionentryinstances; j++)
-//				{
-//					currentbyte = byteoffset + i * naxis1 + j * 4;
-//					val = (arr[currentbyte] << 24) | (arr[currentbyte + 1] << 16) | (arr[currentbyte + 2] << 8) | arr[currentbyte + 3];
-//					result[i * extensionentryinstances + j] = double(val) + bzero;
-//				}
-//			}
-//			break;
-//		}
-//
-//		case ::TypeCode::UInt16:
-//		case ::TypeCode::Int16:
-//		{
-//			double bzero = 32768;
-//			if (extensionentrycode == ::TypeCode::Int16)
-//				bzero = 0;
-//			__int16 val;
-//
-//			#pragma omp parallel for private(val, currentbyte)
-//			for (int i = 0; i < naxis2; i++)
-//			{
-//				for (int j = 0; j < extensionentryinstances; j++)
-//				{
-//					currentbyte = byteoffset + i * naxis1 + j * 2;
-//					val = (arr[currentbyte] << 8) | arr[currentbyte + 1];
-//					result[i * extensionentryinstances + j] = double(val) + bzero;
-//				}
-//			}
-//			break;
-//		}
-//
-//		case ::TypeCode::Byte:
-//		case ::TypeCode::SByte:
-//		{
-//			double bzero = 128;
-//			if (extensionentrycode == ::TypeCode::SByte)
-//				bzero = 0;
-//
-//			#pragma omp parallel for private(currentbyte)
-//			for (int i = 0; i < naxis2; i++)
-//			{
-//				for (int j = 0; j < extensionentryinstances; j++)
-//				{
-//					currentbyte = byteoffset + i * naxis1 + j;
-//					result[i * extensionentryinstances + j] = double(arr[currentbyte]) + bzero;
-//				}
-//			}
-//			break;
-//		}
-//
-//		case ::TypeCode::Boolean:
-//		{
-//			#pragma omp parallel for private(currentbyte)
-//			for (int i = 0; i < naxis2; i++)
-//			{
-//				for (int j = 0; j < extensionentryinstances; j++)
-//				{
-//					currentbyte = byteoffset + i * naxis1 + j;
-//					result[i * extensionentryinstances + j] = double((bool)arr[currentbyte]);
-//				}
-//			}
-//			break;
-//		}
-//
-//		default:
-//			throw gcnew Exception("Unrecognized TypeCode: '" + extensionentrycode.ToString() + "'");
-//	}
-//
-//	return result;
-//}
+void JPFITS::FITSBinTable::RemoveTTYPEEntry(String^ ttypeEntryLabel)
+{
+	int extensionentry_index = -1;
+	for (int i = 0; i < TTYPES->Length; i++)
+		if (TTYPES[i] == ttypeEntryLabel)
+		{
+			extensionentry_index = i;
+			break;
+		}
+
+	if (extensionentry_index == -1)
+	{
+		throw gcnew Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntryLabel + "'");
+		return;
+	}
+
+	array<Object^>^ newEntryDataObjs = gcnew array<Object^>(TFIELDS - 1);
+	array<String^>^ newTTYPES = gcnew array<String^>(TFIELDS - 1);
+	array<String^>^ newTFORMS = gcnew array<String^>(TFIELDS - 1);
+	array<String^>^ newTUNITS = gcnew array<String^>(TFIELDS - 1);
+	array<int>^ newTBYTES = gcnew array<int>(TFIELDS - 1);
+	array<int>^ newTINSTANCES = gcnew array<int>(TFIELDS - 1);
+	array<TypeCode>^ newTCODES = gcnew array<TypeCode>(TFIELDS - 1);
+
+	int c = 0;
+	for (int i = 0; i < TFIELDS; i++)
+		if (i == extensionentry_index)
+			continue;
+		else
+		{
+			TypeCode code;
+			int rank;
+			newEntryDataObjs[c] = this->GetTTYPEEntry(TTYPES[i], code, rank);
+			newTTYPES[c] = TTYPES[i];
+			newTFORMS[c] = TFORMS[i];
+			newTUNITS[c] = TUNITS[i];
+			newTBYTES[c] = TBYTES[i];
+			newTINSTANCES[c] = TINSTANCES[i];
+			newTCODES[c] = TCODES[i];
+			c++;
+		}
+
+	BINTABLE = MAKEBINTABLEBYTEARRAY(newEntryDataObjs);
+	TFIELDS--;
+	TTYPES = newTTYPES;
+	TFORMS = newTFORMS;
+	TUNITS = newTUNITS;
+	TBYTES = newTBYTES;
+	TINSTANCES = newTINSTANCES;
+	TCODES = newTCODES;
+}
+
+void JPFITS::FITSBinTable::AddTTYPEEntries(array<String^>^ ttypeEntryLabels, bool replaceIfExists, array<Object^>^ entryArrays, array<String^>^ entryUnits)
+{
+
+}
+
+void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIfExists, Object^ entryArray, String^ entryUnits)
+{
+	int extensionentry_index = -1;
+	if (TTYPES != nullptr)
+		for (int i = 0; i < TTYPES->Length; i++)
+			if (TTYPES[i] == ttypeEntryLabel)
+			{
+				extensionentry_index = i;
+				break;
+			}
+
+	if (extensionentry_index != -1 && !replaceIfExists)
+	{
+		throw gcnew Exception("Extension Entry TTYPE Label '" + ttypeEntryLabel + "' already exists, but was told to not overwrite it.");
+		return;
+	}
+
+	if (extensionentry_index != -1)//then remove it
+		this->RemoveTTYPEEntry(ttypeEntryLabel);
+	else
+		extensionentry_index = TFIELDS;//then put the entry at the last column of the table...NB this is a zero-based index...TFIELDS will increment by one below
+
+	this->TFIELDS++;
+	array<Object^>^ newEntryDataObjs = gcnew array<Object^>(TFIELDS);
+	array<String^>^ newTTYPES = gcnew array<String^>(TFIELDS);
+	array<String^>^ newTFORMS = gcnew array<String^>(TFIELDS);
+	array<String^>^ newTUNITS = gcnew array<String^>(TFIELDS);
+	array<int>^ newTBYTES = gcnew array<int>(TFIELDS);
+	array<int>^ newTINSTANCES = gcnew array<int>(TFIELDS);
+	array<TypeCode>^ newTCODES = gcnew array<TypeCode>(TFIELDS);
+
+	int c = 0;
+	for (int i = 0; i < TFIELDS; i++)
+		if (i == extensionentry_index)
+		{
+			int rank = ((Array^)entryArray)->Rank;
+			int instances = 1;
+			if (rank == 2)
+				instances = ((Array^)entryArray)->GetLength(0);
+
+			newEntryDataObjs[i] = entryArray;
+			newTTYPES[i] = ttypeEntryLabel;
+			newTCODES[i] = Type::GetTypeCode((((Array^)entryArray)->GetType())->GetElementType());
+			newTFORMS[i] = TYPECODETFORM(newTCODES[i]);
+			newTUNITS[i] = entryUnits;
+			newTBYTES[i] = TYPECODETONBYTES(newTCODES[i]) * instances;
+			newTINSTANCES[i] = instances;
+		}
+		else
+		{
+			TypeCode code;
+			int rank;
+			newEntryDataObjs[i] = this->GetTTYPEEntry(TTYPES[c], code, rank);
+			newTTYPES[i] = TTYPES[c];
+			newTFORMS[i] = TFORMS[c];
+			newTUNITS[i] = TUNITS[c];
+			newTBYTES[i] = TBYTES[c];
+			newTINSTANCES[i] = TINSTANCES[c];
+			newTCODES[i] = TCODES[c];
+			c++;
+		}
+
+	BINTABLE = MAKEBINTABLEBYTEARRAY(newEntryDataObjs);
+	TTYPES = newTTYPES;
+	TFORMS = newTFORMS;
+	TUNITS = newTUNITS;
+	TBYTES = newTBYTES;
+	TINSTANCES = newTINSTANCES;
+	TCODES = newTCODES;
+
+	//either it was an add to a blank table, or a replacement, or an additional, so these either need set for the first time, or updated
+	BITPIX = 8;
+	NAXIS = 2;
+	NAXIS1 = 0;
+	for (int i = 0; i < TBYTES->Length; i++)
+		NAXIS1 += TBYTES[i];
+	if (((Array^)entryArray)->Rank == 1)
+		NAXIS2 = ((Array^)entryArray)->Length;
+	else
+		NAXIS2 = ((Array^)entryArray)->GetLength(1);
+}
+
+void JPFITS::FITSBinTable::AddExtraHeaderKey(String^ keyName, String^ keyValue, String^ keyComment)
+{
+	if (EXTRAKEYS == nullptr)
+	{
+		EXTRAKEYS = gcnew array<String^>(1) { keyName };
+		EXTRAKEYVALS = gcnew array<String^>(1) { keyValue };
+		EXTRAKEYCOMS = gcnew array<String^>(1) { keyComment };
+	}
+	else
+	{
+		array<String^>^ newkeys = gcnew array<String^>(EXTRAKEYS->Length + 1);
+		array<String^>^ newvals = gcnew array<String^>(EXTRAKEYS->Length + 1);
+		array<String^>^ newcoms = gcnew array<String^>(EXTRAKEYS->Length + 1);
+
+		for (int i = 0; i < EXTRAKEYS->Length; i++)
+		{
+			newkeys[i] = EXTRAKEYS[i];
+			newvals[i] = EXTRAKEYS[i];
+			newcoms[i] = EXTRAKEYS[i];
+		}
+		newkeys[EXTRAKEYS->Length] = keyName;
+		newvals[EXTRAKEYS->Length] = keyValue;
+		newcoms[EXTRAKEYS->Length] = keyComment;
+
+		EXTRAKEYS = newkeys;
+		EXTRAKEYVALS = newvals;
+		EXTRAKEYCOMS = newcoms;
+	}
+}
 
 void JPFITS::FITSBinTable::RemoveExtension(String^ FileName, String^ ExtensionName)
 {
@@ -692,6 +914,28 @@ bool JPFITS::FITSBinTable::ExtensionExists(String^ FileName, String^ ExtensionNa
 	bool exists = FITSFILEOPS::SEEKEXTENSION(fs, "BINTABLE", ExtensionName, nullptr, start, end);
 	fs->Close();
 	return exists;
+}
+
+void JPFITS::FITSBinTable::Write(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists)
+{
+	TypeCode code;
+	int rank;
+	array<Object^>^ writeobj = gcnew array<Object^>(this->TFIELDS);
+	for (int i = 0; i < TFIELDS; i++)
+		writeobj[i] = this->GetTTYPEEntry(TTYPES[i], code, rank);
+
+	EXTENSIONNAME = ExtensionName;
+	FILENAME = FileName;
+
+	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, this->TTYPES, this->TUNITS, this->EXTRAKEYS, this->EXTRAKEYVALS, this->EXTRAKEYCOMS, writeobj);
+}
+
+void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, String^ ExtensionEntryLabel, String^ ExtensionEntryDataUnit, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, Object^ ExtensionEntryData)
+{
+	array<String^>^ label = gcnew array<String^>(1) { ExtensionEntryLabel };
+	array<String^>^ unit = gcnew array<String^>(1) { ExtensionEntryDataUnit };
+	
+	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, label, unit, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments, gcnew array<Object^>(1) { ExtensionEntryData });
 }
 
 void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData)
@@ -772,9 +1016,45 @@ void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionNam
 	if (extensionfound)
 		fs->Position = startpos;
 
+	//format the header for writing
+	array<String^>^ header = FORMATBINARYTABLEEXTENSIONHEADER(ExtensionName, ExtensionEntryData, ExtensionEntryLabels, ExtensionEntryDataUnits, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments);
+	array<unsigned char>^ headerdata = gcnew array<unsigned char>(header->Length * 80);
+
+	for (int i = 0; i < header->Length; i++)
+		for (int j = 0; j < 80; j++)
+			headerdata[i * 80 + j] = (unsigned char)header[i][j];
+
+	array<unsigned char>^ data;
+	try
+	{
+		data = MAKEBINTABLEBYTEARRAY(ExtensionEntryData);
+	}
+	catch (Exception^ e)
+	{
+		fs->Close();
+		throw gcnew Exception(e->Message);
+		return;
+	}
+
+	fs->Write(headerdata, 0, headerdata->Length);
+	fs->Write(data, 0, data->Length);
+	if (arr_append != nullptr)
+		fs->Write(arr_append, 0, arr_append->Length);
+	fs->Close();
+}
+
+array<unsigned char>^ JPFITS::FITSBinTable::MAKEBINTABLEBYTEARRAY(array<Object^>^ ExtensionEntryData)
+{
 	array<TypeCode>^ ExtensionEntryDataTypes = gcnew array<TypeCode>(ExtensionEntryData->Length);
 	for (int i = 0; i < ExtensionEntryData->Length; i++)
+	{
+		if (!ExtensionEntryData[i]->GetType()->IsArray)
+		{
+			throw gcnew Exception("Error: Object at index '" + i + "' is not an array. Stopping write.");
+			return nullptr;
+		}
 		ExtensionEntryDataTypes[i] = Type::GetTypeCode((((Array^)ExtensionEntryData[i])->GetType())->GetElementType());
+	}
 
 	array<int>^ ExtensionEntryDataTypeInstances = gcnew array<int>(ExtensionEntryData->Length);
 	array<int>^ datanaxes2 = gcnew array<int>(ExtensionEntryData->Length);
@@ -787,7 +1067,7 @@ void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionNam
 		else
 		{
 			ExtensionEntryDataTypeInstances[i] = ((Array^)ExtensionEntryData[i])->GetLength(0);
-			datanaxes2[i] /= ExtensionEntryDataTypeInstances[i];
+			datanaxes2[i] = ((Array^)ExtensionEntryData[i])->GetLength(1);
 		}
 	}
 
@@ -799,25 +1079,12 @@ void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionNam
 	for (int i = 1; i < datanaxes2->Length; i++)
 		if (naxis2 != datanaxes2[i])
 		{
-			fs->Close();
 			throw gcnew Exception("ExtensionEntryData do not all have the same number of rows, NAXES2. Cannot continue;");
-			return;
+			return nullptr;
 		}
 
-	//format the header for writing
-	array<String^>^ header = FORMATBINARYTABLEEXTENSIONHEADER(ExtensionName, ExtensionEntryData, ExtensionEntryLabels, ExtensionEntryDataUnits, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments);
-
-	int NbytesExtension = naxis2 * naxis1;//number of bytes in table
-	int NbytesHead = header->Length * 80;//number of bytes in extension header...should always be multiple of 2880.
-	int NbytesHeadExtension = NbytesHead + NbytesExtension;//this is the number of bytes in the header + extension data...but need to write file so multiple of 2880 bytes
-	int Ncards = int(Math::Ceiling(double(NbytesHeadExtension) / 2880.0));
-	int NBytesTot = Ncards * 2880;
+	int NBytesTot = int(Math::Ceiling(double(naxis1 * naxis2) / 2880.0)) * 2880;
 	array<unsigned char>^ data = gcnew array<unsigned char>(NBytesTot);
-
-	for (int i = 0; i < header->Length; i++)
-		for (int j = 0; j < 80; j++)
-			data[i * 80 + j] = (unsigned char)header[i][j];
-	//header is now written into the data array
 
 	int nthread = omp_get_max_threads();
 	bool parallel_top = false;
@@ -839,7 +1106,7 @@ void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionNam
 			for (int jj = 0; jj < j; jj++)
 				jtps += TYPECODETONBYTES(ExtensionEntryDataTypes[jj]) * ExtensionEntryDataTypeInstances[jj];
 
-			int cc = NbytesHead + i * naxis1 + jtps;
+			int cc = i * naxis1 + jtps;
 
 			switch (ExtensionEntryDataTypes[j])
 			{
@@ -1030,326 +1297,12 @@ void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionNam
 
 	if (exception)
 	{
-		fs->Close();
 		throw gcnew Exception("Data type not recognized for writing as FITS table: '" + exceptiontypecode.ToString() + "'");
-		return;
+		return nullptr;
 	}
 
-	fs->Write(data, 0, NBytesTot);
-	if (arr_append != nullptr)
-		fs->Write(arr_append, 0, arr_append->Length);
-	fs->Close();
+	return data;
 }
-
-void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<TypeCode>^ ExtensionEntryDataTypes, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<double, 2>^ ExtensionEntryData)
-{
-	array<Object^>^ dataobj = gcnew array<Object^>(ExtensionEntryData->GetLength(0));
-
-	int nthread = omp_get_max_threads();
-	bool parallel_top = false;
-	if (ExtensionEntryData->GetLength(0) >= nthread)
-		parallel_top = true;
-	bool exception = false;
-	TypeCode exceptiontypecode;
-	bool parallel_in = false;
-	if (!parallel_top && ExtensionEntryData->GetLength(1) >= nthread)
-		parallel_in = true;
-
-	#pragma omp parallel for if(parallel_top)
-	for (int i = 0; i < ExtensionEntryData->GetLength(0); i++)
-	{
-		if (exception)
-			break;
-
-		switch (ExtensionEntryDataTypes[i])
-		{
-			case TypeCode::Double:
-			{
-				array<double>^ datacol = gcnew array<double>(ExtensionEntryData->GetLength(1));
-
-				#pragma omp parallel for if(parallel_in)
-				for (int j = 0; j < datacol->Length; j++)
-					datacol[j] = ExtensionEntryData[i, j];
-
-				dataobj[i] = (Object^)datacol;
-				break;
-			}
-
-			case TypeCode::Single:
-			{
-				array<float>^ datacol = gcnew array<float>(ExtensionEntryData->GetLength(1));
-
-				#pragma omp parallel for if(parallel_in)
-				for (int j = 0; j < datacol->Length; j++)
-					datacol[j] = (float)ExtensionEntryData[i, j];
-
-				dataobj[i] = (Object^)datacol;
-				break;
-			}
-
-			case TypeCode::Int64:
-			{
-				array<__int64>^ datacol = gcnew array<__int64>(ExtensionEntryData->GetLength(1));
-				
-				#pragma omp parallel for if(parallel_in)
-				for (int j = 0; j < datacol->Length; j++)
-					datacol[j] = (__int64)ExtensionEntryData[i, j];
-
-				dataobj[i] = (Object^)datacol;
-				break;
-			}
-
-			case TypeCode::Int32:
-			{
-				array<__int32>^ datacol = gcnew array<__int32>(ExtensionEntryData->GetLength(1));
-				
-				#pragma omp parallel for if(parallel_in)
-				for (int j = 0; j < datacol->Length; j++)
-					datacol[j] = (__int32)ExtensionEntryData[i, j];
-
-				dataobj[i] = (Object^)datacol;
-				break;
-			}
-
-			case TypeCode::UInt32:
-			{
-				array<unsigned __int32>^ datacol = gcnew array<unsigned __int32>(ExtensionEntryData->GetLength(1));
-				
-				#pragma omp parallel for if(parallel_in)
-				for (int j = 0; j < datacol->Length; j++)
-					datacol[j] = (unsigned __int32)ExtensionEntryData[i, j];
-
-				dataobj[i] = (Object^)datacol;
-				break;
-			}
-
-			case TypeCode::Int16:
-			{
-				array<__int16>^ datacol = gcnew array<__int16>(ExtensionEntryData->GetLength(1));
-				
-				#pragma omp parallel for if(parallel_in)
-				for (int j = 0; j < datacol->Length; j++)
-					datacol[j] = (__int16)ExtensionEntryData[i, j];
-
-				dataobj[i] = (Object^)datacol;
-				break;
-			}
-
-			case TypeCode::UInt16:
-			{
-				array<unsigned __int16>^ datacol = gcnew array<unsigned __int16>(ExtensionEntryData->GetLength(1));
-				
-				#pragma omp parallel for if(parallel_in)
-				for (int j = 0; j < datacol->Length; j++)
-					datacol[j] = (unsigned __int16)ExtensionEntryData[i, j];
-
-				dataobj[i] = (Object^)datacol;
-				break;
-			}
-
-			case TypeCode::SByte:
-			{
-				array<char>^ datacol = gcnew array<char>(ExtensionEntryData->GetLength(1));
-				
-				#pragma omp parallel for if(parallel_in)
-				for (int j = 0; j < datacol->Length; j++)
-					datacol[j] = (char)ExtensionEntryData[i, j];
-
-				dataobj[i] = (Object^)datacol;
-				break;
-			}
-
-			case TypeCode::Byte:
-			{
-				array<unsigned char>^ datacol = gcnew array<unsigned char>(ExtensionEntryData->GetLength(1));
-				
-				#pragma omp parallel for if(parallel_in)
-				for (int j = 0; j < datacol->Length; j++)
-					datacol[j] = (unsigned char)ExtensionEntryData[i, j];
-
-				dataobj[i] = (Object^)datacol;
-				break;
-			}
-
-			case TypeCode::Boolean:
-			{
-				array<bool>^ datacol = gcnew array<bool>(ExtensionEntryData->GetLength(1));
-				
-				#pragma omp parallel for if(parallel_in)
-				for (int j = 0; j < datacol->Length; j++)
-					datacol[j] = (bool)ExtensionEntryData[i, j];
-
-				dataobj[i] = (Object^)datacol;
-				break;
-			}
-
-			default:
-			{
-				exception = true;
-				exceptiontypecode = ExtensionEntryDataTypes[i];
-				break;
-			}
-		}
-	}
-
-	if (exception)
-	{
-		throw gcnew Exception("Data type not recognized for writing as FITS table: '" + exceptiontypecode.ToString() + "'");
-		return;
-	}
-
-	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, ExtensionEntryLabels, ExtensionEntryDataUnits, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments, dataobj);
-}
-
-void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, String^ ExtensionEntryLabel, TypeCode ExtensionEntryDataType, String^ ExtensionEntryDataUnit, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<double>^ ExtensionEntryData)
-{
-	array<Object^>^ dataobj = gcnew array<Object^>(1);
-	array<int>^ ExtensionEntryDataTypeInstances = gcnew array<int>(1) { 1 };
-
-	int nthread = omp_get_max_threads();
-	TypeCode exceptiontypecode;
-	bool parallel_in = false;
-	if (ExtensionEntryData->Length >= nthread)
-		parallel_in = true;
-	bool exception = false;
-
-	switch (ExtensionEntryDataType)
-	{
-		case TypeCode::Double:
-		{
-			dataobj[0] = (Object^)ExtensionEntryData;
-			break;
-		}
-
-		case TypeCode::Single:
-		{
-			array<float>^ datacol = gcnew array<float>(ExtensionEntryData->Length);
-
-			#pragma omp parallel for if(parallel_in)
-			for (int j = 0; j < datacol->Length; j++)
-				datacol[j] = (float)ExtensionEntryData[j];
-
-			dataobj[0] = (Object^)datacol;
-			break;
-		}
-
-		case TypeCode::Int64:
-		{
-			array<__int64>^ datacol = gcnew array<__int64>(ExtensionEntryData->Length);
-
-			#pragma omp parallel for if(parallel_in)
-			for (int j = 0; j < datacol->Length; j++)
-				datacol[j] = (__int64)ExtensionEntryData[j];
-
-			dataobj[0] = (Object^)datacol;
-			break;
-		}
-
-		case TypeCode::Int32:
-		{
-			array<__int32>^ datacol = gcnew array<__int32>(ExtensionEntryData->Length);
-
-			#pragma omp parallel for if(parallel_in)
-			for (int j = 0; j < datacol->Length; j++)
-				datacol[j] = (__int32)ExtensionEntryData[j];
-
-			dataobj[0] = (Object^)datacol;
-			break;
-		}
-
-		case TypeCode::UInt32:
-		{
-			array<unsigned __int32>^ datacol = gcnew array<unsigned __int32>(ExtensionEntryData->Length);
-
-			#pragma omp parallel for if(parallel_in)
-			for (int j = 0; j < datacol->Length; j++)
-				datacol[j] = (unsigned __int32)ExtensionEntryData[j];
-
-			dataobj[0] = (Object^)datacol;
-			break;
-		}
-
-		case TypeCode::Int16:
-		{
-			array<__int16>^ datacol = gcnew array<__int16>(ExtensionEntryData->Length);
-
-			#pragma omp parallel for if(parallel_in)
-			for (int j = 0; j < datacol->Length; j++)
-				datacol[j] = (__int16)ExtensionEntryData[j];
-
-			dataobj[0] = (Object^)datacol;
-			break;
-		}
-
-		case TypeCode::UInt16:
-		{
-			array<unsigned __int16>^ datacol = gcnew array<unsigned __int16>(ExtensionEntryData->Length);
-
-			#pragma omp parallel for if(parallel_in)
-			for (int j = 0; j < datacol->Length; j++)
-				datacol[j] = (unsigned __int16)ExtensionEntryData[j];
-
-			dataobj[0] = (Object^)datacol;
-			break;
-		}
-
-		case TypeCode::SByte:
-		{
-			array<char>^ datacol = gcnew array<char>(ExtensionEntryData->Length);
-
-			#pragma omp parallel for if(parallel_in)
-			for (int j = 0; j < datacol->Length; j++)
-				datacol[j] = (char)ExtensionEntryData[j];
-
-			dataobj[0] = (Object^)datacol;
-			break;
-		}
-
-		case TypeCode::Byte:
-		{
-			array<unsigned char>^ datacol = gcnew array<unsigned char>(ExtensionEntryData->Length);
-
-			#pragma omp parallel for if(parallel_in)
-			for (int j = 0; j < datacol->Length; j++)
-				datacol[j] = (unsigned char)ExtensionEntryData[j];
-
-			dataobj[0] = (Object^)datacol;
-			break;
-		}
-
-		case TypeCode::Boolean:
-		{
-			array<bool>^ datacol = gcnew array<bool>(ExtensionEntryData->Length);
-
-			#pragma omp parallel for if(parallel_in)
-			for (int j = 0; j < datacol->Length; j++)
-				datacol[j] = (bool)ExtensionEntryData[j];
-
-			dataobj[0] = (Object^)datacol;
-			break;
-		}
-
-		default:
-		{
-			exception = true;
-			exceptiontypecode = ExtensionEntryDataType;
-			break;
-		}
-	}
-
-	if (exception)
-	{
-		throw gcnew Exception("Data type not recognized for writing as FITS table: '" + exceptiontypecode.ToString() + "'");
-		return;
-	}
-
-	array<String^>^ ExtensionEntryLabels = gcnew array<String^>(1) { ExtensionEntryLabel };
-	array<TypeCode>^ ExtensionEntryDataTypes = gcnew array<TypeCode>(1) { ExtensionEntryDataType };
-	array<String^>^ ExtensionEntryDataUnits = gcnew array<String^>(1) { ExtensionEntryDataUnit };
-
-	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, ExtensionEntryLabels, ExtensionEntryDataUnits, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments, dataobj);
-}
-
 
 array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ ExtensionName, array<Object^>^ ExtensionEntryData, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments)
 {
@@ -1433,6 +1386,16 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ E
 		hcomslist->Add("data format of field: " + TYPECODETONBYTES(ExtensionEntryDataTypes[i]).ToString() + "-byte " + TYPECODESTRING(ExtensionEntryDataTypes[i]));
 
 		//TZERO and TSCAL
+		if (ExtensionEntryDataTypes[i] == TypeCode::Byte)
+		{
+			hkeyslist->Add("TZERO" + (i + 1).ToString());
+			hvalslist->Add("128");
+			hcomslist->Add("offset for unsigned 16-bit integers");
+
+			hkeyslist->Add("TSCAL" + (i + 1).ToString());
+			hvalslist->Add("1");
+			hcomslist->Add("data are not scaled");
+		}
 		if (ExtensionEntryDataTypes[i] == TypeCode::UInt16)
 		{
 			hkeyslist->Add("TZERO" + (i + 1).ToString());
@@ -1443,31 +1406,11 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ E
 			hvalslist->Add("1");
 			hcomslist->Add("data are not scaled");
 		}
-		if (ExtensionEntryDataTypes[i] == TypeCode::Int16)
-		{
-			hkeyslist->Add("TZERO" + (i + 1).ToString());
-			hvalslist->Add("0");
-			hcomslist->Add("offset for signed 16-bit integers");
-
-			hkeyslist->Add("TSCAL" + (i + 1).ToString());
-			hvalslist->Add("1");
-			hcomslist->Add("data are not scaled");
-		}
 		if (ExtensionEntryDataTypes[i] == TypeCode::UInt32)
 		{
 			hkeyslist->Add("TZERO" + (i + 1).ToString());
 			hvalslist->Add("2147483648");
 			hcomslist->Add("offset for unsigned 32-bit integers");
-
-			hkeyslist->Add("TSCAL" + (i + 1).ToString());
-			hvalslist->Add("1");
-			hcomslist->Add("data are not scaled");
-		}
-		if (ExtensionEntryDataTypes[i] == TypeCode::Int32)
-		{
-			hkeyslist->Add("TZERO" + (i + 1).ToString());
-			hvalslist->Add("0");
-			hcomslist->Add("offset for signed 32-bit integers");
 
 			hkeyslist->Add("TSCAL" + (i + 1).ToString());
 			hvalslist->Add("1");
@@ -1558,9 +1501,9 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ E
 				for (int i = 0; i < 18 - L; i++)
 					value += " ";//pad right
 			}
-			if (value->Trim() == "T")
+			if (headerkeyvals[i]->Trim() == "T")
 				value = "                   T";
-			if (value->Trim() == "F")
+			if (headerkeyvals[i]->Trim() == "F")
 				value = "                   F";
 		}
 		//value formatting done
@@ -1746,6 +1689,8 @@ int JPFITS::FITSBinTable::TYPECODETONBYTES(TypeCode typecode)
 
 void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 {
+	ArrayList^ extras = gcnew ArrayList();//for possible extras
+
 	HEADER = gcnew array<String^>(header->Count);
 	String^ strheaderline;
 	int ttypeindex = -1;
@@ -1754,35 +1699,34 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 	{
 		strheaderline = (String^)header[i];
 		HEADER[i] = strheaderline;
-		//do keys, values, and comments???????
 
 		if (NAXIS == 0)
-			if (strheaderline->Substring(0, 8) == "NAXIS   ")
+			if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS"))
 			{
 				NAXIS = ::Convert::ToInt32(strheaderline->Substring(10, 20));
 				continue;
 			}
 		if (NAXIS1 == 0)
-			if (strheaderline->Substring(0, 8) == "NAXIS1  ")
+			if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS1"))
 			{
 				NAXIS1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
 				continue;
 			}
 		if (NAXIS2 == 0)
-			if (strheaderline->Substring(0, 8) == "NAXIS2  ")
+			if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS2"))
 			{
 				NAXIS2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
 				continue;
 			}
 		if (BITPIX == 0)
-			if (strheaderline->Substring(0, 8) == "BITPIX  ")
+			if (strheaderline->Substring(0, 8)->Trim()->Equals("BITPIX"))
 			{
 				BITPIX = ::Convert::ToInt32(strheaderline->Substring(10, 20));
 				continue;
 			}
 
 		if (TFIELDS == 0)
-			if (strheaderline->Substring(0, 8) == "TFIELDS ")
+			if (strheaderline->Substring(0, 8)->Trim()->Equals("TFIELDS"))
 			{
 				TFIELDS = ::Convert::ToInt32(strheaderline->Substring(10, 20));
 				TTYPES = gcnew array<String^>(TFIELDS);
@@ -1794,10 +1738,10 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 				continue;
 			}
 
-		if (strheaderline->Substring(0, 8)->Contains("TTYPE" + (ttypeindex + 2).ToString()) || strheaderline->Substring(0, 8)->Contains("TFORM" + (ttypeindex + 2).ToString()))
+		if (strheaderline->Substring(0, 8)->Trim()->Equals("TTYPE" + (ttypeindex + 2).ToString()) || strheaderline->Substring(0, 8)->Trim()->Equals("TFORM" + (ttypeindex + 2).ToString()))
 			ttypeindex++;
 
-		if (strheaderline->Substring(0, 8)->Contains("TTYPE"))
+		if (strheaderline->Substring(0, 8)->Trim()->Equals("TTYPE" + (ttypeindex + 1).ToString()))
 		{
 			int f = strheaderline->IndexOf("'");
 			int l = strheaderline->LastIndexOf("'");
@@ -1805,7 +1749,7 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 			continue;
 		}
 
-		if (strheaderline->Substring(0, 8)->Contains("TFORM"))
+		if (strheaderline->Substring(0, 8)->Trim()->Equals("TFORM" + (ttypeindex + 1).ToString()))
 		{
 			int f = strheaderline->IndexOf("'");
 			int l = strheaderline->LastIndexOf("'");
@@ -1817,7 +1761,7 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 			continue;
 		}
 
-		if (strheaderline->Substring(0, 8)->Contains("TUNIT"))
+		if (strheaderline->Substring(0, 8)->Trim()->Equals("TUNIT" + (ttypeindex + 1).ToString()))
 		{
 			int f = strheaderline->IndexOf("'");
 			int l = strheaderline->LastIndexOf("'");
@@ -1829,7 +1773,7 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 		//therefore find the TSCALE and TZERO for this entry...if they don't exist then it is signed, if they do exist
 		//then it is whatever values they are, for either determined signed or unsigned
 		//then set this current tcode[typeindex] to what it should be
-		if (strheaderline->Substring(0, 8)->Contains("TZERO"))
+		if (strheaderline->Substring(0, 8)->Trim()->Equals("TZERO" + (ttypeindex + 1).ToString()))
 		{
 			if (TCODES[ttypeindex] == TypeCode::SByte)//then get the value
 				if (Convert::ToByte(strheaderline->Substring(10, 20)->Trim()) == 128)//then it is an unsigned
@@ -1840,6 +1784,49 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 			if (TCODES[ttypeindex] == TypeCode::Int32)//then get the value
 				if (Convert::ToUInt32(strheaderline->Substring(10, 20)->Trim()) == 2147483648)//then it is an unsigned
 					TCODES[ttypeindex] = TypeCode::UInt32;
+			continue;
+		}
+
+		if (strheaderline->Substring(0, 8)->Trim()->Equals("TSCAL" + (ttypeindex + 1).ToString()))//don't need to do anything with this
+			continue;
+
+		String^ key = strheaderline->Substring(0, 8)->Trim();
+		if (key->Substring(0, 1) == "T" && JPMath::IsNumeric(key->Substring(key->Length - 1)))//then likely it is some other T____N field which I haven't explicitly coded above...will need to check all essential keywords listing to do this properly
+			continue;
+
+		//should now only be where extra keys might remain...so add them etc
+		extras->Add(header[i]);
+	}
+
+	if (extras->Count == 0)
+		return;
+
+	EXTRAKEYS = gcnew array<String^>(extras->Count);
+	EXTRAKEYVALS = gcnew array<String^>(extras->Count);
+	EXTRAKEYCOMS = gcnew array<String^>(extras->Count);
+
+	for (int i = 0; i < extras->Count; i++)
+	{
+		String^ line = (String^)header[i];
+		EXTRAKEYS[i] = line->Substring(0, 8)->Trim();
+
+		if (EXTRAKEYS[i] == "COMMENT")
+		{
+			EXTRAKEYVALS[i] = line->Substring(8, 18);
+			EXTRAKEYCOMS[i] = line->Substring(26);
+		}
+		else
+		{
+			if (JPMath::IsNumeric(line->Substring(10, 20)))//this has to work if it is supposed to be a numeric value here
+				EXTRAKEYVALS[i] = line->Substring(10, 20)->Trim();//get rid of leading and trailing white space
+			else
+			{
+				String^ nock = "'";
+				EXTRAKEYVALS[i] = line->Substring(10, 20)->Trim();
+				EXTRAKEYVALS[i] = EXTRAKEYVALS[i]->Trim(nock->ToCharArray());
+				EXTRAKEYVALS[i] = EXTRAKEYVALS[i]->Trim();
+			}
+			EXTRAKEYCOMS[i] = line->Substring(32)->Trim();
 		}
 	}
 }
