@@ -804,11 +804,16 @@ namespace JPFITS
 		/// <summary>Add an entry to the binary table.</summary>
 		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
-		/// <param name="entryArray">The array to enter into the array.</param>
+		/// <param name="entryArray">The array to enter into the table.</param>
 		/// <param name="entryUnits">The physical units of the values of the array.</param>
 		void AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIfExists, Object^ entryArray, String^ entryUnits);
 
-		void AddTTYPEEntries(array<String^>^ ttypeEntryLabels, bool replaceIfExists, array<Object^>^ entryArrays, array<String^>^ entryUnits);
+		/*/// <summary>Add a series of entries to the binary table.</summary>
+		/// <param name="ttypeEntryLabels">The names of the binary table extension entries, i.e. the TTYPE values.</param>
+		/// <param name="replaceIfExists">Replace a TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
+		/// <param name="entryArrays">The arrays to enter into the table.</param>
+		/// <param name="entryUnits">The physical units of the values of the arrays.</param>
+		void AddTTYPEEntries(array<String^>^ ttypeEntryLabels, bool replaceIfExists, array<Object^>^ entryArrays, array<String^>^ entryUnits);*/
 
 		/// <summary>Add an extra key to the extension header. If it is to be a COMMENT, just fill the keyValue with ten characters, and the keyComment with 54 characters.</summary>
 		/// <param name="keyName">The name of the key.</param>

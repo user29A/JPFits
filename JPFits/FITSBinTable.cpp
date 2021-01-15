@@ -746,10 +746,19 @@ void JPFITS::FITSBinTable::RemoveTTYPEEntry(String^ ttypeEntryLabel)
 	TCODES = newTCODES;
 }
 
-void JPFITS::FITSBinTable::AddTTYPEEntries(array<String^>^ ttypeEntryLabels, bool replaceIfExists, array<Object^>^ entryArrays, array<String^>^ entryUnits)
-{
-
-}
+//void JPFITS::FITSBinTable::AddTTYPEEntries(array<String^>^ ttypeEntryLabels, bool replaceIfExists, array<Object^>^ entryArrays, array<String^>^ entryUnits)
+//{
+//	if (TTYPES != nullptr)
+//		for (int i = 0; i < ttypeEntryLabels->Length; i++)
+//			for (int j = 0; j < TTYPES->Length; j++)
+//				if (ttypeEntryLabels[i] == TTYPES[j] && !replaceIfExists)
+//				{
+//					throw gcnew Exception("Extension Entry TTYPE Label '" + ttypeEntryLabels[i] + "' already exists, but was told to not overwrite it. Not proceeding with anything.");
+//					return;
+//				}
+//
+//
+//}
 
 void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIfExists, Object^ entryArray, String^ entryUnits)
 {
@@ -920,14 +929,14 @@ void JPFITS::FITSBinTable::Write(String^ FileName, String^ ExtensionName, bool O
 {
 	TypeCode code;
 	int rank;
-	array<Object^>^ writeobj = gcnew array<Object^>(this->TFIELDS);
+	array<Object^>^ writeobjarr = gcnew array<Object^>(this->TFIELDS);
 	for (int i = 0; i < TFIELDS; i++)
-		writeobj[i] = this->GetTTYPEEntry(TTYPES[i], code, rank);
+		writeobjarr[i] = this->GetTTYPEEntry(TTYPES[i], code, rank);
 
 	EXTENSIONNAME = ExtensionName;
 	FILENAME = FileName;
 
-	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, this->TTYPES, this->TUNITS, this->EXTRAKEYS, this->EXTRAKEYVALS, this->EXTRAKEYCOMS, writeobj);
+	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, this->TTYPES, this->TUNITS, this->EXTRAKEYS, this->EXTRAKEYVALS, this->EXTRAKEYCOMS, writeobjarr);
 }
 
 void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, String^ ExtensionEntryLabel, String^ ExtensionEntryDataUnit, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, Object^ ExtensionEntryData)
