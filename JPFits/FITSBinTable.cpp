@@ -351,7 +351,7 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 
 	switch (TCODES[extensionentry_index])
 	{
-		case ::TypeCode::Double:
+		/*case ::TypeCode::Double:
 		{
 			array<double>^ vector = gcnew array<double>(TINSTANCES[extensionentry_index] * NAXIS2);
 
@@ -387,302 +387,407 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 				return vector;
 
 			break;
+		}*/
+
+		case ::TypeCode::Double:
+		{
+			if (objectArrayRank == 1)
+			{
+				array<double>^ vector = gcnew array<double>(TINSTANCES[extensionentry_index] * NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+				{
+					array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 8;
+						dbl[7] = BINTABLE[currentbyte];
+						dbl[6] = BINTABLE[currentbyte + 1];
+						dbl[5] = BINTABLE[currentbyte + 2];
+						dbl[4] = BINTABLE[currentbyte + 3];
+						dbl[3] = BINTABLE[currentbyte + 4];
+						dbl[2] = BINTABLE[currentbyte + 5];
+						dbl[1] = BINTABLE[currentbyte + 6];
+						dbl[0] = BINTABLE[currentbyte + 7];
+						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToDouble(dbl, 0);
+					}
+				}
+				return vector;
+			}
+			else
+			{
+				array<double, 2>^ arrya = gcnew array<double, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+				{
+					array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 8;
+						dbl[7] = BINTABLE[currentbyte];
+						dbl[6] = BINTABLE[currentbyte + 1];
+						dbl[5] = BINTABLE[currentbyte + 2];
+						dbl[4] = BINTABLE[currentbyte + 3];
+						dbl[3] = BINTABLE[currentbyte + 4];
+						dbl[2] = BINTABLE[currentbyte + 5];
+						dbl[1] = BINTABLE[currentbyte + 6];
+						dbl[0] = BINTABLE[currentbyte + 7];
+						arrya[j, i] = BitConverter::ToDouble(dbl, 0);
+					}
+				}
+				return arrya;
+			}
+			break;
 		}
 
 		case (::TypeCode::Int64):
 		{
-			array<__int64>^ vector = gcnew array<__int64>(TINSTANCES[extensionentry_index] * NAXIS2);
-
-			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < NAXIS2; i++)
+			if (objectArrayRank == 1)
 			{
-				array<unsigned char>^ i64 = gcnew array<unsigned char>(8);
-				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				array<__int64>^ vector = gcnew array<__int64>(TINSTANCES[extensionentry_index] * NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
 				{
-					currentbyte = byteoffset + i * NAXIS1 + j * 8;
-					i64[7] = BINTABLE[currentbyte];
-					i64[6] = BINTABLE[currentbyte + 1];
-					i64[5] = BINTABLE[currentbyte + 2];
-					i64[4] = BINTABLE[currentbyte + 3];
-					i64[3] = BINTABLE[currentbyte + 4];
-					i64[2] = BINTABLE[currentbyte + 5];
-					i64[1] = BINTABLE[currentbyte + 6];
-					i64[0] = BINTABLE[currentbyte + 7];
-					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt64(i64, 0);
+					array<unsigned char>^ i64 = gcnew array<unsigned char>(8);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 8;
+						i64[7] = BINTABLE[currentbyte];
+						i64[6] = BINTABLE[currentbyte + 1];
+						i64[5] = BINTABLE[currentbyte + 2];
+						i64[4] = BINTABLE[currentbyte + 3];
+						i64[3] = BINTABLE[currentbyte + 4];
+						i64[2] = BINTABLE[currentbyte + 5];
+						i64[1] = BINTABLE[currentbyte + 6];
+						i64[0] = BINTABLE[currentbyte + 7];
+						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt64(i64, 0);
+					}
 				}
-			}
-
-			if (objectArrayRank == 2)
-			{
-				array<__int64, 2>^ arrya = gcnew array<__int64, 2>(TINSTANCES[extensionentry_index], NAXIS2);
-				#pragma omp parallel for
-				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
-					for (int y = 0; y < NAXIS2; y++)
-						arrya[x, y] = vector[x * NAXIS2 + y];
-				return arrya;
+				return vector;
 			}
 			else
-				return vector;
-
+			{
+				array<__int64, 2>^ arrya = gcnew array<__int64, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+				{
+					array<unsigned char>^ i64 = gcnew array<unsigned char>(8);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 8;
+						i64[7] = BINTABLE[currentbyte];
+						i64[6] = BINTABLE[currentbyte + 1];
+						i64[5] = BINTABLE[currentbyte + 2];
+						i64[4] = BINTABLE[currentbyte + 3];
+						i64[3] = BINTABLE[currentbyte + 4];
+						i64[2] = BINTABLE[currentbyte + 5];
+						i64[1] = BINTABLE[currentbyte + 6];
+						i64[0] = BINTABLE[currentbyte + 7];
+						arrya[j, i] = BitConverter::ToInt64(i64, 0);
+					}
+				}
+				return arrya;
+			}
 			break;
 		}
 
 		case ::TypeCode::Single:
 		{
-			array<float>^ vector = gcnew array<float>(TINSTANCES[extensionentry_index] * NAXIS2);
-
-			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < NAXIS2; i++)
+			if (objectArrayRank == 1)
 			{
-				array<unsigned char>^ sng = gcnew array<unsigned char>(4);
-				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				array<float>^ vector = gcnew array<float>(TINSTANCES[extensionentry_index] * NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
 				{
-					currentbyte = byteoffset + i * NAXIS1 + j * 4;
-					sng[3] = BINTABLE[currentbyte];
-					sng[2] = BINTABLE[currentbyte + 1];
-					sng[1] = BINTABLE[currentbyte + 2];
-					sng[0] = BINTABLE[currentbyte + 3];
-					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToSingle(sng, 0);
+					array<unsigned char>^ sng = gcnew array<unsigned char>(4);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 4;
+						sng[3] = BINTABLE[currentbyte];
+						sng[2] = BINTABLE[currentbyte + 1];
+						sng[1] = BINTABLE[currentbyte + 2];
+						sng[0] = BINTABLE[currentbyte + 3];
+						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToSingle(sng, 0);
+					}
 				}
+				return vector;
 			}
-
-			if (objectArrayRank == 2)
+			else			
 			{
 				array<float, 2>^ arrya = gcnew array<float, 2>(TINSTANCES[extensionentry_index], NAXIS2);
-				#pragma omp parallel for
-				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
-					for (int y = 0; y < NAXIS2; y++)
-						arrya[x, y] = vector[x * NAXIS2 + y];
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+				{
+					array<unsigned char>^ sng = gcnew array<unsigned char>(4);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 4;
+						sng[3] = BINTABLE[currentbyte];
+						sng[2] = BINTABLE[currentbyte + 1];
+						sng[1] = BINTABLE[currentbyte + 2];
+						sng[0] = BINTABLE[currentbyte + 3];
+						arrya[j, i] = BitConverter::ToSingle(sng, 0);
+					}
+				}
 				return arrya;
 			}
-			else
-				return vector;
-
 			break;
 		}
 
 		case ::TypeCode::UInt32:
 		{
-			//unsigned __int32 bzero = 2147483648;// + bzero somewhere or does bitcoverter do it all???
-			array<unsigned __int32>^ vector = gcnew array<unsigned __int32>(TINSTANCES[extensionentry_index] * NAXIS2);
-
-			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < NAXIS2; i++)
+			if (objectArrayRank == 1)
 			{
-				array<unsigned char>^ uint32 = gcnew array<unsigned char>(4);
-				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				//unsigned __int32 bzero = 2147483648;// + bzero somewhere or does bitcoverter do it all???
+				array<unsigned __int32>^ vector = gcnew array<unsigned __int32>(TINSTANCES[extensionentry_index] * NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
 				{
-					currentbyte = byteoffset + i * NAXIS1 + j * 4;
-					uint32[3] = BINTABLE[currentbyte];
-					uint32[2] = BINTABLE[currentbyte + 1];
-					uint32[1] = BINTABLE[currentbyte + 2];
-					uint32[0] = BINTABLE[currentbyte + 3];
-					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToUInt32(uint32, 0); // + bzero somewhere or does bitcoverter do it all???
+					array<unsigned char>^ uint32 = gcnew array<unsigned char>(4);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 4;
+						uint32[3] = BINTABLE[currentbyte];
+						uint32[2] = BINTABLE[currentbyte + 1];
+						uint32[1] = BINTABLE[currentbyte + 2];
+						uint32[0] = BINTABLE[currentbyte + 3];
+						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToUInt32(uint32, 0); // + bzero somewhere or does bitcoverter do it all???
+					}
 				}
-			}
-
-			if (objectArrayRank == 2)
-			{
-				array<unsigned __int32, 2>^ arrya = gcnew array<unsigned __int32, 2>(TINSTANCES[extensionentry_index], NAXIS2);
-				#pragma omp parallel for
-				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
-					for (int y = 0; y < NAXIS2; y++)
-						arrya[x, y] = vector[x * NAXIS2 + y];
-				return arrya;
+				return vector;
 			}
 			else
-				return vector;
-
+			{
+				array<unsigned __int32, 2>^ arrya = gcnew array<unsigned __int32, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+				{
+					array<unsigned char>^ uint32 = gcnew array<unsigned char>(4);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 4;
+						uint32[3] = BINTABLE[currentbyte];
+						uint32[2] = BINTABLE[currentbyte + 1];
+						uint32[1] = BINTABLE[currentbyte + 2];
+						uint32[0] = BINTABLE[currentbyte + 3];
+						arrya[j, i] = BitConverter::ToUInt32(uint32, 0); // + bzero somewhere or does bitcoverter do it all???
+					}
+				}
+				return arrya;
+			}
 			break;
 		}
 
 		case ::TypeCode::Int32:
 		{
-			//unsigned __int32 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
-			array<__int32>^ vector = gcnew array<__int32>(TINSTANCES[extensionentry_index] * NAXIS2);
-
-			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < NAXIS2; i++)
+			if (objectArrayRank == 1)
 			{
-				array<unsigned char>^ int32 = gcnew array<unsigned char>(4);
-				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				//unsigned __int32 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
+				array<__int32>^ vector = gcnew array<__int32>(TINSTANCES[extensionentry_index] * NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
 				{
-					currentbyte = byteoffset + i * NAXIS1 + j * 4;
-					int32[3] = BINTABLE[currentbyte];
-					int32[2] = BINTABLE[currentbyte + 1];
-					int32[1] = BINTABLE[currentbyte + 2];
-					int32[0] = BINTABLE[currentbyte + 3];
-					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt32(int32, 0); // + bzero somewhere or does bitcoverter do it all???
+					array<unsigned char>^ int32 = gcnew array<unsigned char>(4);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 4;
+						int32[3] = BINTABLE[currentbyte];
+						int32[2] = BINTABLE[currentbyte + 1];
+						int32[1] = BINTABLE[currentbyte + 2];
+						int32[0] = BINTABLE[currentbyte + 3];
+						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt32(int32, 0); // + bzero somewhere or does bitcoverter do it all???
+					}
 				}
+				return vector;
 			}
-
-			if (objectArrayRank == 2)
+			else			
 			{
 				array<__int32, 2>^ arrya = gcnew array<__int32, 2>(TINSTANCES[extensionentry_index], NAXIS2);
-				#pragma omp parallel for
-				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
-					for (int y = 0; y < NAXIS2; y++)
-						arrya[x, y] = vector[x * NAXIS2 + y];
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+				{
+					array<unsigned char>^ int32 = gcnew array<unsigned char>(4);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 4;
+						int32[3] = BINTABLE[currentbyte];
+						int32[2] = BINTABLE[currentbyte + 1];
+						int32[1] = BINTABLE[currentbyte + 2];
+						int32[0] = BINTABLE[currentbyte + 3];
+						arrya[j, i] = BitConverter::ToInt32(int32, 0); // + bzero somewhere or does bitcoverter do it all???
+					}
+				}
 				return arrya;
 			}
-			else
-				return vector;
-
 			break;
 		}
 
 		case ::TypeCode::UInt16:
 		{
-			//unsigned __int32 bzero = 32768;// + bzero somewhere or does bitcoverter do it all???
-			array<unsigned __int16>^ vector = gcnew array<unsigned __int16>(TINSTANCES[extensionentry_index] * NAXIS2);
-
-			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < NAXIS2; i++)
+			if (objectArrayRank == 1)
 			{
-				array<unsigned char>^ uint16 = gcnew array<unsigned char>(2);
-				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				//unsigned __int32 bzero = 32768;// + bzero somewhere or does bitcoverter do it all???
+				array<unsigned __int16>^ vector = gcnew array<unsigned __int16>(TINSTANCES[extensionentry_index] * NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
 				{
-					currentbyte = byteoffset + i * NAXIS1 + j * 2;
-					uint16[1] = BINTABLE[currentbyte];
-					uint16[0] = BINTABLE[currentbyte + 1];
-					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToUInt16(uint16, 0); // + bzero somewhere or does bitcoverter do it all???
+					array<unsigned char>^ uint16 = gcnew array<unsigned char>(2);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 2;
+						uint16[1] = BINTABLE[currentbyte];
+						uint16[0] = BINTABLE[currentbyte + 1];
+						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToUInt16(uint16, 0); // + bzero somewhere or does bitcoverter do it all???
+					}
 				}
+				return vector;
 			}
-
-			if (objectArrayRank == 2)
+			else			
 			{
 				array<unsigned __int16, 2>^ arrya = gcnew array<unsigned __int16, 2>(TINSTANCES[extensionentry_index], NAXIS2);
-				#pragma omp parallel for
-				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
-					for (int y = 0; y < NAXIS2; y++)
-						arrya[x, y] = vector[x * NAXIS2 + y];
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+				{
+					array<unsigned char>^ uint16 = gcnew array<unsigned char>(2);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 2;
+						uint16[1] = BINTABLE[currentbyte];
+						uint16[0] = BINTABLE[currentbyte + 1];
+						arrya[j, i] = BitConverter::ToUInt16(uint16, 0); // + bzero somewhere or does bitcoverter do it all???
+					}
+				}
 				return arrya;
 			}
-			else
-				return vector;
-
 			break;
 		}
 
 		case ::TypeCode::Int16:
 		{
-			//unsigned __int32 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
-			array<__int16>^ vector = gcnew array<__int16>(TINSTANCES[extensionentry_index] * NAXIS2);
-
-			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < NAXIS2; i++)
+			if (objectArrayRank == 1)
 			{
-				array<unsigned char>^ int16 = gcnew array<unsigned char>(2);
-				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				//unsigned __int32 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
+				array<__int16>^ vector = gcnew array<__int16>(TINSTANCES[extensionentry_index] * NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
 				{
-					currentbyte = byteoffset + i * NAXIS1 + j * 2;
-					int16[1] = BINTABLE[currentbyte];
-					int16[0] = BINTABLE[currentbyte + 1];
-					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt16(int16, 0); // + bzero somewhere or does bitcoverter do it all???
+					array<unsigned char>^ int16 = gcnew array<unsigned char>(2);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 2;
+						int16[1] = BINTABLE[currentbyte];
+						int16[0] = BINTABLE[currentbyte + 1];
+						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt16(int16, 0); // + bzero somewhere or does bitcoverter do it all???
+					}
 				}
+				return vector;
 			}
-
-			if (objectArrayRank == 2)
+			else			
 			{
 				array<__int16, 2>^ arrya = gcnew array<__int16, 2>(TINSTANCES[extensionentry_index], NAXIS2);
-				#pragma omp parallel for
-				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
-					for (int y = 0; y < NAXIS2; y++)
-						arrya[x, y] = vector[x * NAXIS2 + y];
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+				{
+					array<unsigned char>^ int16 = gcnew array<unsigned char>(2);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 2;
+						int16[1] = BINTABLE[currentbyte];
+						int16[0] = BINTABLE[currentbyte + 1];
+						arrya[j, i] = BitConverter::ToInt16(int16, 0); // + bzero somewhere or does bitcoverter do it all???
+					}
+				}
 				return arrya;
 			}
-			else
-				return vector;
-
 			break;
 		}
 
 		case ::TypeCode::Byte:
 		{
-			//unsigned __int8 bzero = 128;// + bzero somewhere or does bitcoverter do it all???
-			array<unsigned __int8>^ vector = gcnew array<unsigned __int8>(TINSTANCES[extensionentry_index] * NAXIS2);
-
-			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < NAXIS2; i++)
+			if (objectArrayRank == 1)
 			{
-				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-				{
-					currentbyte = byteoffset + i * NAXIS1 + j;
-					vector[i * TINSTANCES[extensionentry_index] + j] = (unsigned __int8)BINTABLE[currentbyte] + 128; // + bzero somewhere or does bitcoverter do it all???
-				}
+				//unsigned __int8 bzero = 128;// + bzero somewhere or does bitcoverter do it all???
+				array<unsigned __int8>^ vector = gcnew array<unsigned __int8>(TINSTANCES[extensionentry_index] * NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j;
+						vector[i * TINSTANCES[extensionentry_index] + j] = (unsigned __int8)BINTABLE[currentbyte] + 128; // + bzero somewhere or does bitcoverter do it all???
+					}
+				return vector;
 			}
-
-			if (objectArrayRank == 2)
+			else			
 			{
 				array<unsigned __int8, 2>^ arrya = gcnew array<unsigned __int8, 2>(TINSTANCES[extensionentry_index], NAXIS2);
-				#pragma omp parallel for
-				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
-					for (int y = 0; y < NAXIS2; y++)
-						arrya[x, y] = vector[x * NAXIS2 + y];
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j;
+						arrya[j, i] = (unsigned __int8)BINTABLE[currentbyte] + 128; // + bzero somewhere or does bitcoverter do it all???
+					}
 				return arrya;
 			}
-			else
-				return vector;
-
 			break;
 		}
 
 		case ::TypeCode::SByte:
 		{
-			//unsigned __int8 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
-			array<__int8>^ vector = gcnew array<__int8>(TINSTANCES[extensionentry_index] * NAXIS2);
-
-			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < NAXIS2; i++)
+			if (objectArrayRank == 1)
 			{
-				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-				{
-					currentbyte = byteoffset + i * NAXIS1 + j;
-					vector[i * TINSTANCES[extensionentry_index] + j] = (__int8)BINTABLE[currentbyte]; // + bzero somewhere or does bitcoverter do it all???
-				}
+				//unsigned __int8 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
+				array<__int8>^ vector = gcnew array<__int8>(TINSTANCES[extensionentry_index] * NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j;
+						vector[i * TINSTANCES[extensionentry_index] + j] = (__int8)BINTABLE[currentbyte]; // + bzero somewhere or does bitcoverter do it all???
+					}
+				return vector;
 			}
-
-			if (objectArrayRank == 2)
+			else			
 			{
 				array<__int8, 2>^ arrya = gcnew array<__int8, 2>(TINSTANCES[extensionentry_index], NAXIS2);
-				#pragma omp parallel for
-				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
-					for (int y = 0; y < NAXIS2; y++)
-						arrya[x, y] = vector[x * NAXIS2 + y];
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j;
+						arrya[j, i] = (__int8)BINTABLE[currentbyte]; // + bzero somewhere or does bitcoverter do it all???
+					}
 				return arrya;
 			}
-			else
-				return vector;
-
 			break;
 		}
 
 		case ::TypeCode::Boolean:
 		{
-			array<bool>^ vector = gcnew array<bool>(TINSTANCES[extensionentry_index] * NAXIS2);
-
-			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < NAXIS2; i++)
+			if (objectArrayRank == 1)
 			{
-				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-				{
-					currentbyte = byteoffset + i * NAXIS1 + j;
-					vector[i * TINSTANCES[extensionentry_index] + j] = Convert::ToBoolean(BINTABLE[currentbyte]);
-				}
+				array<bool>^ vector = gcnew array<bool>(TINSTANCES[extensionentry_index] * NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j;
+						vector[i * TINSTANCES[extensionentry_index] + j] = Convert::ToBoolean(BINTABLE[currentbyte]);
+					}
+				return vector;
 			}
-
-			if (objectArrayRank == 2)
+			else			
 			{
 				array<bool, 2>^ arrya = gcnew array<bool, 2>(TINSTANCES[extensionentry_index], NAXIS2);
 				#pragma omp parallel for
-				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
-					for (int y = 0; y < NAXIS2; y++)
-						arrya[x, y] = vector[x * NAXIS2 + y];
+				for (int i = 0; i < NAXIS2; i++)
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j;
+						arrya[j, i] = Convert::ToBoolean(BINTABLE[currentbyte]);
+					}
 				return arrya;
 			}
-			else
-				return vector;
-
 			break;
 		}
 

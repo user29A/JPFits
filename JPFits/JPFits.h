@@ -200,7 +200,7 @@ namespace JPFITS
 		#pragma endregion
 
 		#pragma region IMAGEOPS
-			/// <summary>StatsUpD updates the statistics for the primary image: maximum, minimum, mean, median, and standard deviation.</summary>
+		/// <summary>StatsUpD updates the statistics for the primary image: maximum, minimum, mean, median, and standard deviation.</summary>
 		void StatsUpD(bool do_parallel);
 
 		/// <summary>Use SetImage to replace the existing double array for the FITSImage object with a new double array.</summary>
@@ -330,14 +330,19 @@ namespace JPFITS
 		#pragma region OPERATORS
 		static array<double, 2>^ operator +(FITSImage^ lhs_img, FITSImage^ rhs_img);
 		static array<double, 2>^ operator +(FITSImage^ lhs_img, double scalar);
+		static array<double, 2>^ operator +(double scalar, FITSImage^ rhs_img);
 		static array<double, 2>^ operator -(FITSImage^ lhs_img, FITSImage^ rhs_img);
 		static array<double, 2>^ operator -(FITSImage^ lhs_img, double scalar);
+		static array<double, 2>^ operator -(double scalar, FITSImage^ rhs_img);
 		static array<double, 2>^ operator /(FITSImage^ lhs_img, FITSImage^ rhs_img);
 		static array<double, 2>^ operator /(FITSImage^ lhs_img, double scalar);
+		static array<double, 2>^ operator /(double scalar, FITSImage^ rhs_img);
 		static array<double, 2>^ operator *(FITSImage^ lhs_img, FITSImage^ rhs_img);
 		static array<double, 2>^ operator *(FITSImage^ lhs_img, double scalar);
+		static array<double, 2>^ operator *(double scalar, FITSImage^ rhs_img);
 		static array<double, 2>^ operator ^(FITSImage^ lhs_img, FITSImage^ rhs_img);
 		static array<double, 2>^ operator ^(FITSImage^ lhs_img, double scalar);
+		static array<double, 2>^ operator ^(double scalar, FITSImage^ rhs_img);
 		#pragma endregion
 
 		#pragma region PROPERTIES
@@ -350,14 +355,14 @@ namespace JPFITS
 		}
 
 		/// <summary>Default indexer accesses the image element of the primary image of the FITSImage object.</summary>
-			property double default[int, int]
+		property double default[int, int]
 		{
 			double get(int x, int y) { return DIMAGE[x, y]; }
 			void set(int x, int y, double val) { DIMAGE[x, y] = val; }
 		}
 
 		/// <summary>Min returns the minimum of the FITS image data array.  Returns zero if there is no array loaded or if stats have not been performed.</summary>
-			property double Min
+		property double Min
 		{
 			double get() { return MIN; }
 		}
@@ -533,7 +538,7 @@ namespace JPFITS
 	{
 		public:
 
-			/// <summary>Constructor for the FITSImageSet class.</summary>
+		/// <summary>Constructor for the FITSImageSet class.</summary>
 		FITSImageSet();
 
 		/// <summary>Loads FITS objects into the FITSImageSet. If the FITSImageSet already has members (not previously cleared), then the new memers are added (appended) to this FITSImageSet.</summary>
@@ -545,6 +550,11 @@ namespace JPFITS
 		/// <param name="waitbar_message">Message to display on Waitbar progress if it is shown.</param>
 		bool Load(array<String^>^ files, array<int>^ range, bool do_stats, bool do_parallel, bool show_waitbar, String^ waitbar_message);
 
+		/// <summary>Write the FITSImage objects from the FITSImageSet to disk.</summary>
+		/// <param name="precision">The precision at which to write the image data.</param>
+		/// <param name="do_parallel">Write the images with parallelism. In the past with platter drives this would have been impossible, but fast solid state drives can handle it. If there's only a few images then don't bother, but useful when writing hundreds.</param>
+		/// <param name="show_waitbar">Optionally show a cancellable waitbar when saving. If cancelled, return value is false.</param>
+		/// <param name="waitbar_message">Message to display on Waitbar progress if it is shown.</param>
 		bool Write(TypeCode precision, bool do_parallel, bool show_waitbar, String^ waitbar_message);
 
 		/// <summary>Appends a FITSImage object to the ArrayList FITSImageSet object.</summary>
@@ -610,8 +620,10 @@ namespace JPFITS
 			}
 		}
 
+		/// <summary>Gets the common directory of the FITSImage objects in the FITSImageSet based on their file paths.</summary>
 		String^ GetCommonDirectory();
 
+		/// <summary>Gets the common directory of a series of file names, based on their file paths.</summary>
 		static String^ GetCommonDirectory(array<String^>^ filelist);
 
 		/// <summary>Clears the ArrayList FITSImageSet object of all members.</summary>
@@ -678,7 +690,7 @@ namespace JPFITS
 		/// <param name="Show_Waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is nullptr.</param>
 		static FITSImage^ Stdv(JPFITS::FITSImageSet^ ImageSet, bool Do_Stats, bool Show_Waitbar);
 
-		/// <summary>Auto-register non-rotational primary images from the FITSImageSet.  Only works when there is no field rotation in the image set, only shifts, and the field remains mostly the same.</summary>
+		/// <summary>Auto-register non-rotational primary images from the FITSImageSet. Only works when there is no field rotation in the image set, only translational shifts, and the shifts are less than half of the field.</summary>
 		/// <param name="ImageSet">The FITSImageSet object.</param>
 		/// <param name="RefImgIndex">The index in the FitSet list of the reference image to register all the other images to.</param>
 		/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the registered images - saves time if you don't need those.</param>

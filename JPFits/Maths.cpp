@@ -53,6 +53,11 @@ array<double,2>^ JPFITS::FITSImage::operator +(FITSImage^ lhs_img, double scalar
 	return result;
 }
 
+array<double, 2>^ JPFITS::FITSImage::operator +(double scalar, FITSImage^ rhs_img)
+{
+	return FITSImage::operator+(rhs_img, scalar);
+}
+
 array<double,2>^ JPFITS::FITSImage::operator -(FITSImage^ lhs_img, FITSImage^ rhs_img)
 {
 	if (lhs_img->Width != rhs_img->Width || lhs_img->Height != rhs_img->Height)
@@ -79,6 +84,18 @@ array<double,2>^ JPFITS::FITSImage::operator -(FITSImage^ lhs_img,double scalar)
 	for (int i=0; i<W; i++)
 		for (int j=0; j<H; j++)
 			result[i,j] = lhs_img[i,j]-scalar;
+	return result;
+}
+
+array<double, 2>^ JPFITS::FITSImage::operator -(double scalar, FITSImage^ rhs_img)
+{
+	int W = rhs_img->Width;
+	int H = rhs_img->Height;
+	array<double, 2>^ result = gcnew array<double, 2>(W, H);
+	#pragma omp parallel for
+	for (int i = 0; i < W; i++)
+		for (int j = 0; j < H; j++)
+			result[i, j] = scalar - rhs_img[i, j];
 	return result;
 }
 
@@ -113,6 +130,19 @@ array<double,2>^ JPFITS::FITSImage::operator /(FITSImage^ lhs_img,double scalar)
 	return result;
 }
 
+array<double, 2>^ JPFITS::FITSImage::operator /(double scalar, FITSImage^ rhs_img)
+{
+	int W = rhs_img->Width;
+	int H = rhs_img->Height;
+	array<double, 2>^ result = gcnew array<double, 2>(W, H);
+	#pragma omp parallel for
+	for (int i = 0; i < W; i++)
+		for (int j = 0; j < H; j++)
+			result[i, j] = scalar / rhs_img[i, j];
+
+	return result;
+}
+
 array<double,2>^ JPFITS::FITSImage::operator *(FITSImage^ lhs_img,FITSImage^ rhs_img)
 {
 	if (lhs_img->Width != rhs_img->Width || lhs_img->Height != rhs_img->Height)
@@ -143,6 +173,11 @@ array<double,2>^ JPFITS::FITSImage::operator *(FITSImage^ lhs_img,double scalar)
 	return result;
 }
 
+array<double, 2>^ JPFITS::FITSImage::operator *(double scalar, FITSImage^ rhs_img)
+{
+	return FITSImage::operator*(rhs_img, scalar);
+}
+
 array<double,2>^ JPFITS::FITSImage::operator ^(FITSImage^ lhs_img,FITSImage^ rhs_img)
 {
 	if (lhs_img->Width != rhs_img->Width || lhs_img->Height != rhs_img->Height)
@@ -169,6 +204,19 @@ array<double,2>^ JPFITS::FITSImage::operator ^(FITSImage^ lhs_img,double scalar)
 	for (int i=0; i<W; i++)
 		for (int j=0; j<H; j++)
 			result[i,j] = Math::Pow(lhs_img[i,j],scalar);
+
+	return result;
+}
+
+array<double, 2>^ JPFITS::FITSImage::operator ^(double scalar, FITSImage^ rhs_img)
+{
+	int W = rhs_img->Width;
+	int H = rhs_img->Height;
+	array<double, 2>^ result = gcnew array<double, 2>(W, H);
+	#pragma omp parallel for
+	for (int i = 0; i < W; i++)
+		for (int j = 0; j < H; j++)
+			result[i, j] = Math::Pow(scalar, rhs_img[i, j]);
 
 	return result;
 }
