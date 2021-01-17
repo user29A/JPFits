@@ -809,29 +809,34 @@ namespace JPFITS
 		/// <param name="objectArrayRank">The rank of the underlying array in the object (1 = vector, 2 = array).</param>
 		Object^ GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &objectTypeCode, int &objectArrayRank);
 
-		/// <summary>Remove one of the entries from the binary table.</summary>
+		/// <summary>Remove one of the entries from the binary table. Inefficient if the table has a very large number of entries with very large number of elements.</summary>
 		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		void RemoveTTYPEEntry(String^ ttypeEntryLabel);
 
-		/// <summary>Add an entry to the binary table.</summary>
+		/// <summary>Add an entry to the binary table. Useful when dealing with a small number of entries, or if the table formatting time is negligible. Use SetTTYPEEntries for a table with a large numer of fields.</summary>
 		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
 		/// <param name="entryArray">The array to enter into the table.</param>
 		/// <param name="entryUnits">The physical units of the values of the array.</param>
 		void AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIfExists, Object^ entryArray, String^ entryUnits);
 
-		/*/// <summary>Add a series of entries to the binary table.</summary>
+		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES.</summary>
 		/// <param name="ttypeEntryLabels">The names of the binary table extension entries, i.e. the TTYPE values.</param>
-		/// <param name="replaceIfExists">Replace a TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
-		/// <param name="entryArrays">The arrays to enter into the table.</param>
 		/// <param name="entryUnits">The physical units of the values of the arrays.</param>
-		void AddTTYPEEntries(array<String^>^ ttypeEntryLabels, bool replaceIfExists, array<Object^>^ entryArrays, array<String^>^ entryUnits);*/
+		/// <param name="entryArrays">An array of vectors or arrays to enter into the table.</param>
+		void SetTTYPEEntries(array<String^>^ ttypeEntryLabels, array<String^>^ entryUnits, array<Object^>^ entryArrays);
 
 		/// <summary>Add an extra key to the extension header. If it is to be a COMMENT, just fill the keyValue with ten characters, and the keyComment with 54 characters.</summary>
 		/// <param name="keyName">The name of the key.</param>
 		/// <param name="keyValue">The value of the key. Pass numeric types as a string.</param>
 		/// <param name="keyComment">The comment of the key.</param>
 		void AddExtraHeaderKey(String^ keyName, String^ keyValue, String^ keyComment);
+
+		/// <summary>Remove the extra header key with the given name and value.</summary>
+		void RemoveExtraHeaderKey(String^ keyName, String^ keyValue);
+
+		/// <summary>Clear all extra header keys.</summary>
+		void RemoveAllExtraHeaderKeys();
 
 		/// <summary>Write the binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be overwritten.</summary>
 		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>

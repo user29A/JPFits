@@ -851,19 +851,69 @@ void JPFITS::FITSBinTable::RemoveTTYPEEntry(String^ ttypeEntryLabel)
 	TCODES = newTCODES;
 }
 
-//void JPFITS::FITSBinTable::AddTTYPEEntries(array<String^>^ ttypeEntryLabels, bool replaceIfExists, array<Object^>^ entryArrays, array<String^>^ entryUnits)
-//{
-//	if (TTYPES != nullptr)
-//		for (int i = 0; i < ttypeEntryLabels->Length; i++)
-//			for (int j = 0; j < TTYPES->Length; j++)
-//				if (ttypeEntryLabels[i] == TTYPES[j] && !replaceIfExists)
-//				{
-//					throw gcnew Exception("Extension Entry TTYPE Label '" + ttypeEntryLabels[i] + "' already exists, but was told to not overwrite it. Not proceeding with anything.");
-//					return;
-//				}
-//
-//
-//}
+void JPFITS::FITSBinTable::SetTTYPEEntries(array<String^>^ ttypeEntryLabels, array<String^>^ entryUnits, array<Object^>^ entryArrays)
+{
+	bool equalnaxis2 = true;
+	int naxis2;
+	if (((Array^)entryArrays[0])->Rank == 1)
+		naxis2 = ((Array^)entryArrays[0])->Length;
+	else
+		naxis2 = ((Array^)entryArrays[0])->GetLength(1);
+	for (int i = 1; i < entryArrays->Length; i++)
+		if (((Array^)entryArrays[i])->Rank == 1)
+		{
+			if (((Array^)entryArrays[i])->Length != naxis2)
+			{
+				equalnaxis2 = false;
+				break;
+			}
+		}
+		else
+		{
+			if (((Array^)entryArrays[i])->GetLength(1) != naxis2)
+			{
+				equalnaxis2 = false;
+				break;
+			}
+		}
+	if (!equalnaxis2)
+	{
+		throw gcnew Exception("Error: all entry column heights, NAXIS2s, are not equal.");
+		return;
+	}
+
+	BINTABLE = MAKEBINTABLEBYTEARRAY(entryArrays);
+
+	TFIELDS = entryArrays->Length;
+	TTYPES = ttypeEntryLabels;
+	TUNITS = entryUnits;
+	TCODES = gcnew array<TypeCode>(entryArrays->Length);
+	TINSTANCES = gcnew array<int>(entryArrays->Length);
+	TFORMS = gcnew array<String^>(entryArrays->Length);
+	TBYTES = gcnew array<int>(entryArrays->Length);
+	   
+	for (int i = 0; i < entryArrays->Length; i++)
+	{
+		TCODES[i] = Type::GetTypeCode((((Array^)entryArrays[i])->GetType())->GetElementType());
+		if (((Array^)entryArrays[i])->Rank == 1)
+			TINSTANCES[i] = 1;
+		else
+			TINSTANCES[i] = ((Array^)entryArrays[i])->GetLength(0);
+		TFORMS[i] = TYPECODETFORM(TCODES[i]);
+		TBYTES[i] = TYPECODETONBYTES(TCODES[i]) * TINSTANCES[i];
+	}	
+
+	//new table, so these either need set for the first time, or updated
+	BITPIX = 8;
+	NAXIS = 2;
+	NAXIS1 = 0;
+	for (int i = 0; i < entryArrays->Length; i++)
+		NAXIS1 += TBYTES[i];
+	if (((Array^)entryArrays[0])->Rank == 1)
+		NAXIS2 = ((Array^)entryArrays[0])->Length;
+	else
+		NAXIS2 = ((Array^)entryArrays[0])->GetLength(1);
+}
 
 void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIfExists, Object^ entryArray, String^ entryUnits)
 {
@@ -975,6 +1025,49 @@ void JPFITS::FITSBinTable::AddExtraHeaderKey(String^ keyName, String^ keyValue, 
 		EXTRAKEYVALS = newvals;
 		EXTRAKEYCOMS = newcoms;
 	}
+}
+
+void JPFITS::FITSBinTable::RemoveExtraHeaderKey(String^ keyName, String^ keyValue)
+{
+	if (EXTRAKEYS == nullptr)
+		return;
+	
+	int keyindex = -1;
+
+	for (int i = 0; i < EXTRAKEYS->Length; i++)
+		if (EXTRAKEYS[i] == keyName && EXTRAKEYVALS[i] == keyValue)
+		{
+			keyindex = i;
+			break;
+		}
+
+	if (keyindex == -1)
+		return;
+
+	array<String^>^ newkeys = gcnew array<String^>(EXTRAKEYS->Length - 1);
+	array<String^>^ newvals = gcnew array<String^>(EXTRAKEYS->Length - 1);
+	array<String^>^ newcoms = gcnew array<String^>(EXTRAKEYS->Length - 1);
+	int c = 0;
+	for (int i = 0; i < EXTRAKEYS->Length; i++)
+		if (i == keyindex)
+			continue;
+		else
+		{
+			newkeys[c] = EXTRAKEYS[i];
+			newvals[c] = EXTRAKEYVALS[i];
+			newcoms[c] = EXTRAKEYCOMS[i];
+			c++;
+		}
+	EXTRAKEYS = newkeys;
+	EXTRAKEYVALS = newvals;
+	EXTRAKEYCOMS = newcoms;
+}
+
+void JPFITS::FITSBinTable::RemoveAllExtraHeaderKeys()
+{
+	EXTRAKEYS = nullptr;
+	EXTRAKEYVALS = nullptr;
+	EXTRAKEYCOMS = nullptr;
 }
 
 void JPFITS::FITSBinTable::RemoveExtension(String^ FileName, String^ ExtensionName)
