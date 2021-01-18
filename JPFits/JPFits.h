@@ -785,7 +785,7 @@ namespace JPFITS
 	{
 		public:
 
-		/// <summary>Create an empty FITSBinTable object. TTYPE entries may be added later. An extension name can be added at writetime.</summary>
+		/// <summary>Create an empty FITSBinTable object. TTYPE entries may be added later via SetTTYPEEntries or AddTTYPEEntry. An extension name can be added at writetime.</summary>
 		FITSBinTable();
 
 		/// <summary>Create a FITSBinTable object from an existing extension.</summary>
@@ -818,7 +818,7 @@ namespace JPFITS
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
 		/// <param name="entryArray">The array to enter into the table.</param>
 		/// <param name="entryUnits">The physical units of the values of the array.</param>
-		void AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIfExists, Object^ entryArray, String^ entryUnits);
+		void AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIfExists, String^ entryUnits, Object^ entryArray);
 
 		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES.</summary>
 		/// <param name="ttypeEntryLabels">The names of the binary table extension entries, i.e. the TTYPE values.</param>
@@ -826,7 +826,7 @@ namespace JPFITS
 		/// <param name="entryArrays">An array of vectors or arrays to enter into the table.</param>
 		void SetTTYPEEntries(array<String^>^ ttypeEntryLabels, array<String^>^ entryUnits, array<Object^>^ entryArrays);
 
-		/// <summary>Add an extra key to the extension header. If it is to be a COMMENT, just fill the keyValue with ten characters, and the keyComment with 54 characters.</summary>
+		/// <summary>Add an extra key to the extension header. If it is to be a COMMENT, just fill the keyValue with eighteen characters, and the keyComment with 54 characters.</summary>
 		/// <param name="keyName">The name of the key.</param>
 		/// <param name="keyValue">The value of the key. Pass numeric types as a string.</param>
 		/// <param name="keyComment">The comment of the key.</param>
@@ -838,49 +838,14 @@ namespace JPFITS
 		/// <summary>Clear all extra header keys.</summary>
 		void RemoveAllExtraHeaderKeys();
 
-		/// <summary>Write the binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be overwritten.</summary>
-		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
-		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
-		void Write(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists);
-
-		/// <summary>Read a binary table entry TTYPE of type BYTE into a byte array. If the requested entry is not of type BYTE an error will be thrown; use another fucntion instead for numeric value types.
-		/// <para>This method is useful for reading raw byte data which may have meaning other than numeric or is formatted as numeric but in a unique way. A byte array can still be read as numeric with another function if needed.</para></summary>
-		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value in the table to read.</param>
-		array<unsigned char, 2>^ GetTTYPEEntryByteArray(String^ ttypeEntryLabel);
-
 		/// <summary>Returns an array of all binary table extension names in a FITS file. If there are no binary table extensions, returns an empty array.</summary>
 		/// <param name="FileName">The full file name to read from disk.</param>
 		static array<String^>^ GetAllExtensionNames(String^ FileName);
 
-		/// <summary>Static method to write a binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be overwritten.</summary>
+		/// <summary>Write the binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be replaced.</summary>
 		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If the table is to have no name then it will be written as the first binary table extension.</param>
 		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
-		/// <param name="ExtensionEntryLabels">A String array of the binary table extension entries, i.e. the TTYPE values.</param>
-		/// <param name="ExtensionEntryDataUnits">A String array of the physical units for the table entries, i.e. the TUNIT values.</param>
-		/// <param name="ExtensionHeaderExtraKeys">A String array of additional header keys for the table. Pass nullptr if not required.</param>
-		/// <param name="ExtensionHeaderExtraKeyValues">A String array of additional header key values for the table. Pass nullptr if not required.</param>
-		/// <param name="ExtensionHeaderExtraKeyComments">A String array of additional header key comments for the table. Pass nullptr if not required.</param>
-		/// <param name="ExtensionEntryData">An Object array of the data to be written as the table. The array members are the original data as their own types cast as Objects, ex.: 
-		/// <para>ExtensionEntryData[0] = (Object^)array1; where array1 is an array&lt;int&gt;^.</para>
-		/// <para>ExtensionEntryData[1] = (Object^)array2; where array2 is an array&lt;double, 2&gt;^.</para>
-		/// <para>The member arrays will be written as their Type as determined automatically by the ExtensionEntryData Object array member contents.</para>
-		/// <para>The member arrays must all be the same height, i.e. same number of rows, but can have variable width (columns) if their array rank = 2.</para></param>
-		static void WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData);
-
-		/// <summary>Static method to write a single-entry binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be overwritten.</summary>
-		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If the table is to have no name then it will be written as the first binary table extension.</param>
-		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
-		/// <param name="ExtensionEntryLabel">A String for the binary table extension entry, i.e. the TTYPE value.</param>
-		/// <param name="ExtensionEntryDataUnit">A String for the physical unit of the table entry, i.e. the TUNIT value.</param>
-		/// <param name="ExtensionHeaderExtraKeys">A String array of additional header keys for the table. Pass nullptr if not required.</param>
-		/// <param name="ExtensionHeaderExtraKeyValues">A String array of additional header key values for the table. Pass nullptr if not required.</param>
-		/// <param name="ExtensionHeaderExtraKeyComments">A String array of additional header key comments for the table. Pass nullptr if not required.</param>
-		/// <param name="ExtensionEntryData">An Object which is a single array of the data to be written as the table. The array will be written at its precision. For ex.
-		/// <para>ExtensionEntryData is an array&lt;int&gt;^, will be written as ints,</para>
-		/// <para>ExtensionEntryData is an array&lt;double, 2&gt;^, will be written as doubles.</para></param>
-		static void WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, String^ ExtensionEntryLabel, String^ ExtensionEntryDataUnit, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, Object^ ExtensionEntryData);
+		void Write(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists);
 
 		/// <summary>Remove a binary table extension from the given FITS file.</summary>
 		/// <param name="FileName">The full-path file name.</param>
@@ -891,14 +856,6 @@ namespace JPFITS
 		/// <param name="FileName">The full-path file name.</param>
 		/// <param name="ExtensionName">The name of the binary table extension.</param>
 		static bool ExtensionExists(String^ FileName, String^ ExtensionName);
-
-		private:
-		static array<String^>^ FORMATBINARYTABLEEXTENSIONHEADER(String^ ExtensionName, array<Object^>^ ExtensionEntryData, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments);
-		static int TFORMTONBYTES(String^ tform, int& instances);
-		static TypeCode TFORMTYPECODE(String^ tform);
-		static String^ TYPECODETFORM(TypeCode typecode);
-		static String^ TYPECODESTRING(TypeCode typecode);
-		static int TYPECODETONBYTES(TypeCode typecode);
 
 		#pragma region Class Properties
 		public:
@@ -959,7 +916,6 @@ namespace JPFITS
 
 		#pragma region PRIVATECLASSMEMBERS
 		private:
-		//__int64 EXTENSIONPOSITIONSTART, EXTENSIONPOSITIONEND, EXTENSIONPOSITIONDATA;
 		int BITPIX = 0, NAXIS = 0, NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
 		array<String^>^ TTYPES;//names of each table entry
 		array<String^>^ TFORMS;//FITS name for the table entry precisions
@@ -974,7 +930,30 @@ namespace JPFITS
 		array<String^>^ EXTRAKEYVALS;
 		array<String^>^ EXTRAKEYCOMS;
 		array<unsigned char>^ BINTABLE;
+
 		static array<unsigned char>^ MAKEBINTABLEBYTEARRAY(array<Object^>^ ExtensionEntryData);
+		static array<String^>^ FORMATBINARYTABLEEXTENSIONHEADER(String^ ExtensionName, array<Object^>^ ExtensionEntryData, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments);
+		static int TFORMTONBYTES(String^ tform, int& instances);
+		static TypeCode TFORMTYPECODE(String^ tform);
+		static String^ TYPECODETFORM(TypeCode typecode);
+		static String^ TYPECODESTRING(TypeCode typecode);
+		static int TYPECODETONBYTES(TypeCode typecode);
+
+		/// <summary>Static method to write a binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be overwritten.</summary>
+		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
+		/// <param name="ExtensionName">The name of the binary table extension. If the table is to have no name then it will be written as the first binary table extension.</param>
+		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
+		/// <param name="ExtensionEntryLabels">A String array of the binary table extension entries, i.e. the TTYPE values.</param>
+		/// <param name="ExtensionEntryDataUnits">A String array of the physical units for the table entries, i.e. the TUNIT values.</param>
+		/// <param name="ExtensionHeaderExtraKeys">A String array of additional header keys for the table. Pass nullptr if not required.</param>
+		/// <param name="ExtensionHeaderExtraKeyValues">A String array of additional header key values for the table. Pass nullptr if not required.</param>
+		/// <param name="ExtensionHeaderExtraKeyComments">A String array of additional header key comments for the table. Pass nullptr if not required.</param>
+		/// <param name="ExtensionEntryData">An Object array of the data to be written as the table. The array members are the original data as their own types cast as Objects, ex.: 
+		/// <para>ExtensionEntryData[0] = (Object^)array1; where array1 is an array&lt;int&gt;^.</para>
+		/// <para>ExtensionEntryData[1] = (Object^)array2; where array2 is an array&lt;double, 2&gt;^.</para>
+		/// <para>The member arrays will be written as their Type as determined automatically by the ExtensionEntryData Object array member contents.</para>
+		/// <para>The member arrays must all be the same height, i.e. same number of rows, but can have variable width (columns) if their array rank = 2.</para></param>
+		void WRITEEXTENSION(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData);
 
 		void EATRAWBINTABLEHEADER(ArrayList^ header);
 		#pragma endregion

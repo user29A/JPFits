@@ -23,7 +23,7 @@ using namespace JPFITS;
 
 JPFITS::FITSBinTable::FITSBinTable()
 {
-	//EXTENSIONNAME = extensionName;
+
 }
 
 JPFITS::FITSBinTable::FITSBinTable(String^ fileName, String^ extensionName)
@@ -49,10 +49,6 @@ JPFITS::FITSBinTable::FITSBinTable(String^ fileName, String^ extensionName)
 
 	FILENAME = fileName;
 	EXTENSIONNAME = extensionName;
-
-	/*EXTENSIONPOSITIONSTART = extensionstartposition;
-	EXTENSIONPOSITIONDATA = fs->Position;
-	EXTENSIONPOSITIONEND = extensionendposition;*/
 	
 	EATRAWBINTABLEHEADER(header);
 
@@ -65,47 +61,6 @@ JPFITS::FITSBinTable::FITSBinTable(String^ fileName, String^ extensionName)
 array<String^>^ JPFITS::FITSBinTable::GetAllExtensionNames(String^ FileName)
 {
 	return FITSFILEOPS::GETALLEXTENSIONNAMES(FileName, "BINTABLE");
-}
-
-array<unsigned char, 2>^ JPFITS::FITSBinTable::GetTTYPEEntryByteArray(String^ ttypeEntryLabel)
-{
-	int extensionentry_index = -1;
-	for (int i = 0; i < TTYPES->Length; i++)
-		if (TTYPES[i] == ttypeEntryLabel)
-		{
-			extensionentry_index = i;
-			break;
-		}
-
-	if (extensionentry_index == -1)
-	{
-		throw gcnew Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntryLabel + "'");
-		return nullptr;
-	}
-
-	if (TCODES[extensionentry_index] != TypeCode::SByte)
-	{
-		throw gcnew Exception("Requested entry '" + ttypeEntryLabel + "'" + " is not of type SBYTE. It is: '" + TCODES[extensionentry_index].ToString() + "'. Use an overload instead for numeric value types.");
-		return nullptr;
-	}
-
-	int extensionentryinstances = TINSTANCES[extensionentry_index];
-	array<unsigned char, 2>^ bytearray = gcnew array<unsigned char, 2>(extensionentryinstances, NAXIS2);
-
-	int byteoffset = 0;
-	for (int i = 0; i < extensionentry_index; i++)
-		byteoffset += TBYTES[i];
-	int currentbyte;
-
-	#pragma omp parallel for private(currentbyte)
-	for (int i = 0; i < NAXIS2; i++)
-		for (int j = 0; j < extensionentryinstances; j++)
-		{
-			currentbyte = byteoffset + i * NAXIS1 + j;
-			bytearray[j, i] = BINTABLE[currentbyte];
-		}
-
-	return bytearray;
 }
 
 array<double>^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ExtensionEntryLabel)
@@ -351,44 +306,6 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 
 	switch (TCODES[extensionentry_index])
 	{
-		/*case ::TypeCode::Double:
-		{
-			array<double>^ vector = gcnew array<double>(TINSTANCES[extensionentry_index] * NAXIS2);
-
-			#pragma omp parallel for private(currentbyte)
-			for (int i = 0; i < NAXIS2; i++)
-			{
-				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-				{
-					currentbyte = byteoffset + i * NAXIS1 + j * 8;
-					dbl[7] = BINTABLE[currentbyte];
-					dbl[6] = BINTABLE[currentbyte + 1];
-					dbl[5] = BINTABLE[currentbyte + 2];
-					dbl[4] = BINTABLE[currentbyte + 3];
-					dbl[3] = BINTABLE[currentbyte + 4];
-					dbl[2] = BINTABLE[currentbyte + 5];
-					dbl[1] = BINTABLE[currentbyte + 6];
-					dbl[0] = BINTABLE[currentbyte + 7];
-					vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToDouble(dbl, 0);
-				}
-			}
-
-			if (objectArrayRank == 2)
-			{
-				array<double, 2>^ arrya = gcnew array<double, 2>(TINSTANCES[extensionentry_index], NAXIS2);
-				#pragma omp parallel for
-				for (int x = 0; x < TINSTANCES[extensionentry_index]; x++)
-					for (int y = 0; y < NAXIS2; y++)
-						arrya[x, y] = vector[x * NAXIS2 + y];
-				return arrya;
-			}
-			else
-				return vector;
-
-			break;
-		}*/
-
 		case ::TypeCode::Double:
 		{
 			if (objectArrayRank == 1)
@@ -915,7 +832,7 @@ void JPFITS::FITSBinTable::SetTTYPEEntries(array<String^>^ ttypeEntryLabels, arr
 		NAXIS2 = ((Array^)entryArrays[0])->GetLength(1);
 }
 
-void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIfExists, Object^ entryArray, String^ entryUnits)
+void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIfExists, String^ entryUnits, Object^ entryArray)
 {
 	int extensionentry_index = -1;
 	if (TTYPES != nullptr)
@@ -1134,18 +1051,10 @@ void JPFITS::FITSBinTable::Write(String^ FileName, String^ ExtensionName, bool O
 	EXTENSIONNAME = ExtensionName;
 	FILENAME = FileName;
 
-	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, this->TTYPES, this->TUNITS, this->EXTRAKEYS, this->EXTRAKEYVALS, this->EXTRAKEYCOMS, writeobjarr);
+	WRITEEXTENSION(FileName, ExtensionName, OverWriteExtensionIfExists, this->TTYPES, this->TUNITS, this->EXTRAKEYS, this->EXTRAKEYVALS, this->EXTRAKEYCOMS, writeobjarr);
 }
 
-void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, String^ ExtensionEntryLabel, String^ ExtensionEntryDataUnit, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, Object^ ExtensionEntryData)
-{
-	array<String^>^ label = gcnew array<String^>(1) { ExtensionEntryLabel };
-	array<String^>^ unit = gcnew array<String^>(1) { ExtensionEntryDataUnit };
-	
-	WriteExtension(FileName, ExtensionName, OverWriteExtensionIfExists, label, unit, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments, gcnew array<Object^>(1) { ExtensionEntryData });
-}
-
-void JPFITS::FITSBinTable::WriteExtension(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData)
+void JPFITS::FITSBinTable::WRITEEXTENSION(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData)
 {
 	if (!File::Exists(FileName))//then write a new file, otherwise check the existing file for existing table, etc.
 	{
