@@ -33,7 +33,7 @@ void JPFITS::FitsExtensionTableViewer::OpenFITSImage(String^ FileName)
 		for (int i = 0; i < list->Length; i++)
 		{
 			if (list[i] == "")
-				MenuChooseTable->DropDownItems->Add("UNNAMED" + i);
+				MenuChooseTable->DropDownItems->Add("UNNAMED");
 			else
 				MenuChooseTable->DropDownItems->Add(list[i]);
 
@@ -59,14 +59,10 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 {
 	try
 	{
-		this->ExtensionTableGrid->SuspendLayout();
-
 		EXTENSIONNAME = ExtensionName;
 
 		FITSBinTable^ bt = gcnew FITSBinTable(FILENAME, EXTENSIONNAME);
 		array<String^>^ labels = bt->TableDataLabelsTTYPE;
-
-		//array<String^>^ labels = JPFITS::FITSBinTable::GetExtensionEntryLabels(FILENAME, EXTENSIONNAME);
 
 		for (int i = 0; i < labels->Length; i++)
 			labels[i] = labels[i]->Trim();
@@ -83,50 +79,55 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 		XDrop->Items->AddRange(labels);
 		YDrop->Items->AddRange(labels);
 
+		ExtensionTableGrid->Columns->Clear();
+		ExtensionTableGrid->Rows->Clear();
 		ExtensionTableGrid->ColumnCount = labels->Length;
 
 		for (int i = 0; i < labels->Length; i++)
 			ExtensionTableGrid->Columns[i]->HeaderText = labels[i];
 
-		//DATATABLE = FITSImage::ReadBinaryTableExtensionEntries(FILENAME, EXTENSIONNAME, labels);
-		int width = 0, height = 0;
-		array<double>^ entry = bt->GetTTYPEEntry(labels[0], width, height);
-		ExtensionTableGrid->RowCount = height;
+		ExtensionTableGrid->RowCount = bt->Naxis2;
+		DATATABLE = gcnew array<double, 2>(labels->Length, bt->Naxis2);
 
-		/*#pragma omp parallel for
-		for (int i = 0; i < labels->Length; i++)
-			for (int j = 0; j < DATATABLE->GetLength(1); j++)
-			{
-				#pragma omp critical
-				{
-					ExtensionTableGrid[i, j]->Value = DATATABLE[i, j];
-				}
-			}*/
-
-		DATATABLE = gcnew array<double, 2>(labels->Length, height);
 		for (int i = 0; i < labels->Length; i++)
 		{
-			entry = bt->GetTTYPEEntry(labels[i], width, height);
-			if (width != 1)
-				for (int j = 0; j < height; j++)
-				{
-					ExtensionTableGrid[i, j]->Value = "multi";
-					DATATABLE[i, j] = Double::NaN;
-				}
-			else
-				for (int j = 0; j < height; j++)
-				{
-					ExtensionTableGrid[i, j]->Value = entry[j];
-					DATATABLE[i, j] = entry[j];
-				}
-		}
+			int width, height;
+			array<double>^ entry = bt->GetTTYPEEntry(labels[i], width, height);
 
-		this->ExtensionTableGrid->ResumeLayout();
+			if (width != 1)
+			{
+				#pragma omp parallel for
+				for (int j = 0; j < height; j++)
+					DATATABLE[i, j] = Double::NaN;
+			}
+			else
+			{
+				#pragma omp parallel for
+				for (int j = 0; j < height; j++)
+					DATATABLE[i, j] = entry[j];
+			}
+		}
 	}
 	catch (Exception^ e)
 	{
 		MessageBox::Show(e->Data + "	" + e->InnerException + "	" + e->Message + "	" + e->Source + "	" + e->StackTrace + "	" + e->TargetSite);
 	}
+}
+
+void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_Scroll(System::Object^  sender, System::Windows::Forms::ScrollEventArgs^  e)
+{
+	
+}
+
+void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_NewRowNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewRowEventArgs^  e)
+{
+
+}
+
+void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_CellValueNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewCellValueEventArgs^  e)
+{
+	e->Value = DATATABLE[e->ColumnIndex, e->RowIndex];
+	ExtensionTableGrid->Rows[e->RowIndex]->HeaderCell->Value = e->RowIndex.ToString();
 }
 
 void JPFITS::FitsExtensionTableViewer::MenuChooseTable_Click(System::Object^  sender, System::EventArgs^  e)
@@ -363,3 +364,4 @@ void JPFITS::FitsExtensionTableViewer::ViewHeaderMenu_Click(System::Object^  sen
 		HeaderListBox->SendToBack();
 	headerfront = !headerfront;
 }
+

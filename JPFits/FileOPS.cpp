@@ -149,9 +149,12 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 
 	while (!endfile)
 	{
-		endheader = false;//reset
+		//reset
+		extname = "";
+		endheader = false;
 		extnamekeyexists = false;
 		extensiontypefound = false;
+		naxis = 0, naxis1 = 0, naxis2 = 0;
 		while (!endheader)
 		{
 			fs->Read(charheaderblock, 0, 2880);
@@ -195,7 +198,6 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 				{
 					if (extensiontypefound)
 						namelist->Add(extname);
-					extname = "";
 					endheader = true;
 					break;
 				}
@@ -239,10 +241,14 @@ bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, 
 
 	while (!extensionfound && !endfile)
 	{
+		//reset
 		startposition = fs->Position;
-		endheader = false;//reset
+		endheader = false;
 		extnamekeyexists = false;
 		extensiontypefound = false;
+		naxis = 0, naxis1 = 0, naxis2 = 0, bitpix = 0;
+		if (header_return != nullptr)
+			header_return->Clear();
 		while (!endheader)
 		{
 			fs->Read(charheaderblock, 0, 2880);

@@ -308,53 +308,60 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 	{
 		case ::TypeCode::Double:
 		{
-			if (objectArrayRank == 1)
+			try
 			{
-				array<double>^ vector = gcnew array<double>(TINSTANCES[extensionentry_index] * NAXIS2);
-				#pragma omp parallel for private(currentbyte)
-				for (int i = 0; i < NAXIS2; i++)
+				if (objectArrayRank == 1)
 				{
-					array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					array<double>^ vector = gcnew array<double>(TINSTANCES[extensionentry_index] * NAXIS2);
+					//#pragma omp parallel for private(currentbyte)
+					for (int i = 0; i < NAXIS2; i++)
 					{
-						currentbyte = byteoffset + i * NAXIS1 + j * 8;
-						dbl[7] = BINTABLE[currentbyte];
-						dbl[6] = BINTABLE[currentbyte + 1];
-						dbl[5] = BINTABLE[currentbyte + 2];
-						dbl[4] = BINTABLE[currentbyte + 3];
-						dbl[3] = BINTABLE[currentbyte + 4];
-						dbl[2] = BINTABLE[currentbyte + 5];
-						dbl[1] = BINTABLE[currentbyte + 6];
-						dbl[0] = BINTABLE[currentbyte + 7];
-						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToDouble(dbl, 0);
+						array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+						for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+						{
+							currentbyte = byteoffset + i * NAXIS1 + j * 8;
+							dbl[7] = BINTABLE[currentbyte];
+							dbl[6] = BINTABLE[currentbyte + 1];
+							dbl[5] = BINTABLE[currentbyte + 2];
+							dbl[4] = BINTABLE[currentbyte + 3];
+							dbl[3] = BINTABLE[currentbyte + 4];
+							dbl[2] = BINTABLE[currentbyte + 5];
+							dbl[1] = BINTABLE[currentbyte + 6];
+							dbl[0] = BINTABLE[currentbyte + 7];
+							vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToDouble(dbl, 0);
+						}
 					}
+					return vector;
 				}
-				return vector;
+				else
+				{
+					array<double, 2>^ arrya = gcnew array<double, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+					//#pragma omp parallel for private(currentbyte)
+					for (int i = 0; i < NAXIS2; i++)
+					{
+						array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+						for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+						{
+							currentbyte = byteoffset + i * NAXIS1 + j * 8;
+							dbl[7] = BINTABLE[currentbyte];
+							dbl[6] = BINTABLE[currentbyte + 1];
+							dbl[5] = BINTABLE[currentbyte + 2];
+							dbl[4] = BINTABLE[currentbyte + 3];
+							dbl[3] = BINTABLE[currentbyte + 4];
+							dbl[2] = BINTABLE[currentbyte + 5];
+							dbl[1] = BINTABLE[currentbyte + 6];
+							dbl[0] = BINTABLE[currentbyte + 7];
+							arrya[j, i] = BitConverter::ToDouble(dbl, 0);
+						}
+					}
+					return arrya;
+				}
+				break;
 			}
-			else
+			catch (Exception^ e)
 			{
-				array<double, 2>^ arrya = gcnew array<double, 2>(TINSTANCES[extensionentry_index], NAXIS2);
-				#pragma omp parallel for private(currentbyte)
-				for (int i = 0; i < NAXIS2; i++)
-				{
-					array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-					{
-						currentbyte = byteoffset + i * NAXIS1 + j * 8;
-						dbl[7] = BINTABLE[currentbyte];
-						dbl[6] = BINTABLE[currentbyte + 1];
-						dbl[5] = BINTABLE[currentbyte + 2];
-						dbl[4] = BINTABLE[currentbyte + 3];
-						dbl[3] = BINTABLE[currentbyte + 4];
-						dbl[2] = BINTABLE[currentbyte + 5];
-						dbl[1] = BINTABLE[currentbyte + 6];
-						dbl[0] = BINTABLE[currentbyte + 7];
-						arrya[j, i] = BitConverter::ToDouble(dbl, 0);
-					}
-				}
-				return arrya;
+				MessageBox::Show(e->Data + "	" + e->InnerException + "	" + e->Message + "	" + e->Source + "	" + e->StackTrace + "	" + e->TargetSite);
 			}
-			break;
 		}
 
 		case (::TypeCode::Int64):
@@ -1805,6 +1812,9 @@ int JPFITS::FITSBinTable::TYPECODETONBYTES(TypeCode typecode)
 
 void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 {
+	//reset
+	BITPIX = 0, NAXIS = 0, NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
+
 	ArrayList^ extras = gcnew ArrayList();//for possible extras
 
 	HEADER = gcnew array<String^>(header->Count);

@@ -97,6 +97,7 @@ namespace JPFITS {
 		/// </summary>
 		void InitializeComponent(void)
 		{
+			System::Windows::Forms::DataGridViewCellStyle^  dataGridViewCellStyle1 = (gcnew System::Windows::Forms::DataGridViewCellStyle());
 			System::ComponentModel::ComponentResourceManager^  resources = (gcnew System::ComponentModel::ComponentResourceManager(FitsExtensionTableViewer::typeid));
 			this->ExtensionTableGrid = (gcnew System::Windows::Forms::DataGridView());
 			this->menuStrip1 = (gcnew System::Windows::Forms::MenuStrip());
@@ -131,8 +132,24 @@ namespace JPFITS {
 			this->ExtensionTableGrid->Location = System::Drawing::Point(0, 24);
 			this->ExtensionTableGrid->Name = L"ExtensionTableGrid";
 			this->ExtensionTableGrid->ReadOnly = true;
+			dataGridViewCellStyle1->Alignment = System::Windows::Forms::DataGridViewContentAlignment::MiddleLeft;
+			dataGridViewCellStyle1->BackColor = System::Drawing::SystemColors::Control;
+			dataGridViewCellStyle1->Font = (gcnew System::Drawing::Font(L"Microsoft Sans Serif", 8.25F, System::Drawing::FontStyle::Regular,
+				System::Drawing::GraphicsUnit::Point, static_cast<System::Byte>(0)));
+			dataGridViewCellStyle1->ForeColor = System::Drawing::SystemColors::WindowText;
+			dataGridViewCellStyle1->Format = L"N0";
+			dataGridViewCellStyle1->NullValue = nullptr;
+			dataGridViewCellStyle1->SelectionBackColor = System::Drawing::SystemColors::Highlight;
+			dataGridViewCellStyle1->SelectionForeColor = System::Drawing::SystemColors::HighlightText;
+			dataGridViewCellStyle1->WrapMode = System::Windows::Forms::DataGridViewTriState::True;
+			this->ExtensionTableGrid->RowHeadersDefaultCellStyle = dataGridViewCellStyle1;
+			this->ExtensionTableGrid->RowHeadersWidth = 75;
 			this->ExtensionTableGrid->Size = System::Drawing::Size(583, 329);
 			this->ExtensionTableGrid->TabIndex = 0;
+			this->ExtensionTableGrid->VirtualMode = true;
+			this->ExtensionTableGrid->CellValueNeeded += gcnew System::Windows::Forms::DataGridViewCellValueEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_CellValueNeeded);
+			this->ExtensionTableGrid->NewRowNeeded += gcnew System::Windows::Forms::DataGridViewRowEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_NewRowNeeded);
+			this->ExtensionTableGrid->Scroll += gcnew System::Windows::Forms::ScrollEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_Scroll);
 			// 
 			// menuStrip1
 			// 
@@ -163,7 +180,7 @@ namespace JPFITS {
 			// MenuChooseTable
 			// 
 			this->MenuChooseTable->Name = L"MenuChooseTable";
-			this->MenuChooseTable->Size = System::Drawing::Size(52, 20);
+			this->MenuChooseTable->Size = System::Drawing::Size(51, 20);
 			this->MenuChooseTable->Text = L"Tables";
 			// 
 			// MenuChooseTableEntries
@@ -173,7 +190,7 @@ namespace JPFITS {
 					this->toolStripSeparator1
 			});
 			this->MenuChooseTableEntries->Name = L"MenuChooseTableEntries";
-			this->MenuChooseTableEntries->Size = System::Drawing::Size(85, 20);
+			this->MenuChooseTableEntries->Size = System::Drawing::Size(84, 20);
 			this->MenuChooseTableEntries->Text = L"Table Entries";
 			this->MenuChooseTableEntries->DropDownItemClicked += gcnew System::Windows::Forms::ToolStripItemClickedEventHandler(this, &FitsExtensionTableViewer::MenuChooseTableEntries_DropDownItemClicked);
 			this->MenuChooseTableEntries->Click += gcnew System::EventHandler(this, &FitsExtensionTableViewer::MenuChooseTableEntries_Click);
@@ -351,5 +368,8 @@ private: System::Void FitsExtensionTableViewer_LocationChanged(System::Object^  
 	SetReg("JPChart", this->Text + "FitsTableHeight", this->Height);
 }
 private: System::Void FitsExtensionTableViewer_Shown(System::Object^  sender, System::EventArgs^  e);
+private: System::Void ExtensionTableGrid_Scroll(System::Object^  sender, System::Windows::Forms::ScrollEventArgs^  e);
+private: System::Void ExtensionTableGrid_NewRowNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewRowEventArgs^  e);
+private: System::Void ExtensionTableGrid_CellValueNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewCellValueEventArgs^  e);
 };
 }
