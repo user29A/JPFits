@@ -456,7 +456,7 @@ array<String^>^ JPFITS::FITSFILEOPS::GETFORMATTEDIMAGEHEADER(array<String^>^ ima
 		{
 			double val = ::Convert::ToDouble(imageHeaderKeyValues[i]);
 
-			if (Math::Abs(val) <= 1e-5 || Math::Abs(val) >= 1e7)
+			if (Math::Abs(val) <= 1e-5 || Math::Abs(val) >= 1e13)
 				value = val.ToString("0.00###########e+00");
 			else
 				value = val.ToString("G");

@@ -77,6 +77,8 @@ namespace JPFITS {
 	private: System::Windows::Forms::Button^  button1;
 	private: System::Windows::Forms::ToolStripMenuItem^  ViewHeaderMenu;
 	private: System::Windows::Forms::ListBox^  HeaderListBox;
+		private: System::Windows::Forms::ToolTip^  toolTip1;
+		private: System::ComponentModel::IContainer^  components;
 
 
 
@@ -88,7 +90,7 @@ namespace JPFITS {
 		/// <summary>
 		/// Required designer variable.
 		/// </summary>
-		System::ComponentModel::Container ^components;
+
 
 #pragma region Windows Form Designer generated code
 		/// <summary>
@@ -97,6 +99,7 @@ namespace JPFITS {
 		/// </summary>
 		void InitializeComponent(void)
 		{
+			this->components = (gcnew System::ComponentModel::Container());
 			System::Windows::Forms::DataGridViewCellStyle^  dataGridViewCellStyle1 = (gcnew System::Windows::Forms::DataGridViewCellStyle());
 			System::ComponentModel::ComponentResourceManager^  resources = (gcnew System::ComponentModel::ComponentResourceManager(FitsExtensionTableViewer::typeid));
 			this->ExtensionTableGrid = (gcnew System::Windows::Forms::DataGridView());
@@ -118,6 +121,7 @@ namespace JPFITS {
 			this->ViewHeaderMenu = (gcnew System::Windows::Forms::ToolStripMenuItem());
 			this->button1 = (gcnew System::Windows::Forms::Button());
 			this->HeaderListBox = (gcnew System::Windows::Forms::ListBox());
+			this->toolTip1 = (gcnew System::Windows::Forms::ToolTip(this->components));
 			(cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->ExtensionTableGrid))->BeginInit();
 			this->menuStrip1->SuspendLayout();
 			this->SuspendLayout();
@@ -147,6 +151,7 @@ namespace JPFITS {
 			this->ExtensionTableGrid->Size = System::Drawing::Size(583, 329);
 			this->ExtensionTableGrid->TabIndex = 0;
 			this->ExtensionTableGrid->VirtualMode = true;
+			this->ExtensionTableGrid->CellMouseClick += gcnew System::Windows::Forms::DataGridViewCellMouseEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_CellMouseClick);
 			this->ExtensionTableGrid->CellValueNeeded += gcnew System::Windows::Forms::DataGridViewCellValueEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_CellValueNeeded);
 			this->ExtensionTableGrid->NewRowNeeded += gcnew System::Windows::Forms::DataGridViewRowEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_NewRowNeeded);
 			this->ExtensionTableGrid->Scroll += gcnew System::Windows::Forms::ScrollEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_Scroll);
@@ -293,6 +298,13 @@ namespace JPFITS {
 			this->HeaderListBox->Size = System::Drawing::Size(583, 353);
 			this->HeaderListBox->TabIndex = 3;
 			// 
+			// toolTip1
+			// 
+			this->toolTip1->AutomaticDelay = 100;
+			this->toolTip1->AutoPopDelay = 10000;
+			this->toolTip1->InitialDelay = 100;
+			this->toolTip1->ReshowDelay = 20;
+			// 
 			// FitsExtensionTableViewer
 			// 
 			this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
@@ -308,6 +320,7 @@ namespace JPFITS {
 			this->Name = L"FitsExtensionTableViewer";
 			this->StartPosition = System::Windows::Forms::FormStartPosition::CenterParent;
 			this->Text = L"FitsExtensionTableViewer";
+			this->TopMost = true;
 			this->FormClosing += gcnew System::Windows::Forms::FormClosingEventHandler(this, &FitsExtensionTableViewer::FitsExtensionTableViewer_FormClosing);
 			this->Load += gcnew System::EventHandler(this, &FitsExtensionTableViewer::FitsExtensionTableViewer_Load);
 			this->Shown += gcnew System::EventHandler(this, &FitsExtensionTableViewer::FitsExtensionTableViewer_Shown);
@@ -327,6 +340,7 @@ namespace JPFITS {
 String^ FILENAME;
 String^ EXTENSIONNAME;
 array<double, 2>^ DATATABLE;
+FITSBinTable^ FITSBINTABLE;
 
 void OpenFITSImage(String^ FileName);
 void PopulateTable(String^ ExtensionName);
@@ -371,5 +385,6 @@ private: System::Void FitsExtensionTableViewer_Shown(System::Object^  sender, Sy
 private: System::Void ExtensionTableGrid_Scroll(System::Object^  sender, System::Windows::Forms::ScrollEventArgs^  e);
 private: System::Void ExtensionTableGrid_NewRowNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewRowEventArgs^  e);
 private: System::Void ExtensionTableGrid_CellValueNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewCellValueEventArgs^  e);
+private: System::Void ExtensionTableGrid_CellMouseClick(System::Object^  sender, System::Windows::Forms::DataGridViewCellMouseEventArgs^  e);
 };
 }

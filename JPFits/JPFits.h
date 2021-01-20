@@ -803,6 +803,8 @@ namespace JPFITS
 		/// <param name="height">If the entry has multiple instances, then the user may like to know the number of rows in the entry for reformatting the vector return.</param>
 		array<double>^ GetTTYPEEntry(String^ ttypeEntryLabel, int& width, int& height);
 
+		String^ GetTTypeEntryRow(String^ ttypeEntryLabel, int rowindex);
+
 		/// <summary>Return a binary table entry as an Object. Its type and rank are given to the user. If you just need a double precision array to work on, use the overload for that.</summary>
 		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="objectTypeCode">The TypeCode precision of the underlying array in the object.</param>
@@ -921,7 +923,7 @@ namespace JPFITS
 		array<String^>^ TFORMS;//FITS name for the table entry precisions
 		array<String^>^ TUNITS;//FITS name for the table entry units
 		array<int>^ TBYTES;//number of bytes for the table entry precisions
-		array<int>^ TINSTANCES;//number of instances (columns) of each table entry
+		array<int>^ TINSTANCES;//number of TFORM instances (columns) of each table entry
 		array<TypeCode>^ TCODES;//.NET typcodes for each table entry
 		array<String^>^ HEADER;
 		String^ FILENAME;
@@ -931,30 +933,13 @@ namespace JPFITS
 		array<String^>^ EXTRAKEYCOMS;
 		array<unsigned char>^ BINTABLE;
 
-		static array<unsigned char>^ MAKEBINTABLEBYTEARRAY(array<Object^>^ ExtensionEntryData);
-		static array<String^>^ FORMATBINARYTABLEEXTENSIONHEADER(String^ ExtensionName, array<Object^>^ ExtensionEntryData, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments);
-		static int TFORMTONBYTES(String^ tform, int& instances);
-		static TypeCode TFORMTYPECODE(String^ tform);
-		static String^ TYPECODETFORM(TypeCode typecode);
-		static String^ TYPECODESTRING(TypeCode typecode);
-		static int TYPECODETONBYTES(TypeCode typecode);
-
-		/// <summary>Static method to write a binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be overwritten.</summary>
-		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
-		/// <param name="ExtensionName">The name of the binary table extension. If the table is to have no name then it will be written as the first binary table extension.</param>
-		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
-		/// <param name="ExtensionEntryLabels">A String array of the binary table extension entries, i.e. the TTYPE values.</param>
-		/// <param name="ExtensionEntryDataUnits">A String array of the physical units for the table entries, i.e. the TUNIT values.</param>
-		/// <param name="ExtensionHeaderExtraKeys">A String array of additional header keys for the table. Pass nullptr if not required.</param>
-		/// <param name="ExtensionHeaderExtraKeyValues">A String array of additional header key values for the table. Pass nullptr if not required.</param>
-		/// <param name="ExtensionHeaderExtraKeyComments">A String array of additional header key comments for the table. Pass nullptr if not required.</param>
-		/// <param name="ExtensionEntryData">An Object array of the data to be written as the table. The array members are the original data as their own types cast as Objects, ex.: 
-		/// <para>ExtensionEntryData[0] = (Object^)array1; where array1 is an array&lt;int&gt;^.</para>
-		/// <para>ExtensionEntryData[1] = (Object^)array2; where array2 is an array&lt;double, 2&gt;^.</para>
-		/// <para>The member arrays will be written as their Type as determined automatically by the ExtensionEntryData Object array member contents.</para>
-		/// <para>The member arrays must all be the same height, i.e. same number of rows, but can have variable width (columns) if their array rank = 2.</para></param>
-		void WRITEEXTENSION(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData);
-
+		void MAKEBINTABLEBYTEARRAY(array<Object^>^ ExtensionEntryData);
+		array<String^>^ FORMATBINARYTABLEEXTENSIONHEADER();
+		int TFORMTONBYTES(String^ tform, int& instances);
+		TypeCode TFORMTYPECODE(String^ tform);
+		String^ TYPECODETFORM(TypeCode typecode);
+		String^ TYPECODESTRING(TypeCode typecode);
+		int TYPECODETONBYTES(TypeCode typecode);
 		void EATRAWBINTABLEHEADER(ArrayList^ header);
 		#pragma endregion
 

@@ -308,60 +308,50 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 	{
 		case ::TypeCode::Double:
 		{
-			try
+			if (objectArrayRank == 1)
 			{
-				if (objectArrayRank == 1)
+				array<double>^ vector = gcnew array<double>(TINSTANCES[extensionentry_index] * NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
 				{
-					array<double>^ vector = gcnew array<double>(TINSTANCES[extensionentry_index] * NAXIS2);
-					//#pragma omp parallel for private(currentbyte)
-					for (int i = 0; i < NAXIS2; i++)
-					{
-						array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-						for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-						{
-							currentbyte = byteoffset + i * NAXIS1 + j * 8;
-							dbl[7] = BINTABLE[currentbyte];
-							dbl[6] = BINTABLE[currentbyte + 1];
-							dbl[5] = BINTABLE[currentbyte + 2];
-							dbl[4] = BINTABLE[currentbyte + 3];
-							dbl[3] = BINTABLE[currentbyte + 4];
-							dbl[2] = BINTABLE[currentbyte + 5];
-							dbl[1] = BINTABLE[currentbyte + 6];
-							dbl[0] = BINTABLE[currentbyte + 7];
-							vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToDouble(dbl, 0);
-						}
-					}
-					return vector;
+					array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+					currentbyte = byteoffset + i * NAXIS1;
+					dbl[7] = BINTABLE[currentbyte];
+					dbl[6] = BINTABLE[currentbyte + 1];
+					dbl[5] = BINTABLE[currentbyte + 2];
+					dbl[4] = BINTABLE[currentbyte + 3];
+					dbl[3] = BINTABLE[currentbyte + 4];
+					dbl[2] = BINTABLE[currentbyte + 5];
+					dbl[1] = BINTABLE[currentbyte + 6];
+					dbl[0] = BINTABLE[currentbyte + 7];
+					vector[i * TINSTANCES[extensionentry_index]] = BitConverter::ToDouble(dbl, 0);
 				}
-				else
-				{
-					array<double, 2>^ arrya = gcnew array<double, 2>(TINSTANCES[extensionentry_index], NAXIS2);
-					//#pragma omp parallel for private(currentbyte)
-					for (int i = 0; i < NAXIS2; i++)
-					{
-						array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-						for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-						{
-							currentbyte = byteoffset + i * NAXIS1 + j * 8;
-							dbl[7] = BINTABLE[currentbyte];
-							dbl[6] = BINTABLE[currentbyte + 1];
-							dbl[5] = BINTABLE[currentbyte + 2];
-							dbl[4] = BINTABLE[currentbyte + 3];
-							dbl[3] = BINTABLE[currentbyte + 4];
-							dbl[2] = BINTABLE[currentbyte + 5];
-							dbl[1] = BINTABLE[currentbyte + 6];
-							dbl[0] = BINTABLE[currentbyte + 7];
-							arrya[j, i] = BitConverter::ToDouble(dbl, 0);
-						}
-					}
-					return arrya;
-				}
-				break;
+				return vector;
 			}
-			catch (Exception^ e)
+			else
 			{
-				MessageBox::Show(e->Data + "	" + e->InnerException + "	" + e->Message + "	" + e->Source + "	" + e->StackTrace + "	" + e->TargetSite);
+				array<double, 2>^ arrya = gcnew array<double, 2>(TINSTANCES[extensionentry_index], NAXIS2);
+				#pragma omp parallel for private(currentbyte)
+				for (int i = 0; i < NAXIS2; i++)
+				{
+					array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+					{
+						currentbyte = byteoffset + i * NAXIS1 + j * 8;
+						dbl[7] = BINTABLE[currentbyte];
+						dbl[6] = BINTABLE[currentbyte + 1];
+						dbl[5] = BINTABLE[currentbyte + 2];
+						dbl[4] = BINTABLE[currentbyte + 3];
+						dbl[3] = BINTABLE[currentbyte + 4];
+						dbl[2] = BINTABLE[currentbyte + 5];
+						dbl[1] = BINTABLE[currentbyte + 6];
+						dbl[0] = BINTABLE[currentbyte + 7];
+						arrya[j, i] = BitConverter::ToDouble(dbl, 0);
+					}
+				}
+				return arrya;
 			}
+			break;
 		}
 
 		case (::TypeCode::Int64):
@@ -373,19 +363,16 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 				for (int i = 0; i < NAXIS2; i++)
 				{
 					array<unsigned char>^ i64 = gcnew array<unsigned char>(8);
-					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-					{
-						currentbyte = byteoffset + i * NAXIS1 + j * 8;
-						i64[7] = BINTABLE[currentbyte];
-						i64[6] = BINTABLE[currentbyte + 1];
-						i64[5] = BINTABLE[currentbyte + 2];
-						i64[4] = BINTABLE[currentbyte + 3];
-						i64[3] = BINTABLE[currentbyte + 4];
-						i64[2] = BINTABLE[currentbyte + 5];
-						i64[1] = BINTABLE[currentbyte + 6];
-						i64[0] = BINTABLE[currentbyte + 7];
-						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt64(i64, 0);
-					}
+					currentbyte = byteoffset + i * NAXIS1;
+					i64[7] = BINTABLE[currentbyte];
+					i64[6] = BINTABLE[currentbyte + 1];
+					i64[5] = BINTABLE[currentbyte + 2];
+					i64[4] = BINTABLE[currentbyte + 3];
+					i64[3] = BINTABLE[currentbyte + 4];
+					i64[2] = BINTABLE[currentbyte + 5];
+					i64[1] = BINTABLE[currentbyte + 6];
+					i64[0] = BINTABLE[currentbyte + 7];
+					vector[i * TINSTANCES[extensionentry_index]] = BitConverter::ToInt64(i64, 0);
 				}
 				return vector;
 			}
@@ -424,15 +411,12 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 				for (int i = 0; i < NAXIS2; i++)
 				{
 					array<unsigned char>^ sng = gcnew array<unsigned char>(4);
-					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-					{
-						currentbyte = byteoffset + i * NAXIS1 + j * 4;
-						sng[3] = BINTABLE[currentbyte];
-						sng[2] = BINTABLE[currentbyte + 1];
-						sng[1] = BINTABLE[currentbyte + 2];
-						sng[0] = BINTABLE[currentbyte + 3];
-						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToSingle(sng, 0);
-					}
+					currentbyte = byteoffset + i * NAXIS1;
+					sng[3] = BINTABLE[currentbyte];
+					sng[2] = BINTABLE[currentbyte + 1];
+					sng[1] = BINTABLE[currentbyte + 2];
+					sng[0] = BINTABLE[currentbyte + 3];
+					vector[i * TINSTANCES[extensionentry_index]] = BitConverter::ToSingle(sng, 0);
 				}
 				return vector;
 			}
@@ -460,23 +444,20 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 
 		case ::TypeCode::UInt32:
 		{
+			unsigned __int32 bzero = 2147483648;
 			if (objectArrayRank == 1)
 			{
-				//unsigned __int32 bzero = 2147483648;// + bzero somewhere or does bitcoverter do it all???
 				array<unsigned __int32>^ vector = gcnew array<unsigned __int32>(TINSTANCES[extensionentry_index] * NAXIS2);
 				#pragma omp parallel for private(currentbyte)
 				for (int i = 0; i < NAXIS2; i++)
 				{
 					array<unsigned char>^ uint32 = gcnew array<unsigned char>(4);
-					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-					{
-						currentbyte = byteoffset + i * NAXIS1 + j * 4;
-						uint32[3] = BINTABLE[currentbyte];
-						uint32[2] = BINTABLE[currentbyte + 1];
-						uint32[1] = BINTABLE[currentbyte + 2];
-						uint32[0] = BINTABLE[currentbyte + 3];
-						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToUInt32(uint32, 0); // + bzero somewhere or does bitcoverter do it all???
-					}
+					currentbyte = byteoffset + i * NAXIS1;
+					uint32[3] = BINTABLE[currentbyte];
+					uint32[2] = BINTABLE[currentbyte + 1];
+					uint32[1] = BINTABLE[currentbyte + 2];
+					uint32[0] = BINTABLE[currentbyte + 3];
+					vector[i * TINSTANCES[extensionentry_index]] = BitConverter::ToInt32(uint32, 0) + bzero;
 				}
 				return vector;
 			}
@@ -494,7 +475,7 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 						uint32[2] = BINTABLE[currentbyte + 1];
 						uint32[1] = BINTABLE[currentbyte + 2];
 						uint32[0] = BINTABLE[currentbyte + 3];
-						arrya[j, i] = BitConverter::ToUInt32(uint32, 0); // + bzero somewhere or does bitcoverter do it all???
+						arrya[j, i] = BitConverter::ToInt32(uint32, 0) + bzero;
 					}
 				}
 				return arrya;
@@ -506,21 +487,17 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 		{
 			if (objectArrayRank == 1)
 			{
-				//unsigned __int32 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
 				array<__int32>^ vector = gcnew array<__int32>(TINSTANCES[extensionentry_index] * NAXIS2);
 				#pragma omp parallel for private(currentbyte)
 				for (int i = 0; i < NAXIS2; i++)
 				{
 					array<unsigned char>^ int32 = gcnew array<unsigned char>(4);
-					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-					{
-						currentbyte = byteoffset + i * NAXIS1 + j * 4;
-						int32[3] = BINTABLE[currentbyte];
-						int32[2] = BINTABLE[currentbyte + 1];
-						int32[1] = BINTABLE[currentbyte + 2];
-						int32[0] = BINTABLE[currentbyte + 3];
-						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt32(int32, 0); // + bzero somewhere or does bitcoverter do it all???
-					}
+					currentbyte = byteoffset + i * NAXIS1;
+					int32[3] = BINTABLE[currentbyte];
+					int32[2] = BINTABLE[currentbyte + 1];
+					int32[1] = BINTABLE[currentbyte + 2];
+					int32[0] = BINTABLE[currentbyte + 3];
+					vector[i * TINSTANCES[extensionentry_index]] = BitConverter::ToInt32(int32, 0);
 				}
 				return vector;
 			}
@@ -538,7 +515,7 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 						int32[2] = BINTABLE[currentbyte + 1];
 						int32[1] = BINTABLE[currentbyte + 2];
 						int32[0] = BINTABLE[currentbyte + 3];
-						arrya[j, i] = BitConverter::ToInt32(int32, 0); // + bzero somewhere or does bitcoverter do it all???
+						arrya[j, i] = BitConverter::ToInt32(int32, 0);
 					}
 				}
 				return arrya;
@@ -548,21 +525,18 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 
 		case ::TypeCode::UInt16:
 		{
+			unsigned __int16 bzero = 32768;
 			if (objectArrayRank == 1)
 			{
-				//unsigned __int32 bzero = 32768;// + bzero somewhere or does bitcoverter do it all???
 				array<unsigned __int16>^ vector = gcnew array<unsigned __int16>(TINSTANCES[extensionentry_index] * NAXIS2);
 				#pragma omp parallel for private(currentbyte)
 				for (int i = 0; i < NAXIS2; i++)
 				{
 					array<unsigned char>^ uint16 = gcnew array<unsigned char>(2);
-					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-					{
-						currentbyte = byteoffset + i * NAXIS1 + j * 2;
-						uint16[1] = BINTABLE[currentbyte];
-						uint16[0] = BINTABLE[currentbyte + 1];
-						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToUInt16(uint16, 0); // + bzero somewhere or does bitcoverter do it all???
-					}
+					currentbyte = byteoffset + i * NAXIS1;
+					uint16[1] = BINTABLE[currentbyte];
+					uint16[0] = BINTABLE[currentbyte + 1];
+					vector[i * TINSTANCES[extensionentry_index]] = BitConverter::ToInt16(uint16, 0) + bzero;
 				}
 				return vector;
 			}
@@ -578,7 +552,7 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 						currentbyte = byteoffset + i * NAXIS1 + j * 2;
 						uint16[1] = BINTABLE[currentbyte];
 						uint16[0] = BINTABLE[currentbyte + 1];
-						arrya[j, i] = BitConverter::ToUInt16(uint16, 0); // + bzero somewhere or does bitcoverter do it all???
+						arrya[j, i] = BitConverter::ToInt16(uint16, 0) + bzero;
 					}
 				}
 				return arrya;
@@ -590,19 +564,15 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 		{
 			if (objectArrayRank == 1)
 			{
-				//unsigned __int32 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
 				array<__int16>^ vector = gcnew array<__int16>(TINSTANCES[extensionentry_index] * NAXIS2);
 				#pragma omp parallel for private(currentbyte)
 				for (int i = 0; i < NAXIS2; i++)
 				{
 					array<unsigned char>^ int16 = gcnew array<unsigned char>(2);
-					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-					{
-						currentbyte = byteoffset + i * NAXIS1 + j * 2;
-						int16[1] = BINTABLE[currentbyte];
-						int16[0] = BINTABLE[currentbyte + 1];
-						vector[i * TINSTANCES[extensionentry_index] + j] = BitConverter::ToInt16(int16, 0); // + bzero somewhere or does bitcoverter do it all???
-					}
+					currentbyte = byteoffset + i * NAXIS1;
+					int16[1] = BINTABLE[currentbyte];
+					int16[0] = BINTABLE[currentbyte + 1];
+					vector[i * TINSTANCES[extensionentry_index]] = BitConverter::ToInt16(int16, 0);
 				}
 				return vector;
 			}
@@ -618,7 +588,7 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 						currentbyte = byteoffset + i * NAXIS1 + j * 2;
 						int16[1] = BINTABLE[currentbyte];
 						int16[0] = BINTABLE[currentbyte + 1];
-						arrya[j, i] = BitConverter::ToInt16(int16, 0); // + bzero somewhere or does bitcoverter do it all???
+						arrya[j, i] = BitConverter::ToInt16(int16, 0);
 					}
 				}
 				return arrya;
@@ -630,15 +600,13 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 		{
 			if (objectArrayRank == 1)
 			{
-				//unsigned __int8 bzero = 128;// + bzero somewhere or does bitcoverter do it all???
 				array<unsigned __int8>^ vector = gcnew array<unsigned __int8>(TINSTANCES[extensionentry_index] * NAXIS2);
 				#pragma omp parallel for private(currentbyte)
 				for (int i = 0; i < NAXIS2; i++)
-					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-					{
-						currentbyte = byteoffset + i * NAXIS1 + j;
-						vector[i * TINSTANCES[extensionentry_index] + j] = (unsigned __int8)BINTABLE[currentbyte] + 128; // + bzero somewhere or does bitcoverter do it all???
-					}
+				{
+					currentbyte = byteoffset + i * NAXIS1;
+					vector[i * TINSTANCES[extensionentry_index]] = (unsigned __int8)BINTABLE[currentbyte] + 128;
+				}
 				return vector;
 			}
 			else			
@@ -649,7 +617,7 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 					{
 						currentbyte = byteoffset + i * NAXIS1 + j;
-						arrya[j, i] = (unsigned __int8)BINTABLE[currentbyte] + 128; // + bzero somewhere or does bitcoverter do it all???
+						arrya[j, i] = (unsigned __int8)BINTABLE[currentbyte] + 128;
 					}
 				return arrya;
 			}
@@ -660,15 +628,13 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 		{
 			if (objectArrayRank == 1)
 			{
-				//unsigned __int8 bzero = 0;// + bzero somewhere or does bitcoverter do it all???
 				array<__int8>^ vector = gcnew array<__int8>(TINSTANCES[extensionentry_index] * NAXIS2);
 				#pragma omp parallel for private(currentbyte)
 				for (int i = 0; i < NAXIS2; i++)
-					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-					{
-						currentbyte = byteoffset + i * NAXIS1 + j;
-						vector[i * TINSTANCES[extensionentry_index] + j] = (__int8)BINTABLE[currentbyte]; // + bzero somewhere or does bitcoverter do it all???
-					}
+				{
+					currentbyte = byteoffset + i * NAXIS1;
+					vector[i * TINSTANCES[extensionentry_index]] = (__int8)BINTABLE[currentbyte];
+				}
 				return vector;
 			}
 			else			
@@ -679,7 +645,7 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
 					{
 						currentbyte = byteoffset + i * NAXIS1 + j;
-						arrya[j, i] = (__int8)BINTABLE[currentbyte]; // + bzero somewhere or does bitcoverter do it all???
+						arrya[j, i] = (__int8)BINTABLE[currentbyte];
 					}
 				return arrya;
 			}
@@ -693,11 +659,10 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 				array<bool>^ vector = gcnew array<bool>(TINSTANCES[extensionentry_index] * NAXIS2);
 				#pragma omp parallel for private(currentbyte)
 				for (int i = 0; i < NAXIS2; i++)
-					for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
-					{
-						currentbyte = byteoffset + i * NAXIS1 + j;
-						vector[i * TINSTANCES[extensionentry_index] + j] = Convert::ToBoolean(BINTABLE[currentbyte]);
-					}
+				{
+					currentbyte = byteoffset + i * NAXIS1;
+					vector[i * TINSTANCES[extensionentry_index]] = Convert::ToBoolean(BINTABLE[currentbyte]);
+				}
 				return vector;
 			}
 			else			
@@ -711,6 +676,298 @@ Object^ JPFITS::FITSBinTable::GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &o
 						arrya[j, i] = Convert::ToBoolean(BINTABLE[currentbyte]);
 					}
 				return arrya;
+			}
+			break;
+		}
+
+		default:
+		{
+			throw gcnew Exception("Unrecognized TypeCode: '" + TCODES[extensionentry_index].ToString() + "'");
+			return nullptr;
+		}
+	}
+}
+
+String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntryLabel, int rowindex)
+{
+	int extensionentry_index = -1;
+	for (int i = 0; i < TTYPES->Length; i++)
+		if (TTYPES[i] == ttypeEntryLabel)
+		{
+			extensionentry_index = i;
+			break;
+		}
+
+	if (extensionentry_index == -1)
+	{
+		throw gcnew Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntryLabel + "'");
+		return nullptr;
+	}
+
+	TypeCode objectTypeCode = TCODES[extensionentry_index];
+	int objectArrayRank;
+	if (TINSTANCES[extensionentry_index] == 1)
+		objectArrayRank = 1;
+	else
+		objectArrayRank = 2;
+
+	int byteoffset = 0;
+	for (int i = 0; i < extensionentry_index; i++)
+		byteoffset += TBYTES[i];
+	int currentbyte = byteoffset + rowindex * NAXIS1;
+	String^ str = "";
+
+	switch (TCODES[extensionentry_index])
+	{
+		case ::TypeCode::Double:
+		{
+			array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+			if (objectArrayRank == 1)
+			{
+				dbl[7] = BINTABLE[currentbyte];
+				dbl[6] = BINTABLE[currentbyte + 1];
+				dbl[5] = BINTABLE[currentbyte + 2];
+				dbl[4] = BINTABLE[currentbyte + 3];
+				dbl[3] = BINTABLE[currentbyte + 4];
+				dbl[2] = BINTABLE[currentbyte + 5];
+				dbl[1] = BINTABLE[currentbyte + 6];
+				dbl[0] = BINTABLE[currentbyte + 7];
+				return BitConverter::ToDouble(dbl, 0).ToString();
+			}
+			else
+			{
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + rowindex * NAXIS1 + j * 8;
+					dbl[7] = BINTABLE[currentbyte];
+					dbl[6] = BINTABLE[currentbyte + 1];
+					dbl[5] = BINTABLE[currentbyte + 2];
+					dbl[4] = BINTABLE[currentbyte + 3];
+					dbl[3] = BINTABLE[currentbyte + 4];
+					dbl[2] = BINTABLE[currentbyte + 5];
+					dbl[1] = BINTABLE[currentbyte + 6];
+					dbl[0] = BINTABLE[currentbyte + 7];
+					str += BitConverter::ToDouble(dbl, 0).ToString() + "; ";
+				}
+				return str;
+			}
+			break;
+		}
+
+		case (::TypeCode::Int64):
+		{
+			array<unsigned char>^ i64 = gcnew array<unsigned char>(8);
+			if (objectArrayRank == 1)
+			{
+				i64[7] = BINTABLE[currentbyte];
+				i64[6] = BINTABLE[currentbyte + 1];
+				i64[5] = BINTABLE[currentbyte + 2];
+				i64[4] = BINTABLE[currentbyte + 3];
+				i64[3] = BINTABLE[currentbyte + 4];
+				i64[2] = BINTABLE[currentbyte + 5];
+				i64[1] = BINTABLE[currentbyte + 6];
+				i64[0] = BINTABLE[currentbyte + 7];
+				return BitConverter::ToInt64(i64, 0).ToString();
+			}
+			else
+			{
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + rowindex * NAXIS1 + j * 8;
+					i64[7] = BINTABLE[currentbyte];
+					i64[6] = BINTABLE[currentbyte + 1];
+					i64[5] = BINTABLE[currentbyte + 2];
+					i64[4] = BINTABLE[currentbyte + 3];
+					i64[3] = BINTABLE[currentbyte + 4];
+					i64[2] = BINTABLE[currentbyte + 5];
+					i64[1] = BINTABLE[currentbyte + 6];
+					i64[0] = BINTABLE[currentbyte + 7];
+					str += BitConverter::ToInt64(i64, 0).ToString() + "; ";
+				}
+				return str;
+			}
+			break;
+		}
+
+		case ::TypeCode::Single:
+		{
+			array<unsigned char>^ sng = gcnew array<unsigned char>(4);
+			if (objectArrayRank == 1)
+			{
+				sng[3] = BINTABLE[currentbyte];
+				sng[2] = BINTABLE[currentbyte + 1];
+				sng[1] = BINTABLE[currentbyte + 2];
+				sng[0] = BINTABLE[currentbyte + 3];
+				return BitConverter::ToSingle(sng, 0).ToString();
+			}
+			else
+			{
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + rowindex * NAXIS1 + j * 4;
+					sng[3] = BINTABLE[currentbyte];
+					sng[2] = BINTABLE[currentbyte + 1];
+					sng[1] = BINTABLE[currentbyte + 2];
+					sng[0] = BINTABLE[currentbyte + 3];
+					str += BitConverter::ToSingle(sng, 0).ToString() + "; ";
+				}
+				return str;
+			}
+			break;
+		}
+
+		case ::TypeCode::UInt32:
+		{
+			unsigned __int32 bzero = 2147483648;
+			array<unsigned char>^ uint32 = gcnew array<unsigned char>(4);
+			if (objectArrayRank == 1)
+			{
+				uint32[3] = BINTABLE[currentbyte];
+				uint32[2] = BINTABLE[currentbyte + 1];
+				uint32[1] = BINTABLE[currentbyte + 2];
+				uint32[0] = BINTABLE[currentbyte + 3];
+				return (BitConverter::ToInt32(uint32, 0) + bzero).ToString();
+			}
+			else
+			{
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + rowindex * NAXIS1 + j * 4;
+					uint32[3] = BINTABLE[currentbyte];
+					uint32[2] = BINTABLE[currentbyte + 1];
+					uint32[1] = BINTABLE[currentbyte + 2];
+					uint32[0] = BINTABLE[currentbyte + 3];
+					str += (BitConverter::ToInt32(uint32, 0) + bzero).ToString() + "; ";
+				}
+				return str;
+			}
+			break;
+		}
+
+		case ::TypeCode::Int32:
+		{
+			array<unsigned char>^ int32 = gcnew array<unsigned char>(4);
+			if (objectArrayRank == 1)
+			{
+				int32[3] = BINTABLE[currentbyte];
+				int32[2] = BINTABLE[currentbyte + 1];
+				int32[1] = BINTABLE[currentbyte + 2];
+				int32[0] = BINTABLE[currentbyte + 3];
+				return BitConverter::ToInt32(int32, 0).ToString();
+			}
+			else
+			{
+
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + rowindex * NAXIS1 + j * 4;
+					int32[3] = BINTABLE[currentbyte];
+					int32[2] = BINTABLE[currentbyte + 1];
+					int32[1] = BINTABLE[currentbyte + 2];
+					int32[0] = BINTABLE[currentbyte + 3];
+					str += BitConverter::ToInt32(int32, 0).ToString() + "; ";
+				}
+				return str;
+			}
+			break;
+		}
+
+		case ::TypeCode::UInt16:
+		{
+			unsigned __int16 bzero = 32768;
+			array<unsigned char>^ uint16 = gcnew array<unsigned char>(2);
+			if (objectArrayRank == 1)
+			{
+				uint16[1] = BINTABLE[currentbyte];
+				uint16[0] = BINTABLE[currentbyte + 1];
+				return (BitConverter::ToInt16(uint16, 0) + bzero).ToString();
+			}
+			else
+			{
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + rowindex * NAXIS1 + j * 2;
+					uint16[1] = BINTABLE[currentbyte];
+					uint16[0] = BINTABLE[currentbyte + 1];
+					str += (BitConverter::ToInt16(uint16, 0) + bzero).ToString() + "; ";
+				}
+				return str;
+			}
+			break;
+		}
+
+		case ::TypeCode::Int16:
+		{
+			array<unsigned char>^ int16 = gcnew array<unsigned char>(2);
+			if (objectArrayRank == 1)
+			{
+
+				int16[1] = BINTABLE[currentbyte];
+				int16[0] = BINTABLE[currentbyte + 1];
+				return BitConverter::ToInt16(int16, 0).ToString();
+			}
+			else
+			{
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + rowindex * NAXIS1 + j * 2;
+					int16[1] = BINTABLE[currentbyte];
+					int16[0] = BINTABLE[currentbyte + 1];
+					str += BitConverter::ToInt16(int16, 0).ToString() + "; ";
+				}
+				return str;
+			}
+			break;
+		}
+
+		case ::TypeCode::Byte:
+		{
+			if (objectArrayRank == 1)
+			{
+				unsigned __int8 ret = (unsigned __int8)BINTABLE[currentbyte] + 128;
+				return ret.ToString();
+			}
+			else
+			{
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + rowindex * NAXIS1 + j;
+					unsigned __int8 ret = (unsigned __int8)BINTABLE[currentbyte] + 128;
+					str += ret.ToString() + "; ";
+				}
+				return str;
+			}
+			break;
+		}
+
+		case ::TypeCode::SByte:
+		{
+			if (objectArrayRank == 1)
+				return ((__int8)BINTABLE[currentbyte]).ToString();
+			else
+			{
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + rowindex * NAXIS1 + j;
+					str += ((__int8)BINTABLE[currentbyte]).ToString() + "; ";
+				}
+				return str;
+			}
+			break;
+		}
+
+		case ::TypeCode::Boolean:
+		{
+			if (objectArrayRank == 1)
+				return Convert::ToBoolean(BINTABLE[currentbyte]).ToString();
+			else
+			{
+				for (int j = 0; j < TINSTANCES[extensionentry_index]; j++)
+				{
+					currentbyte = byteoffset + rowindex * NAXIS1 + j;
+					str += Convert::ToBoolean(BINTABLE[currentbyte]).ToString() + "; ";
+				}
+				return str;
 			}
 			break;
 		}
@@ -765,7 +1022,6 @@ void JPFITS::FITSBinTable::RemoveTTYPEEntry(String^ ttypeEntryLabel)
 			c++;
 		}
 
-	BINTABLE = MAKEBINTABLEBYTEARRAY(newEntryDataObjs);
 	TFIELDS--;
 	TTYPES = newTTYPES;
 	TFORMS = newTFORMS;
@@ -773,6 +1029,8 @@ void JPFITS::FITSBinTable::RemoveTTYPEEntry(String^ ttypeEntryLabel)
 	TBYTES = newTBYTES;
 	TINSTANCES = newTINSTANCES;
 	TCODES = newTCODES;
+
+	MAKEBINTABLEBYTEARRAY(newEntryDataObjs);
 }
 
 void JPFITS::FITSBinTable::SetTTYPEEntries(array<String^>^ ttypeEntryLabels, array<String^>^ entryUnits, array<Object^>^ entryArrays)
@@ -806,8 +1064,6 @@ void JPFITS::FITSBinTable::SetTTYPEEntries(array<String^>^ ttypeEntryLabels, arr
 		return;
 	}
 
-	BINTABLE = MAKEBINTABLEBYTEARRAY(entryArrays);
-
 	TFIELDS = entryArrays->Length;
 	TTYPES = ttypeEntryLabels;
 	TUNITS = entryUnits;
@@ -837,6 +1093,8 @@ void JPFITS::FITSBinTable::SetTTYPEEntries(array<String^>^ ttypeEntryLabels, arr
 		NAXIS2 = ((Array^)entryArrays[0])->Length;
 	else
 		NAXIS2 = ((Array^)entryArrays[0])->GetLength(1);
+
+	MAKEBINTABLEBYTEARRAY(entryArrays);
 }
 
 void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIfExists, String^ entryUnits, Object^ entryArray)
@@ -901,7 +1159,6 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIf
 			c++;
 		}
 
-	BINTABLE = MAKEBINTABLEBYTEARRAY(newEntryDataObjs);
 	TTYPES = newTTYPES;
 	TFORMS = newTFORMS;
 	TUNITS = newTUNITS;
@@ -919,6 +1176,8 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIf
 		NAXIS2 = ((Array^)entryArray)->Length;
 	else
 		NAXIS2 = ((Array^)entryArray)->GetLength(1);
+
+	MAKEBINTABLEBYTEARRAY(newEntryDataObjs);
 }
 
 void JPFITS::FITSBinTable::AddExtraHeaderKey(String^ keyName, String^ keyValue, String^ keyComment)
@@ -1049,27 +1308,16 @@ bool JPFITS::FITSBinTable::ExtensionExists(String^ FileName, String^ ExtensionNa
 
 void JPFITS::FITSBinTable::Write(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists)
 {
-	TypeCode code;
-	int rank;
-	array<Object^>^ writeobjarr = gcnew array<Object^>(this->TFIELDS);
-	for (int i = 0; i < TFIELDS; i++)
-		writeobjarr[i] = this->GetTTYPEEntry(TTYPES[i], code, rank);
-
 	EXTENSIONNAME = ExtensionName;
 	FILENAME = FileName;
 
-	WRITEEXTENSION(FileName, ExtensionName, OverWriteExtensionIfExists, this->TTYPES, this->TUNITS, this->EXTRAKEYS, this->EXTRAKEYVALS, this->EXTRAKEYCOMS, writeobjarr);
-}
-
-void JPFITS::FITSBinTable::WRITEEXTENSION(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments, array<Object^>^ ExtensionEntryData)
-{
-	if (!File::Exists(FileName))//then write a new file, otherwise check the existing file for existing table, etc.
+	if (!File::Exists(FILENAME))//then write a new file, otherwise check the existing file for existing table, etc.
 	{
-		JPFITS::FITSImage^ ff = gcnew FITSImage(FileName, true);
+		JPFITS::FITSImage^ ff = gcnew FITSImage(FILENAME, true);
 		ff->WriteImage(TypeCode::Double, true);
 	}
 
-	FileStream^ fs = gcnew FileStream(FileName, IO::FileMode::Open);
+	FileStream^ fs = gcnew FileStream(FILENAME, IO::FileMode::Open);
 
 	bool hasext = false;
 	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext))
@@ -1086,7 +1334,7 @@ void JPFITS::FITSBinTable::WRITEEXTENSION(String^ FileName, String^ ExtensionNam
 		fs->Read(primarydataarr, 0, primarydataarr->Length);
 		fs->Close();
 
-		FITSImage^ ff = gcnew FITSImage(FileName, nullptr, true, false, false, false);
+		FITSImage^ ff = gcnew FITSImage(FILENAME, nullptr, true, false, false, false);
 		int n = ff->GetKeyIndex("NAXIS");
 		if (n == -1)
 		{
@@ -1112,21 +1360,21 @@ void JPFITS::FITSBinTable::WRITEEXTENSION(String^ FileName, String^ ExtensionNam
 			for (int j = 0; j < 80; j++)
 				headarr[i * 80 + j] = (unsigned char)HEADER[i][j];
 
-		fs = gcnew FileStream(FileName, IO::FileMode::Create);
+		fs = gcnew FileStream(FILENAME, IO::FileMode::Create);
 		fs->Write(headarr, 0, headarr->Length);
 		fs->Write(primarydataarr, 0, primarydataarr->Length);
 		fs->Close();
 
-		fs = gcnew FileStream(FileName, IO::FileMode::Open);
+		fs = gcnew FileStream(FILENAME, IO::FileMode::Open);
 		FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext);
 	}
 
 	__int64 startpos, endpos;
-	bool extensionfound = FITSFILEOPS::SEEKEXTENSION(fs, "BINTABLE", ExtensionName, nullptr, startpos, endpos);
+	bool extensionfound = FITSFILEOPS::SEEKEXTENSION(fs, "BINTABLE", EXTENSIONNAME, nullptr, startpos, endpos);
 	if (extensionfound && !OverWriteExtensionIfExists)
 	{
 		fs->Close();
-		throw gcnew Exception("ExtensionName '" + ExtensionName + "' already exists and was told to not overwrite it...");
+		throw gcnew Exception("ExtensionName '" + EXTENSIONNAME + "' already exists and was told to not overwrite it...");
 		return;
 	}
 	array<unsigned char>^ arr_append;
@@ -1140,85 +1388,42 @@ void JPFITS::FITSBinTable::WRITEEXTENSION(String^ FileName, String^ ExtensionNam
 		fs->Position = startpos;
 
 	//format the header for writing
-	array<String^>^ header = FORMATBINARYTABLEEXTENSIONHEADER(ExtensionName, ExtensionEntryData, ExtensionEntryLabels, ExtensionEntryDataUnits, ExtensionHeaderExtraKeys, ExtensionHeaderExtraKeyValues, ExtensionHeaderExtraKeyComments);
+	array<String^>^ header = FORMATBINARYTABLEEXTENSIONHEADER();
 	array<unsigned char>^ headerdata = gcnew array<unsigned char>(header->Length * 80);
 
 	for (int i = 0; i < header->Length; i++)
 		for (int j = 0; j < 80; j++)
 			headerdata[i * 80 + j] = (unsigned char)header[i][j];
 
-	array<unsigned char>^ data;
-	try
-	{
-		data = MAKEBINTABLEBYTEARRAY(ExtensionEntryData);
-	}
-	catch (Exception^ e)
-	{
-		fs->Close();
-		throw gcnew Exception(e->Message);
-		return;
-	}
-
 	fs->Write(headerdata, 0, headerdata->Length);
-	fs->Write(data, 0, data->Length);
+	fs->Write(BINTABLE, 0, BINTABLE->Length);
 	if (arr_append != nullptr)
 		fs->Write(arr_append, 0, arr_append->Length);
 	fs->Close();
 }
 
-array<unsigned char>^ JPFITS::FITSBinTable::MAKEBINTABLEBYTEARRAY(array<Object^>^ ExtensionEntryData)
+void JPFITS::FITSBinTable::MAKEBINTABLEBYTEARRAY(array<Object^>^ ExtensionEntryData)
 {
-	array<TypeCode>^ ExtensionEntryDataTypes = gcnew array<TypeCode>(ExtensionEntryData->Length);
 	for (int i = 0; i < ExtensionEntryData->Length; i++)
-	{
 		if (!ExtensionEntryData[i]->GetType()->IsArray)
 		{
 			throw gcnew Exception("Error: Object at index '" + i + "' is not an array. Stopping write.");
-			return nullptr;
-		}
-		ExtensionEntryDataTypes[i] = Type::GetTypeCode((((Array^)ExtensionEntryData[i])->GetType())->GetElementType());
-	}
-
-	array<int>^ ExtensionEntryDataTypeInstances = gcnew array<int>(ExtensionEntryData->Length);
-	array<int>^ datanaxes2 = gcnew array<int>(ExtensionEntryData->Length);
-	for (int i = 0; i < ExtensionEntryData->Length; i++)
-	{
-		datanaxes2[i] = ((Array^)ExtensionEntryData[i])->Length;
-		int rank = ((Array^)ExtensionEntryData[i])->Rank;
-		if (rank == 1)
-			ExtensionEntryDataTypeInstances[i] = 1;
-		else
-		{
-			ExtensionEntryDataTypeInstances[i] = ((Array^)ExtensionEntryData[i])->GetLength(0);
-			datanaxes2[i] = ((Array^)ExtensionEntryData[i])->GetLength(1);
-		}
-	}
-
-	//need to get the table width in bytes and height number of rows
-	int naxis1 = 0;
-	for (int i = 0; i < ExtensionEntryDataTypes->Length; i++)
-		naxis1 += TYPECODETONBYTES(ExtensionEntryDataTypes[i]) * ExtensionEntryDataTypeInstances[i];
-	int naxis2 = datanaxes2[0];
-	for (int i = 1; i < datanaxes2->Length; i++)
-		if (naxis2 != datanaxes2[i])
-		{
-			throw gcnew Exception("ExtensionEntryData do not all have the same number of rows, NAXES2. Cannot continue;");
-			return nullptr;
+			return;
 		}
 
-	int NBytesTot = int(Math::Ceiling(double(naxis1 * naxis2) / 2880.0)) * 2880;
-	array<unsigned char>^ data = gcnew array<unsigned char>(NBytesTot);
+	int NBytesTot = int(Math::Ceiling(double(NAXIS1 * NAXIS2) / 2880.0)) * 2880;
+	BINTABLE = gcnew array<unsigned char>(NBytesTot);
 
 	int nthread = omp_get_max_threads();
 	bool parallel_top = false;
-	if (naxis2 >= nthread)
+	if (NAXIS2 >= nthread)
 		parallel_top = true;
 	bool exception = false;
 	TypeCode exceptiontypecode;
 
 	//now write the table data into the array
 	#pragma omp parallel for if(parallel_top)
-	for (int i = 0; i < naxis2; i++)
+	for (int i = 0; i < NAXIS2; i++)
 	{
 		if (exception)
 			break;
@@ -1227,191 +1432,217 @@ array<unsigned char>^ JPFITS::FITSBinTable::MAKEBINTABLEBYTEARRAY(array<Object^>
 		{
 			int jtps = 0;
 			for (int jj = 0; jj < j; jj++)
-				jtps += TYPECODETONBYTES(ExtensionEntryDataTypes[jj]) * ExtensionEntryDataTypeInstances[jj];
+				jtps += TBYTES[jj];
 
-			int cc = i * naxis1 + jtps;
+			int cc = i * NAXIS1 + jtps;
 
-			switch (ExtensionEntryDataTypes[j])
+			switch (TCODES[j])
 			{
 				case TypeCode::Double:
 				{
 					array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-					for (int ii = 0; ii < ExtensionEntryDataTypeInstances[j]; ii++)
+					if (TINSTANCES[j] == 1)
 					{
-						if (ExtensionEntryDataTypeInstances[j] > 1)
-							dbl = BitConverter::GetBytes(((array<double, 2>^)ExtensionEntryData[j])[ii, i]);
-						else
-							dbl = BitConverter::GetBytes(((array<double>^)ExtensionEntryData[j])[i]);
-
-						data[cc + ii * 8] = dbl[7];
-						data[cc + ii * 8 + 1] = dbl[6];
-						data[cc + ii * 8 + 2] = dbl[5];
-						data[cc + ii * 8 + 3] = dbl[4];
-						data[cc + ii * 8 + 4] = dbl[3];
-						data[cc + ii * 8 + 5] = dbl[2];
-						data[cc + ii * 8 + 6] = dbl[1];
-						data[cc + ii * 8 + 7] = dbl[0];
+						dbl = BitConverter::GetBytes(((array<double>^)ExtensionEntryData[j])[i]);
+						BINTABLE[cc] = dbl[7];
+						BINTABLE[cc + 1] = dbl[6];
+						BINTABLE[cc + 2] = dbl[5];
+						BINTABLE[cc + 3] = dbl[4];
+						BINTABLE[cc + 4] = dbl[3];
+						BINTABLE[cc + 5] = dbl[2];
+						BINTABLE[cc + 6] = dbl[1];
+						BINTABLE[cc + 7] = dbl[0];
 					}
+					else
+						for (int ii = 0; ii < TINSTANCES[j]; ii++)
+						{
+							dbl = BitConverter::GetBytes(((array<double, 2>^)ExtensionEntryData[j])[ii, i]);
+							BINTABLE[cc + ii * 8] = dbl[7];
+							BINTABLE[cc + ii * 8 + 1] = dbl[6];
+							BINTABLE[cc + ii * 8 + 2] = dbl[5];
+							BINTABLE[cc + ii * 8 + 3] = dbl[4];
+							BINTABLE[cc + ii * 8 + 4] = dbl[3];
+							BINTABLE[cc + ii * 8 + 5] = dbl[2];
+							BINTABLE[cc + ii * 8 + 6] = dbl[1];
+							BINTABLE[cc + ii * 8 + 7] = dbl[0];
+						}
 					break;
 				}
 
 				case TypeCode::Single:
 				{
 					array<unsigned char>^ flt = gcnew array<unsigned char>(4);
-					for (int ii = 0; ii < ExtensionEntryDataTypeInstances[j]; ii++)
+					if (TINSTANCES[j] == 1)
 					{
-						if (ExtensionEntryDataTypeInstances[j] > 1)
-							flt = BitConverter::GetBytes(((array<float, 2>^)ExtensionEntryData[j])[ii, i]);
-						else
-							flt = BitConverter::GetBytes(((array<float>^)ExtensionEntryData[j])[i]);
-
-						data[cc + ii * 4] = flt[3];
-						data[cc + ii * 4 + 1] = flt[2];
-						data[cc + ii * 4 + 2] = flt[1];
-						data[cc + ii * 4 + 3] = flt[0];
+						flt = BitConverter::GetBytes(((array<float>^)ExtensionEntryData[j])[i]);
+						BINTABLE[cc] = flt[3];
+						BINTABLE[cc + 1] = flt[2];
+						BINTABLE[cc + 2] = flt[1];
+						BINTABLE[cc + 3] = flt[0];
 					}
+					else
+						for (int ii = 0; ii < TINSTANCES[j]; ii++)
+						{
+							flt = BitConverter::GetBytes(((array<float, 2>^)ExtensionEntryData[j])[ii, i]);
+							BINTABLE[cc + ii * 4] = flt[3];
+							BINTABLE[cc + ii * 4 + 1] = flt[2];
+							BINTABLE[cc + ii * 4 + 2] = flt[1];
+							BINTABLE[cc + ii * 4 + 3] = flt[0];
+						}
 					break;
 				}
 
 				case TypeCode::Int64:
 				{
 					__int64 val;
-					for (int ii = 0; ii < ExtensionEntryDataTypeInstances[j]; ii++)
+					if (TINSTANCES[j] == 1)
 					{
-						if (ExtensionEntryDataTypeInstances[j] > 1)
-							val = ((array<__int64, 2>^)ExtensionEntryData[j])[ii, i];
-						else
-							val = ((array<__int64>^)ExtensionEntryData[j])[i];
-
-						data[cc + ii * 8] = ((val >> 56) & 0xff);
-						data[cc + ii * 8 + 1] = ((val >> 48) & 0xff);
-						data[cc + ii * 8 + 2] = ((val >> 40) & 0xff);
-						data[cc + ii * 8 + 3] = ((val >> 32) & 0xff);
-						data[cc + ii * 8 + 4] = ((val >> 24) & 0xff);
-						data[cc + ii * 8 + 5] = ((val >> 16) & 0xff);
-						data[cc + ii * 8 + 6] = ((val >> 8) & 0xff);
-						data[cc + ii * 8 + 7] = (val & 0xff);
+						val = ((array<__int64>^)ExtensionEntryData[j])[i];
+						BINTABLE[cc] = ((val >> 56) & 0xff);
+						BINTABLE[cc+ 1] = ((val >> 48) & 0xff);
+						BINTABLE[cc + 2] = ((val >> 40) & 0xff);
+						BINTABLE[cc + 3] = ((val >> 32) & 0xff);
+						BINTABLE[cc + 4] = ((val >> 24) & 0xff);
+						BINTABLE[cc + 5] = ((val >> 16) & 0xff);
+						BINTABLE[cc + 6] = ((val >> 8) & 0xff);
+						BINTABLE[cc + 7] = (val & 0xff);
 					}
+					else
+						for (int ii = 0; ii < TINSTANCES[j]; ii++)
+						{
+							val = ((array<__int64, 2>^)ExtensionEntryData[j])[ii, i];
+							BINTABLE[cc + ii * 8] = ((val >> 56) & 0xff);
+							BINTABLE[cc + ii * 8 + 1] = ((val >> 48) & 0xff);
+							BINTABLE[cc + ii * 8 + 2] = ((val >> 40) & 0xff);
+							BINTABLE[cc + ii * 8 + 3] = ((val >> 32) & 0xff);
+							BINTABLE[cc + ii * 8 + 4] = ((val >> 24) & 0xff);
+							BINTABLE[cc + ii * 8 + 5] = ((val >> 16) & 0xff);
+							BINTABLE[cc + ii * 8 + 6] = ((val >> 8) & 0xff);
+							BINTABLE[cc + ii * 8 + 7] = (val & 0xff);
+						}
 					break;
 				}
 
 				case TypeCode::Int32:
 				{
 					__int32 val;
-					for (int ii = 0; ii < ExtensionEntryDataTypeInstances[j]; ii++)
+					if (TINSTANCES[j] == 1)
 					{
-						if (ExtensionEntryDataTypeInstances[j] > 1)
-							val = ((array<__int32, 2>^)ExtensionEntryData[j])[ii, i];
-						else
-							val = ((array<__int32>^)ExtensionEntryData[j])[i];
-
-						data[cc + ii * 4] = ((val >> 24) & 0xff);
-						data[cc + ii * 4 + 1] = ((val >> 16) & 0xff);
-						data[cc + ii * 4 + 2] = ((val >> 8) & 0xff);
-						data[cc + ii * 4 + 3] = (val & 0xff);
+						val = ((array<__int32>^)ExtensionEntryData[j])[i];
+						BINTABLE[cc] = ((val >> 24) & 0xff);
+						BINTABLE[cc + 1] = ((val >> 16) & 0xff);
+						BINTABLE[cc + 2] = ((val >> 8) & 0xff);
+						BINTABLE[cc + 3] = (val & 0xff);
 					}
+					else
+						for (int ii = 0; ii < TINSTANCES[j]; ii++)
+						{
+							val = ((array<__int32, 2>^)ExtensionEntryData[j])[ii, i];
+							BINTABLE[cc + ii * 4] = ((val >> 24) & 0xff);
+							BINTABLE[cc + ii * 4 + 1] = ((val >> 16) & 0xff);
+							BINTABLE[cc + ii * 4 + 2] = ((val >> 8) & 0xff);
+							BINTABLE[cc + ii * 4 + 3] = (val & 0xff);
+						}
 					break;
 				}
 
 				case TypeCode::UInt32:
 				{
-					__int32 val;
-					for (int ii = 0; ii < ExtensionEntryDataTypeInstances[j]; ii++)
+					unsigned __int32 bzero = 2147483648;
+					unsigned __int32 val;
+					if (TINSTANCES[j] == 1)
 					{
-						if (ExtensionEntryDataTypeInstances[j] > 1)
-							val = ((array<__int32, 2>^)ExtensionEntryData[j])[ii, i] - 2147483648;
-						else
-							val = ((array<__int32>^)ExtensionEntryData[j])[i] - 2147483648;
-
-						data[cc + ii * 4] = ((val >> 24) & 0xff);
-						data[cc + ii * 4 + 1] = ((val >> 16) & 0xff);
-						data[cc + ii * 4 + 2] = ((val >> 8) & 0xff);
-						data[cc + ii * 4 + 3] = (val & 0xff);
+						val = (((array<__int32>^)ExtensionEntryData[j])[i] - bzero);
+						BINTABLE[cc] = ((val >> 24) & 0xff);
+						BINTABLE[cc + 1] = ((val >> 16) & 0xff);
+						BINTABLE[cc + 2] = ((val >> 8) & 0xff);
+						BINTABLE[cc + 3] = (val & 0xff);
 					}
+					else
+						for (int ii = 0; ii < TINSTANCES[j]; ii++)
+						{
+							val = (((array<__int32, 2>^)ExtensionEntryData[j])[ii, i] - bzero);
+							BINTABLE[cc + ii * 4] = ((val >> 24) & 0xff);
+							BINTABLE[cc + ii * 4 + 1] = ((val >> 16) & 0xff);
+							BINTABLE[cc + ii * 4 + 2] = ((val >> 8) & 0xff);
+							BINTABLE[cc + ii * 4 + 3] = (val & 0xff);
+						}
 					break;
 				}
 
 				case TypeCode::Int16:
 				{
 					__int16 val;
-					for (int ii = 0; ii < ExtensionEntryDataTypeInstances[j]; ii++)
+					if (TINSTANCES[j] == 1)
 					{
-						if (ExtensionEntryDataTypeInstances[j] > 1)
-							val = ((array<__int16, 2>^)ExtensionEntryData[j])[ii, i];
-						else
-							val = ((array<__int16>^)ExtensionEntryData[j])[i];
-
-						data[cc + ii * 2] = ((val >> 8) & 0xff);
-						data[cc + ii * 2 + 1] = (val & 0xff);
+						val = ((array<__int16>^)ExtensionEntryData[j])[i];
+						BINTABLE[cc] = ((val >> 8) & 0xff);
+						BINTABLE[cc + 1] = (val & 0xff);
 					}
+					else
+						for (int ii = 0; ii < TINSTANCES[j]; ii++)
+						{
+							val = ((array<__int16, 2>^)ExtensionEntryData[j])[ii, i];
+							BINTABLE[cc + ii * 2] = ((val >> 8) & 0xff);
+							BINTABLE[cc + ii * 2 + 1] = (val & 0xff);
+						}
 					break;
 				}
 
 				case TypeCode::UInt16:
 				{
-					__int16 val;
-					for (int ii = 0; ii < ExtensionEntryDataTypeInstances[j]; ii++)
+					unsigned __int16 bzero = 32768;
+					unsigned __int16 val;
+					if (TINSTANCES[j] == 1)
 					{
-						if (ExtensionEntryDataTypeInstances[j] > 1)
-							val = ((array<__int16, 2>^)ExtensionEntryData[j])[ii, i] - 32768;
-						else
-							val = ((array<__int16>^)ExtensionEntryData[j])[i] - 32768;
-
-						data[cc + ii * 2] = ((val >> 8) & 0xff);
-						data[cc + ii * 2 + 1] = (val & 0xff);
+						val = (((array<__int16>^)ExtensionEntryData[j])[i] - bzero);
+						BINTABLE[cc] = ((val >> 8) & 0xff);
+						BINTABLE[cc + 1] = (val & 0xff);
 					}
+					else
+						for (int ii = 0; ii < TINSTANCES[j]; ii++)
+						{
+							val = (((array<__int16, 2>^)ExtensionEntryData[j])[ii, i] - bzero);
+							BINTABLE[cc + ii * 2] = ((val >> 8) & 0xff);
+							BINTABLE[cc + ii * 2 + 1] = (val & 0xff);
+						}
 					break;
 				}
 
 				case TypeCode::SByte:
 				{
-					char val;
-					for (int ii = 0; ii < ExtensionEntryDataTypeInstances[j]; ii++)
-					{
-						if (ExtensionEntryDataTypeInstances[j] > 1)
-							val = ((array<char, 2>^)ExtensionEntryData[j])[ii, i];
-						else
-							val = ((array<char>^)ExtensionEntryData[j])[i];
-
-						data[cc + ii] = val;
-					}
+					if (TINSTANCES[j] == 1)
+						BINTABLE[cc] = ((array<__int8>^)ExtensionEntryData[j])[i];
+					else
+						for (int ii = 0; ii < TINSTANCES[j]; ii++)
+							BINTABLE[cc + ii] = ((array<__int8, 2>^)ExtensionEntryData[j])[ii, i];
 					break;
 				}
 
 				case TypeCode::Byte:
 				{
-					char val;
-					for (int ii = 0; ii < ExtensionEntryDataTypeInstances[j]; ii++)
-					{
-						if (ExtensionEntryDataTypeInstances[j] > 1)
-							val = ((array<char, 2>^)ExtensionEntryData[j])[ii, i] - 128;
-						else
-							val = ((array<char>^)ExtensionEntryData[j])[i] - 128;
-
-						data[cc + ii] = val;
-					}
+					if (TINSTANCES[j] == 1)
+						BINTABLE[cc] = __int8(((array<unsigned __int8>^)ExtensionEntryData[j])[i] - 128);
+					else
+						for (int ii = 0; ii < TINSTANCES[j]; ii++)
+							BINTABLE[cc + ii] = __int8(((array<unsigned __int8, 2>^)ExtensionEntryData[j])[ii, i] - 128);
 					break;
 				}
 
 				case TypeCode::Boolean:
 				{
-					bool val;
-					for (int ii = 0; ii < ExtensionEntryDataTypeInstances[j]; ii++)
-					{
-						if (ExtensionEntryDataTypeInstances[j] > 1)
-							val = ((array<bool, 2>^)ExtensionEntryData[j])[ii, i];
-						else
-							val = ((array<bool>^)ExtensionEntryData[j])[i];
-
-						data[cc + ii] = val;
-					}
+					if (TINSTANCES[j] == 1)
+						BINTABLE[cc] = ((array<bool>^)ExtensionEntryData[j])[i];
+					else
+						for (int ii = 0; ii < TINSTANCES[j]; ii++)
+							BINTABLE[cc + ii] = ((array<bool, 2>^)ExtensionEntryData[j])[ii, i];
 					break;
 				}
 
 				default:
 				{
 					exception = true;
-					exceptiontypecode = ExtensionEntryDataTypes[j];
+					exceptiontypecode = TCODES[j];
 					break;
 				}
 			}
@@ -1421,48 +1652,15 @@ array<unsigned char>^ JPFITS::FITSBinTable::MAKEBINTABLEBYTEARRAY(array<Object^>
 	if (exception)
 	{
 		throw gcnew Exception("Data type not recognized for writing as FITS table: '" + exceptiontypecode.ToString() + "'");
-		return nullptr;
+		return;
 	}
-
-	return data;
 }
 
-array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ ExtensionName, array<Object^>^ ExtensionEntryData, array<String^>^ ExtensionEntryLabels, array<String^>^ ExtensionEntryDataUnits, array<String^>^ ExtensionHeaderExtraKeys, array<String^>^ ExtensionHeaderExtraKeyValues, array<String^>^ ExtensionHeaderExtraKeyComments)
+array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER()
 {
 	ArrayList^ hkeyslist = gcnew ArrayList();
 	ArrayList^ hvalslist = gcnew ArrayList();
 	ArrayList^ hcomslist = gcnew ArrayList();
-
-	array<TypeCode>^ ExtensionEntryDataTypes = gcnew array<TypeCode>(ExtensionEntryData->Length);
-	for (int i = 0; i < ExtensionEntryData->Length; i++)
-		ExtensionEntryDataTypes[i] = Type::GetTypeCode((((Array^)ExtensionEntryData[i])->GetType())->GetElementType());
-
-	array<int>^ ExtensionEntryDataTypeInstances = gcnew array<int>(ExtensionEntryData->Length);
-	array<int>^ datanaxes2 = gcnew array<int>(ExtensionEntryData->Length);
-	for (int i = 0; i < ExtensionEntryData->Length; i++)
-	{
-		datanaxes2[i] = ((Array^)ExtensionEntryData[i])->Length;
-		int rank = ((Array^)ExtensionEntryData[i])->Rank;
-		if (rank == 1)
-			ExtensionEntryDataTypeInstances[i] = 1;
-		else
-		{
-			ExtensionEntryDataTypeInstances[i] = ((Array^)ExtensionEntryData[i])->GetLength(0);
-			datanaxes2[i] /= ExtensionEntryDataTypeInstances[i];
-		}
-	}
-
-	//need to get the table width in bytes and height number of rows
-	int naxis1 = 0;
-	for (int i = 0; i < ExtensionEntryDataTypes->Length; i++)
-		naxis1 += TYPECODETONBYTES(ExtensionEntryDataTypes[i]) * ExtensionEntryDataTypeInstances[i];
-	int naxis2 = datanaxes2[0];
-	for (int i = 1; i < datanaxes2->Length; i++)
-		if (naxis2 != datanaxes2[i])
-		{
-			throw gcnew Exception("ExtensionEntryData do not all have the same number of rows, NAXES2. Cannot continue;");
-			return nullptr;
-		}
 
 	hkeyslist->Add("XTENSION");
 	hvalslist->Add("BINTABLE");
@@ -1474,10 +1672,10 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ E
 	hvalslist->Add("2");
 	hcomslist->Add("2-dimensional binary table");
 	hkeyslist->Add("NAXIS1");
-	hvalslist->Add(naxis1.ToString());
+	hvalslist->Add(NAXIS1.ToString());
 	hcomslist->Add("width of table in bytes");
 	hkeyslist->Add("NAXIS2");
-	hvalslist->Add(naxis2.ToString());
+	hvalslist->Add(NAXIS2.ToString());
 	hcomslist->Add("number of rows in table");
 	hkeyslist->Add("PCOUNT");
 	hvalslist->Add("0");
@@ -1486,30 +1684,30 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ E
 	hvalslist->Add("1");
 	hcomslist->Add("one data group");
 	hkeyslist->Add("TFIELDS");
-	hvalslist->Add(ExtensionEntryLabels->Length.ToString());
+	hvalslist->Add(TFIELDS.ToString());
 	hcomslist->Add("number of fields in each row");
-	if (ExtensionName != "")
+	if (EXTENSIONNAME != "")
 	{
 		hkeyslist->Add("EXTNAME");
-		hvalslist->Add(ExtensionName);
+		hvalslist->Add(EXTENSIONNAME);
 		hcomslist->Add("name of this binary table extension");
 	}
 
 	//KEY formats
-	for (int i = 0; i < ExtensionEntryLabels->Length; i++)
+	for (int i = 0; i < TTYPES->Length; i++)
 	{
 		//TTYPE
 		hkeyslist->Add("TTYPE" + (i + 1).ToString());
-		hvalslist->Add(ExtensionEntryLabels[i]);
+		hvalslist->Add(TTYPES[i]);
 		hcomslist->Add("label for field " + (i + 1).ToString());
 
 		//TFORM
 		hkeyslist->Add("TFORM" + (i + 1).ToString());
-		hvalslist->Add(ExtensionEntryDataTypeInstances[i].ToString() + TYPECODETFORM(ExtensionEntryDataTypes[i]));
-		hcomslist->Add("data format of field: " + TYPECODETONBYTES(ExtensionEntryDataTypes[i]).ToString() + "-byte " + TYPECODESTRING(ExtensionEntryDataTypes[i]));
+		hvalslist->Add(TINSTANCES[i].ToString() + TYPECODETFORM(TCODES[i]));
+		hcomslist->Add("data format of field: " + TYPECODETONBYTES(TCODES[i]).ToString() + "-byte " + TYPECODESTRING(TCODES[i]));
 
 		//TZERO and TSCAL
-		if (ExtensionEntryDataTypes[i] == TypeCode::Byte)
+		if (TCODES[i] == TypeCode::Byte)
 		{
 			hkeyslist->Add("TZERO" + (i + 1).ToString());
 			hvalslist->Add("128");
@@ -1519,7 +1717,7 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ E
 			hvalslist->Add("1");
 			hcomslist->Add("data are not scaled");
 		}
-		if (ExtensionEntryDataTypes[i] == TypeCode::UInt16)
+		if (TCODES[i] == TypeCode::UInt16)
 		{
 			hkeyslist->Add("TZERO" + (i + 1).ToString());
 			hvalslist->Add("32768");
@@ -1529,7 +1727,7 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ E
 			hvalslist->Add("1");
 			hcomslist->Add("data are not scaled");
 		}
-		if (ExtensionEntryDataTypes[i] == TypeCode::UInt32)
+		if (TCODES[i] == TypeCode::UInt32)
 		{
 			hkeyslist->Add("TZERO" + (i + 1).ToString());
 			hvalslist->Add("2147483648");
@@ -1542,19 +1740,18 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER(String^ E
 
 		//TUNIT
 		hkeyslist->Add("TUNIT" + (i + 1).ToString());
-		hvalslist->Add(ExtensionEntryDataUnits[i]);
+		hvalslist->Add(TUNITS[i]);
 		hcomslist->Add("physical unit of field");
 	}
 
 	//EXTRAKEYS
-	if (ExtensionHeaderExtraKeys != nullptr)
-		if (ExtensionHeaderExtraKeys->Length > 0)
-			for (int i = 0; i < ExtensionHeaderExtraKeys->Length; i++)
-			{
-				hkeyslist->Add(ExtensionHeaderExtraKeys[i]->ToUpper());
-				hvalslist->Add(ExtensionHeaderExtraKeyValues[i]);
-				hcomslist->Add(ExtensionHeaderExtraKeyComments[i]);
-			}
+	if (EXTRAKEYS != nullptr)
+		for (int i = 0; i < EXTRAKEYS->Length; i++)
+		{
+			hkeyslist->Add(EXTRAKEYS[i]->ToUpper());
+			hvalslist->Add(EXTRAKEYVALS[i]);
+			hcomslist->Add(EXTRAKEYCOMS[i]);
+		}
 
 	hkeyslist->Add("END     ");
 	hvalslist->Add("");
@@ -1826,6 +2023,12 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 		strheaderline = (String^)header[i];
 		HEADER[i] = strheaderline;
 
+		if (BITPIX == 0)
+			if (strheaderline->Substring(0, 8)->Trim()->Equals("BITPIX"))
+			{
+				BITPIX = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+				continue;
+			}
 		if (NAXIS == 0)
 			if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS"))
 			{
@@ -1842,12 +2045,6 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 			if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS2"))
 			{
 				NAXIS2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-				continue;
-			}
-		if (BITPIX == 0)
-			if (strheaderline->Substring(0, 8)->Trim()->Equals("BITPIX"))
-			{
-				BITPIX = ::Convert::ToInt32(strheaderline->Substring(10, 20));
 				continue;
 			}
 
@@ -1891,7 +2088,10 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 		{
 			int f = strheaderline->IndexOf("'");
 			int l = strheaderline->LastIndexOf("'");
-			TUNITS[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
+			if (f != -1)
+				TUNITS[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
+			else
+				TUNITS[ttypeindex] = strheaderline->Substring(10, 20)->Trim();
 			continue;
 		}
 

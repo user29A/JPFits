@@ -61,8 +61,8 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 	{
 		EXTENSIONNAME = ExtensionName;
 
-		FITSBinTable^ bt = gcnew FITSBinTable(FILENAME, EXTENSIONNAME);
-		array<String^>^ labels = bt->TableDataLabelsTTYPE;
+		FITSBINTABLE = gcnew FITSBinTable(FILENAME, EXTENSIONNAME);
+		array<String^>^ labels = FITSBINTABLE->TableDataLabelsTTYPE;
 
 		for (int i = 0; i < labels->Length; i++)
 			labels[i] = labels[i]->Trim();
@@ -86,13 +86,13 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 		for (int i = 0; i < labels->Length; i++)
 			ExtensionTableGrid->Columns[i]->HeaderText = labels[i];
 
-		ExtensionTableGrid->RowCount = bt->Naxis2;
-		DATATABLE = gcnew array<double, 2>(labels->Length, bt->Naxis2);
+		ExtensionTableGrid->RowCount = FITSBINTABLE->Naxis2;
+		DATATABLE = gcnew array<double, 2>(labels->Length, FITSBINTABLE->Naxis2);
 
 		for (int i = 0; i < labels->Length; i++)
 		{
 			int width, height;
-			array<double>^ entry = bt->GetTTYPEEntry(labels[i], width, height);
+			array<double>^ entry = FITSBINTABLE->GetTTYPEEntry(labels[i], width, height);
 
 			if (width != 1)
 			{
@@ -128,6 +128,16 @@ void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_CellValueNeeded(System
 {
 	e->Value = DATATABLE[e->ColumnIndex, e->RowIndex];
 	ExtensionTableGrid->Rows[e->RowIndex]->HeaderCell->Value = e->RowIndex.ToString();
+}
+
+void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_CellMouseClick(System::Object^  sender, System::Windows::Forms::DataGridViewCellMouseEventArgs^  e)
+{
+	if (Double::IsNaN(DATATABLE[e->ColumnIndex, e->RowIndex]))
+	{
+		String^ text = FITSBINTABLE->GetTTypeEntryRow(ExtensionTableGrid->Columns[e->ColumnIndex]->HeaderText, e->RowIndex);
+		Clipboard::SetText(text);
+		MessageBox::Show(text + "\r\r" + "copied to clipboard", ExtensionTableGrid->Columns[e->ColumnIndex]->HeaderText);
+	}
 }
 
 void JPFITS::FitsExtensionTableViewer::MenuChooseTable_Click(System::Object^  sender, System::EventArgs^  e)
