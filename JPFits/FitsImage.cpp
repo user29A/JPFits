@@ -39,7 +39,7 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, String^ DiskUCharBufferName, 
 	DISKBUFFERFULLNAME = DiskUCharBufferName;
 	FROMDISKBUFFER = true;
 
-	DIMAGE = gcnew array<double,2>(1,1);//default fill
+	DIMAGE = gcnew array<double, 2>(NAxis1, NAxis2);//default fill
 
 	HEADERKEYS = gcnew array<String^>(8);
 	HEADERKEYVALS = gcnew array<String^>(8);
@@ -121,12 +121,13 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, String^ extensionName, array<
 	bool hasext;
 	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
 	{
+		fs->Close();
 		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
 	}
 
 	ArrayList^ header = gcnew ArrayList();
-	__int64 extensionstartposition, extensionendposition;
-	if (!FITSFILEOPS::SEEKEXTENSION(fs, "IMAGE", extensionName, header, extensionstartposition, extensionendposition))
+	__int64 extensionstartposition, extensionendposition, tableendposition, pcount, theap;
+	if (!FITSFILEOPS::SEEKEXTENSION(fs, "IMAGE", extensionName, header, extensionstartposition, extensionendposition, tableendposition, pcount, theap))
 	{
 		fs->Close();
 		throw gcnew Exception("Could not find IMAGE extension with name '" + extensionName + "'");
@@ -172,7 +173,7 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, Object^ ImageData, bool Do_St
 
 	if (rank > 2)
 	{
-		throw gcnew Exception("Error: Rank of Object 'ImageData' is not a 1D or 2D array. Use other implementations for creating larger dimensional FITS primary data.");
+		throw gcnew Exception("Error: Rank of Object 'ImageData' is not a 1D or 2D array. Use other interface functions for creating larger dimensional FITS primary data.");
 		return;
 	}
 
@@ -208,6 +209,25 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, Object^ ImageData, bool Do_St
 				for (int x = 0; x < NAXIS1; x++)
 					for (int y = 0; y < NAXIS2; y++)
 						DIMAGE[x, y] = ((array<double, 2>^)ImageData)[x, y];
+			}
+
+			break;
+		}
+
+		case TypeCode::Single:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS2; x++)
+					DIMAGE[0, x] = (double)((array<float>^)ImageData)[x];
+			}
+			else
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS1; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						DIMAGE[x, y] = (double)((array<float, 2>^)ImageData)[x, y];
 			}
 
 			break;
@@ -284,6 +304,44 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, Object^ ImageData, bool Do_St
 				for (int x = 0; x < NAXIS1; x++)
 					for (int y = 0; y < NAXIS2; y++)
 						DIMAGE[x, y] = (double)((array<__int32, 2>^)ImageData)[x, y];
+			}
+
+			break;
+		}
+
+		case TypeCode::UInt64:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS2; x++)
+					DIMAGE[0, x] = (double)((array<unsigned __int64>^)ImageData)[x];
+			}
+			else
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS1; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						DIMAGE[x, y] = (double)((array<unsigned __int64, 2>^)ImageData)[x, y];
+			}
+
+			break;
+		}
+
+		case TypeCode::Int64:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS2; x++)
+					DIMAGE[0, x] = (double)((array<__int64>^)ImageData)[x];
+			}
+			else
+			{
+				#pragma omp parallel for if (do_parallel)
+				for (int x = 0; x < NAXIS1; x++)
+					for (int y = 0; y < NAXIS2; y++)
+						DIMAGE[x, y] = (double)((array<__int64, 2>^)ImageData)[x, y];
 			}
 
 			break;
@@ -379,8 +437,7 @@ void JPFITS::FITSImage::WriteFileFromDiskBuffer(bool DeleteOrigDiskBuffer)
 	}
 
 	array<String^>^ HEADER = FITSFILEOPS::GETFORMATTEDIMAGEHEADER(HEADERKEYS, HEADERKEYVALS, HEADERKEYCOMS, false);
-	//FORMATHEADER();
-	FileStream^ fits_fs = gcnew FileStream(FULLFILENAME,IO::FileMode::Create);
+	FileStream^ fits_fs = gcnew FileStream(FULLFILENAME, IO::FileMode::Create);
 	
 	array<unsigned char>^ head = gcnew array<unsigned char>(HEADER->Length * 80);
 	for (int i = 0; i < HEADER->Length; i++)
@@ -389,7 +446,7 @@ void JPFITS::FITSImage::WriteFileFromDiskBuffer(bool DeleteOrigDiskBuffer)
 
 	fits_fs->Write(head, 0, head->Length);//header is written
 
-	FileStream^ buff_fs = gcnew FileStream(DISKBUFFERFULLNAME,FileMode::Open,::FileAccess::Read);
+	FileStream^ buff_fs = gcnew FileStream(DISKBUFFERFULLNAME, FileMode::Open, ::FileAccess::Read);
 
 	int NBytes = (int)buff_fs->Length;//size of disk data buffer
 	int buffsize = 1024*1024*64;//size of memory array buffer
@@ -587,7 +644,7 @@ array<double,2>^ JPFITS::FITSImage::ConvertTxtToDblArray(String^ FullFileName, b
 
 array<double,2>^ JPFITS::FITSImage::GetSubImage(int X_Center, int Y_Center, int X_HalfWidth, int Y_HalfWidth)
 {
-	array<double,2>^ result = gcnew array<double,2>(X_HalfWidth*2+1,Y_HalfWidth*2+1);
+	array<double, 2>^ result = gcnew array<double, 2>(X_HalfWidth * 2 + 1, Y_HalfWidth * 2 + 1);
 
 	/*if (X_Center - X_HalfWidth < 0 || Y_Center - Y_HalfWidth < 0 || X_Center - X_HalfWidth + result->GetLength(0) > NAXIS1 || Y_Center - Y_HalfWidth + result->GetLength(1) > NAXIS2)
 	{
@@ -596,7 +653,7 @@ array<double,2>^ JPFITS::FITSImage::GetSubImage(int X_Center, int Y_Center, int 
 
 	for (int x = 0; x < result->GetLength(0); x++)
 		for (int y = 0; y < result->GetLength(1); y++)
-			result[x,y] = DIMAGE[X_Center - X_HalfWidth + x, Y_Center - Y_HalfWidth + y];
+			result[x, y] = DIMAGE[X_Center - X_HalfWidth + x, Y_Center - Y_HalfWidth + y];
 
 	return result;
 }
@@ -722,18 +779,18 @@ void JPFITS::FITSImage::EATRAWIMAGEHEADER(ArrayList^ header, bool populate_nones
 
 void JPFITS::FITSImage::READIMAGE(FileStream^ fs, array<int, 1>^ Range, bool do_parallel)//assumed READHEADER has been completed, and bs is at beginning of data block
 {
-	/*if (NAXIS == 0)
+	if (NAXIS <= 0)
 	{
-		NAXIS1 = 1;
-		NAXIS2 = 1;
+		NAXIS1 = 0;
+		NAXIS2 = 0;
 		if (HEADER_POP)
 		{
-			SetKey("NAXIS1","1",false,0);
-			SetKey("NAXIS2","1",false,0);
+			SetKey("NAXIS1","0",false,0);
+			SetKey("NAXIS2","0",false,0);
 		}
-		DIMAGE = gcnew array<double,2>(1,1);
+		DIMAGE = gcnew array<double, 2>(0, 0);
 		return;
-	}*/
+	}
 
 	double bscale = (double)BSCALE;
 	double bzero = (double)BZERO;
@@ -964,8 +1021,8 @@ void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 			return;
 		}
 
-		__int64 extstartpos, extendpos;
-		bool extexists = FITSFILEOPS::SEEKEXTENSION(fs, "IMAGE", EXTNAME, nullptr, extstartpos, extendpos);
+		__int64 extensionstartposition, extensionendposition, tableendposition, pcount, theap;
+		bool extexists = FITSFILEOPS::SEEKEXTENSION(fs, "IMAGE", EXTNAME, nullptr, extensionstartposition, extensionendposition, tableendposition, pcount, theap);
 		if (extexists && !EXTNAMEOVERWRITE)
 		{
 			fs->Close();
@@ -983,11 +1040,11 @@ void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 		}
 		else//then get the prepend units and any append data
 		{
-			prependdata = gcnew array<unsigned char>((int)extstartpos);
+			prependdata = gcnew array<unsigned char>((int)extensionstartposition);
 			fs->Position = 0;
 			fs->Read(prependdata, 0, prependdata->Length);
-			appenddata = gcnew array<unsigned char>(int(fs->Length - extendpos));
-			fs->Position = extendpos;
+			appenddata = gcnew array<unsigned char>(int(fs->Length - extensionendposition));
+			fs->Position = extensionendposition;
 			fs->Read(appenddata, 0, appenddata->Length);
 			fs->Close();
 			fs = gcnew FileStream(FULLFILENAME, IO::FileMode::Create);
@@ -1872,9 +1929,9 @@ void JPFITS::FITSImage::ExtendizePrimaryImageLayerCube(String^ sourceFullFileNam
 		array<double, 2>^ layer = gcnew array<double, 2>(axesN[0], axesN[1]);
 
 		#pragma omp parallel for
-		for (int x = 0; x < axesN[0]; x++)
-			for (int y = 0; y < axesN[1]; y++)
-				layer[x, y] = cube[z * axesN[0] * axesN[1] + x * axesN[1] + y];
+		for (int y = 0; y < axesN[1]; y++)
+			for (int x = 0; x < axesN[0]; x++)
+				layer[x, y] = cube[z * axesN[1] * axesN[0] + y * axesN[0] + x];
 
 		fi = gcnew FITSImage(destFullFileName, layer, false, true);
 		fi->WriteImage(destFullFileName, layerExtensionNames[z], false, TypeCode::Double, true);

@@ -259,10 +259,11 @@ void JPFITS::FITSImage::StatsUpD(bool do_parallel)
 
 	double std = 0.0;
 	#pragma omp parallel for if (do_parallel) reduction(+:std)
-		for (int i=0; i < NAXIS1; i++)
-			for (int j=0; j < NAXIS2; j++)
-				std += (DIMAGE[i,j]-MEAN)*(DIMAGE[i,j]-MEAN);
-	STD = Math::Sqrt(std/(N-1.0));
+	for (int i = 0; i < NAXIS1; i++)
+		for (int j = 0; j < NAXIS2; j++)
+			std += (DIMAGE[i, j] - MEAN)*(DIMAGE[i, j] - MEAN);
+	
+	STD = Math::Sqrt(std / (N - 1.0));
 
 	/*double sum = 0;
 	#pragma omp parallel for reduction(+:sum)
@@ -384,6 +385,14 @@ void JPFITS::FITSImage::SETBITPIX(System::TypeCode Precision)
 			break;
 		}
 
+		case TypeCode::UInt64:
+		{
+			BITPIX = 64;
+			BZERO = 9223372036854775808;
+			BSCALE = 1;
+			break;
+		}
+
 		case TypeCode::Double:
 		{
 			BITPIX = -64;
@@ -394,10 +403,8 @@ void JPFITS::FITSImage::SETBITPIX(System::TypeCode Precision)
 
 		default:
 		{
-			BITPIX = 0;
-			BZERO = 0;
-			BSCALE = 0;
-			break;
+			throw gcnew Exception("TypeCode '" + Precision.ToString() + "' not recognized at SETBITPIX.");
+			return;
 		}
 	}
 

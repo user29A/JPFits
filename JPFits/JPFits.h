@@ -65,15 +65,19 @@ namespace JPFITS
 		/// <param name="has_extensions">Returns whether or not the FITS file may contain extensions.</param>
 		static bool SCANPRIMARYUNIT(FileStream^ fs, bool scanpastprimarydata, ArrayList^ header_return, bool &has_extensions);
 
-		/// <summary>Find the FITS extension table of the given type and name. Returns false if the XTENSION type of the specified EXTNAME is not found.
-		/// <para>If EXTNAME is found the FileStream fs will be placed at the end of the specified extension's header block, i.e. at the beginning of the extension's data block, else it will be at the end of the file if the EXTNAME is not found.</para></summary>
-		/// <param name="fs">The FileStream of the FITS file.</param>
+		/// <summary>Find the FITS extension table of the given type and name. Returns false if the XTENSION type of the specified EXTNAME is not found.</summary>
+		/// <param name="fs">The FileStream of the FITS file.
+		/// <para>If EXTNAME is found the FileStream fs will be placed at the beginning of the extension's main data table block.</para>
+		/// <para>If EXTNAME is NOT found it will be at the end of the file.</para></param>
 		/// <param name="extension_type">The XTENSION extension type, either: &quot;BINTABLE&quot;, &quot;TABLE&quot;, or &quot;IMAGE&quot;.</param>
 		/// <param name="extension_name">The EXTNAME extension name. If the extension is known to have no EXTNAME keyword and name, then pass an empty String and the first nameless extension of the specified type will be seeked.</param>
 		/// <param name="header_return">Returns the header of the extension as an ArrayList with each 80-character header line being a String^ member of this list. Pass nullptr if not required.</param>
-		/// <param name="startposition">Returns the start position within the FileStream of the requested extension...i.e. at the start of its header.</param>
-		/// <param name="endposition">Returns the end position within the FileStream of the requested extension...i.e. at the end of its data.</param>
-		static bool SEEKEXTENSION(FileStream^ fs, String^ extension_type, String^ extension_name, ArrayList^ header_return, __int64 &startposition, __int64 &endposition);
+		/// <param name="extensionStartPosition">Returns the start position within the FileStream of the extension...i.e. at the block boundary at the start of its header.</param>
+		/// <param name="extensionEndPosition">Returns the end position within the FileStream of the extension, including after any heap, rounded up to a multiple of 2880 bytes at the last block boundary.</param>
+		/// <param name="tableEndPosition">Returns the end position within the FileStream of the main data table, NOT rounded to a data block boundary.</param>
+		/// <param name="pcount">Returns the number of bytes of any remaining fill plus supplemental heap data area after the main table endposition, IF any heap data exists. Does not represent fill bytes after the main table if no heap exists. Does not include fill bytes after the heap.</param>
+		/// <param name="theap">Returns the position within the filestream of the beginning of the heap relative to the beginning of the main table. Nominally equal to NAXIS1 * NAXIS2 unless THEAP keyword specifies a larger value.</param>
+		static bool SEEKEXTENSION(FileStream^ fs, String^ extension_type, String^ extension_name, ArrayList^ header_return, __int64 &extensionStartPosition, __int64 &extensionEndPosition, __int64 &tableEndPosition, __int64 &pcount, __int64 &theap);
 
 		/// <summary>Gets all extension names of a specified extension type in the FITS file.</summary>
 		/// <param name="FileName">The full file name to read from disk.</param>
@@ -793,40 +797,57 @@ namespace JPFITS
 		/// <param name="extensionName">The BINTABLE EXTNAME name of the extension. If an empty string is passed the first nameless extension will be found, if one exists.</param>
 		FITSBinTable(String^ fileName, String^ extensionName);
 
-		/// <summary>Return a binary table entry as a double 1-D array, assuming it is a single colunmn entry. If the entry has more than one column, use the overload function.</summary>
-		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		array<double>^ GetTTYPEEntry(String^ ttypeEntryLabel);
+		/// <summary>Return a binary table entry as a double 1-D array, assuming it is a single colunmn entry. If the entry has more than one column, use the overload function to get its dimensions.</summary>
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		array<double>^ GetTTYPEEntry(String^ ttypeEntry);
 
 		/// <summary>Return a binary table entry as a double 1-D array.</summary>
-		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		/// <param name="width">If the entry has multiple instances, then the user may like to know the number of instances (columns) of the entry for reformatting the vector return.</param>
-		/// <param name="height">If the entry has multiple instances, then the user may like to know the number of rows in the entry for reformatting the vector return.</param>
-		array<double>^ GetTTYPEEntry(String^ ttypeEntryLabel, int& width, int& height);
-
-		String^ GetTTypeEntryRow(String^ ttypeEntryLabel, int rowindex);
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		/// <param name="dimNElements">A vector to return the number of elements along each dimension of the Object. 
+		/// <para>Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</para></param>
+		array<double>^ GetTTYPEEntry(String^ ttypeEntry, array<int>^ &dimNElements);
 
 		/// <summary>Return a binary table entry as an Object. Its type and rank are given to the user. If you just need a double precision array to work on, use the overload for that.</summary>
-		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="objectTypeCode">The TypeCode precision of the underlying array in the object.</param>
-		/// <param name="objectArrayRank">The rank of the underlying array in the object (1 = vector, 2 = array).</param>
-		Object^ GetTTYPEEntry(String^ ttypeEntryLabel, TypeCode &objectTypeCode, int &objectArrayRank);
+		/// <param name="dimNElements">A vector to return the number of elements along each dimension of the Object. 
+		/// <para>Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</para></param>
+		Object^ GetTTYPEEntry(String^ ttypeEntry, TypeCode &objectTypeCode, array<int>^ &dimNElements);
+
+		/// <summary>Use this to access individual elements of the table with a String return. Useful for looking at TTYPEs with multiple instances.</summary>
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		/// <param name="rowindex">The row index of the column.</param>
+		String^ GetTTypeEntryRow(String^ ttypeEntry, int rowindex);
 
 		/// <summary>Remove one of the entries from the binary table. Inefficient if the table has a very large number of entries with very large number of elements.</summary>
-		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		void RemoveTTYPEEntry(String^ ttypeEntryLabel);
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		void RemoveTTYPEEntry(String^ ttypeEntry);
 
-		/// <summary>Add an entry to the binary table. Useful when dealing with a small number of entries, or if the table formatting time is negligible. Use SetTTYPEEntries for a table with a large numer of fields.</summary>
-		/// <param name="ttypeEntryLabel">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		/// <summary>Add an entry to the binary table. Useful when dealing with a small table. Use SetTTYPEEntries for a large table to set all entries at once.</summary>
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
-		/// <param name="entryArray">The array to enter into the table.</param>
 		/// <param name="entryUnits">The physical units of the values of the array.</param>
-		void AddTTYPEEntry(String^ ttypeEntryLabel, bool replaceIfExists, String^ entryUnits, Object^ entryArray);
+		/// <param name="entryArray">The vector or 2D array to enter into the table.</param>
+		void AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExists, String^ entryUnits, Object^ entryArray);
 
-		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES.</summary>
-		/// <param name="ttypeEntryLabels">The names of the binary table extension entries, i.e. the TTYPE values.</param>
+		/// <summary>Add an n &gt; 2 dimensional and/or complex entry to the binary table. If entries already exist then the user must have formatted the n &gt; 2 dimensional array to match the existing table height NAXIS2.
+		/// <para>Otherwise it is recommended to create this table with ONLY the n &gt; 2 dimensional entry formatted simply as a vector, non-repeated instance. The height or NAXIS2 will then be the number of elements of the n &gt; 2 dimensional array.</para>
+		/// <para>If adding a complex number array to the binary table, the entryArray must be either single or double floating point.</para>
+		/// <para>If complex the entryArray must be a factor of two columns repeats where the 1st and odd numbered columns are the spatial part, and the 2nd and even numbered columns are the temporal part.</para></summary>
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
+		/// <param name="entryUnits">The physical units of the values of the array.</param>
+		/// <param name="entryArray">The array to enter into the table.</param>
+		/// <param name="dimNElements">A vector giving the number of elements along each dimension of the array, to write as the TDIM key for the entry IF the entry is n &gt; 2 dimensional; pass nullptr if the entry is not n &gt; 2 dimensional.</param>
+		/// <param name="isComplex">A boolean to set whether the array should be interpreted as complex value pairings.</param>
+		void AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExists, String^ entryUnits, Object^ entryArray, array<int>^ dimNElements, bool isComplex);
+
+		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES.
+		/// <para>Do not use for n &gt; 2 dimensional and/or complex entries.</para></summary>
+		/// <param name="ttypeEntries">The names of the binary table extension entries, i.e. the TTYPE values.</param>
 		/// <param name="entryUnits">The physical units of the values of the arrays.</param>
-		/// <param name="entryArrays">An array of vectors or arrays to enter into the table.</param>
-		void SetTTYPEEntries(array<String^>^ ttypeEntryLabels, array<String^>^ entryUnits, array<Object^>^ entryArrays);
+		/// <param name="entryArrays">An array of vectors or 2D arrays to enter into the table.</param>
+		void SetTTYPEEntries(array<String^>^ ttypeEntries, array<String^>^ entryUnits, array<Object^>^ entryArrays);
 
 		/// <summary>Add an extra key to the extension header. If it is to be a COMMENT, just fill the keyValue with eighteen characters, and the keyComment with 54 characters.</summary>
 		/// <param name="keyName">The name of the key.</param>
@@ -919,11 +940,16 @@ namespace JPFITS
 		#pragma region PRIVATECLASSMEMBERS
 		private:
 		int BITPIX = 0, NAXIS = 0, NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
+		__int64 PCOUNT = -1, THEAP = -1;
 		array<String^>^ TTYPES;//names of each table entry
 		array<String^>^ TFORMS;//FITS name for the table entry precisions
+		array<bool>^ TTYPEISCOMPLEX;//for tracking complex singles and doubles
+		array<bool>^ TTYPEISHEAPARRAYDESC;//for tracking array descriptor entries for heap area data
+		array<TypeCode>^ HEAPTCODES;//.NET typcodes for each table entry
+		array<array<int>^>^ TDIMS;//for tracking multidimensional (rank >= 3) arrays
 		array<String^>^ TUNITS;//FITS name for the table entry units
-		array<int>^ TBYTES;//number of bytes for the table entry precisions
-		array<int>^ TINSTANCES;//number of TFORM instances (columns) of each table entry
+		array<int>^ TBYTES;//number of total bytes for each table entry
+		array<int>^ TINSTANCES;//number of TFORM instances of each table entry
 		array<TypeCode>^ TCODES;//.NET typcodes for each table entry
 		array<String^>^ HEADER;
 		String^ FILENAME;
@@ -932,6 +958,7 @@ namespace JPFITS
 		array<String^>^ EXTRAKEYVALS;
 		array<String^>^ EXTRAKEYCOMS;
 		array<unsigned char>^ BINTABLE;
+		array<unsigned char>^ HEAPDATA;
 
 		void MAKEBINTABLEBYTEARRAY(array<Object^>^ ExtensionEntryData);
 		array<String^>^ FORMATBINARYTABLEEXTENSIONHEADER();
@@ -941,8 +968,8 @@ namespace JPFITS
 		String^ TYPECODESTRING(TypeCode typecode);
 		int TYPECODETONBYTES(TypeCode typecode);
 		void EATRAWBINTABLEHEADER(ArrayList^ header);
+		Object^ GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeCode, array<int>^ &dimNElements);
 		#pragma endregion
-
 	};
 
 	/*/// <summary> FITSTable class to create, read, interact with, modify components of, and write FITS TABLE Ascii table data extensions.</summary>

@@ -91,19 +91,19 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 
 		for (int i = 0; i < labels->Length; i++)
 		{
-			int width, height;
-			array<double>^ entry = FITSBINTABLE->GetTTYPEEntry(labels[i], width, height);
+			array<int>^ dimNElements; /*int width, height;*/
+			array<double>^ entry = FITSBINTABLE->GetTTYPEEntry(labels[i], dimNElements/* width, height*/);
 
-			if (width != 1)
+			if (/*width*/ dimNElements->Length != 1)
 			{
 				#pragma omp parallel for
-				for (int j = 0; j < height; j++)
+				for (int j = 0; j < FITSBINTABLE->Naxis2; j++)
 					DATATABLE[i, j] = Double::NaN;
 			}
 			else
 			{
 				#pragma omp parallel for
-				for (int j = 0; j < height; j++)
+				for (int j = 0; j < FITSBINTABLE->Naxis2; j++)
 					DATATABLE[i, j] = entry[j];
 			}
 		}

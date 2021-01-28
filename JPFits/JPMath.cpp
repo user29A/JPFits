@@ -2262,10 +2262,12 @@ array<double, 2>^ JPFITS::JPMath::Exp(array<double, 2>^ data, double base, bool 
 
 bool JPFITS::JPMath::IsEven(int x)
 {
-	if (System::Math::IEEERemainder(double(x), 2) == 0)
+	return (System::Math::IEEERemainder(double(x), 2) == 0);
+
+	/*if (System::Math::IEEERemainder(double(x), 2) == 0)
 		return true;
 	else
-		return false;
+		return false;*/
 }
 
 inline bool JPFITS::JPMath::IsNumeric(String^ x)

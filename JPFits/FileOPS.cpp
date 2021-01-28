@@ -139,6 +139,7 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 
 	array<unsigned char>^ charheaderblock = gcnew array<unsigned char>(2880);
 	int naxis = 0, naxis1 = 0, naxis2 = 0, bitpix = 8;
+	__int64 pcount = -1;
 	bool endheader = false, extensionnamefound = false, extensiontypefound = false, endfile = false, extnamekeyexists = false;
 	String^ strheaderline;
 	ArrayList^ namelist = gcnew ArrayList();
@@ -154,7 +155,7 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 		endheader = false;
 		extnamekeyexists = false;
 		extensiontypefound = false;
-		naxis = 0, naxis1 = 0, naxis2 = 0;
+		naxis = 0, naxis1 = 0, naxis2 = 0, pcount = -1;
 		while (!endheader)
 		{
 			fs->Read(charheaderblock, 0, 2880);
@@ -170,8 +171,8 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 						int l = strheaderline->LastIndexOf("'");
 						if (strheaderline->Substring(f + 1, l - f - 1) == extension_type)
 							extensiontypefound = true;
+						continue;
 					}
-
 				if (!extnamekeyexists)
 					if (strheaderline->Substring(0, 8) == "EXTNAME ")
 					{
@@ -179,21 +180,38 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 						int f = strheaderline->IndexOf("'");
 						int l = strheaderline->LastIndexOf("'");
 						extname = strheaderline->Substring(f + 1, l - f - 1)->Trim();
+						continue;
 					}
-
 				if (naxis == 0)
-					if (strheaderline->Substring(0, 8) == "NAXIS   ")
+					if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS"))
+					{
 						naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+						continue;
+					}
 				if (naxis1 == 0)
-					if (strheaderline->Substring(0, 8) == "NAXIS1  ")
+					if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS1"))
+					{
 						naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+						continue;
+					}
 				if (naxis2 == 0)
-					if (strheaderline->Substring(0, 8) == "NAXIS2  ")
+					if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS2"))
+					{
 						naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+						continue;
+					}
 				if (bitpix == 0)
-					if (strheaderline->Substring(0, 8) == "BITPIX  ")
+					if (strheaderline->Substring(0, 8)->Trim()->Equals("BITPIX"))
+					{
 						bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-
+						continue;
+					}
+				if (pcount == -1)
+					if (strheaderline->Substring(0, 8)->Trim()->Equals("PCOUNT"))
+					{
+						pcount = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+						continue;
+					}
 				if (strheaderline->Substring(0, 8) == "END     ")//check if we're at the end of the header keys
 				{
 					if (extensiontypefound)
@@ -204,11 +222,8 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 			}
 		}
 
-		if (naxis != 0)
-		{
-			__int64 NBytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-			fs->Seek(__int64(Math::Ceiling(double(NBytes) / 2880) * 2880), ::SeekOrigin::Current);
-		}
+		__int64 TableBytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
+		fs->Seek(__int64(Math::Ceiling(double(TableBytes + pcount) / 2880) * 2880), ::SeekOrigin::Current);
 
 		if (fs->Position >= fs->Length)
 			endfile = true;
@@ -223,7 +238,7 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 	return list;
 }
 
-bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, String^ extension_name, ArrayList^ header_return, __int64 &startposition, __int64 &endposition)
+bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, String^ extension_name, ArrayList^ header_return, __int64 &extensionStartPosition, __int64 &extensionEndPosition, __int64 &tableEndPosition, __int64 &pcount, __int64 &theap)
 {
 	if (fs->Position == 0)
 	{
@@ -242,11 +257,11 @@ bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, 
 	while (!extensionfound && !endfile)
 	{
 		//reset
-		startposition = fs->Position;
+		extensionStartPosition = fs->Position;
 		endheader = false;
 		extnamekeyexists = false;
 		extensiontypefound = false;
-		naxis = 0, naxis1 = 0, naxis2 = 0, bitpix = 0;
+		naxis = 0, naxis1 = 0, naxis2 = 0, bitpix = 0, pcount = -1, theap = -1;
 		if (header_return != nullptr)
 			header_return->Clear();
 		while (!endheader)
@@ -267,8 +282,8 @@ bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, 
 						int l = strheaderline->LastIndexOf("'");
 						if (strheaderline->Substring(f + 1, l - f - 1)->Trim() == extension_type)
 							extensiontypefound = true;
+						continue;
 					}
-
 				if (!extnamekeyexists)
 					if (strheaderline->Substring(0, 8) == "EXTNAME ")
 					{
@@ -277,45 +292,69 @@ bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, 
 						int l = strheaderline->LastIndexOf("'");
 						if (extension_name == strheaderline->Substring(f + 1, l - f - 1)->Trim())
 							extensionnamefound = true;
+						continue;
 					}
-
-				if (naxis == 0)
-					if (strheaderline->Substring(0, 8) == "NAXIS   ")
-						naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-				if (naxis1 == 0)
-					if (strheaderline->Substring(0, 8) == "NAXIS1  ")
-						naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-				if (naxis2 == 0)
-					if (strheaderline->Substring(0, 8) == "NAXIS2  ")
-						naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
 				if (bitpix == 0)
-					if (strheaderline->Substring(0, 8) == "BITPIX  ")
+					if (strheaderline->Substring(0, 8)->Trim()->Equals("BITPIX"))
+					{
 						bitpix = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-
-				if (strheaderline->Substring(0, 8) == "END     ")//check if we're at the end of the header keys
+						continue;
+					}
+				if (naxis == 0)
+					if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS"))
+					{
+						naxis = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+						continue;
+					}
+				if (naxis1 == 0)
+					if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS1"))
+					{
+						naxis1 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+						continue;
+					}
+				if (naxis2 == 0)
+					if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS2"))
+					{
+						naxis2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+						theap = naxis1 * naxis2;
+						continue;
+					}				
+				if (pcount == -1)
+					if (strheaderline->Substring(0, 8)->Trim()->Equals("PCOUNT"))
+					{
+						pcount = ::Convert::ToInt64(strheaderline->Substring(10, 20));
+						continue;
+					}
+				if (theap == naxis1 * naxis2)
+					if (strheaderline->Substring(0, 8)->Trim()->Equals("THEAP"))
+					{
+						theap = ::Convert::ToInt64(strheaderline->Substring(10, 20));
+						continue;
+					}
+				if (strheaderline->Substring(0, 8)->Trim()->Equals("END"))
 				{
 					endheader = true;
 					break;
 				}
 			}
-		}
-
-		if (fs->Position >= fs->Length)
-			endfile = true;
+		}		
 
 		if (extensiontypefound)
 			if ((extnamekeyexists && extensionnamefound) || (!extnamekeyexists && extension_name == ""))
 				extensionfound = true;
 
-		endposition = fs->Position;
-		if (naxis != 0)
+		__int64 TableBytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
+		if (!extensionfound)
 		{
-			__int64 NBytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
-			if (!extensionfound)
-				fs->Seek(__int64(Math::Ceiling(double(NBytes) / 2880) * 2880), ::SeekOrigin::Current);
-			else
-				endposition = fs->Position + __int64(Math::Ceiling(double(NBytes) / 2880) * 2880);
-		}	
+			fs->Position += __int64(Math::Ceiling(double(TableBytes + pcount) / 2880) * 2880);
+			if (fs->Position >= fs->Length)
+				endfile = true;
+		}
+		else
+		{
+			extensionEndPosition = fs->Position + __int64(Math::Ceiling(double(TableBytes + pcount) / 2880) * 2880);
+			tableEndPosition = fs->Position + TableBytes;
+		}
 	}
 	
 	return extensionfound;
@@ -399,10 +438,10 @@ array<String^>^ JPFITS::FITSFILEOPS::GETFORMATTEDIMAGEHEADER(array<String^>^ ima
 			}
 			keys[naxisNindex + 1] = "PCOUNT";
 			vals[naxisNindex + 1] = "0";
-			coms[naxisNindex + 1] = "";
+			coms[naxisNindex + 1] = "number of bytes in heap area";
 			keys[naxisNindex + 2] = "GCOUNT";
 			vals[naxisNindex + 2] = "1";
-			coms[naxisNindex + 2] = "";
+			coms[naxisNindex + 2] = "single data table";
 
 			for (int i = naxisNindex + 3; i < keys->Length; i++)
 			{
@@ -456,7 +495,9 @@ array<String^>^ JPFITS::FITSFILEOPS::GETFORMATTEDIMAGEHEADER(array<String^>^ ima
 		{
 			double val = ::Convert::ToDouble(imageHeaderKeyValues[i]);
 
-			if (Math::Abs(val) <= 1e-5 || Math::Abs(val) >= 1e13)
+			if (val == 9223372036854775808)
+				value = "9223372036854775808";
+			else if (Math::Abs(val) <= 1e-5 || Math::Abs(val) >= 1e13)
 				value = val.ToString("0.00###########e+00");
 			else
 				value = val.ToString("G");
