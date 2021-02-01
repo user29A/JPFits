@@ -138,7 +138,7 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 	}
 
 	array<unsigned char>^ charheaderblock = gcnew array<unsigned char>(2880);
-	int naxis = 0, naxis1 = 0, naxis2 = 0, bitpix = 8;
+	int naxis = 0, naxis1 = 0, naxis2 = 0, bitpix = 0;
 	__int64 pcount = -1;
 	bool endheader = false, extensionnamefound = false, extensiontypefound = false, endfile = false, extnamekeyexists = false;
 	String^ strheaderline;
@@ -155,7 +155,7 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 		endheader = false;
 		extnamekeyexists = false;
 		extensiontypefound = false;
-		naxis = 0, naxis1 = 0, naxis2 = 0, pcount = -1;
+		naxis = 0, naxis1 = 0, naxis2 = 0, pcount = -1, bitpix = 0;
 		while (!endheader)
 		{
 			fs->Read(charheaderblock, 0, 2880);
@@ -209,7 +209,7 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 				if (pcount == -1)
 					if (strheaderline->Substring(0, 8)->Trim()->Equals("PCOUNT"))
 					{
-						pcount = ::Convert::ToInt32(strheaderline->Substring(10, 20));
+						pcount = ::Convert::ToInt64(strheaderline->Substring(10, 20));
 						continue;
 					}
 				if (strheaderline->Substring(0, 8) == "END     ")//check if we're at the end of the header keys

@@ -339,7 +339,7 @@ namespace JPFITS {
 
 String^ FILENAME;
 String^ EXTENSIONNAME;
-array<double, 2>^ DATATABLE;
+array<array<double>^>^ DATATABLE;
 FITSBinTable^ FITSBINTABLE;
 
 void OpenFITSImage(String^ FileName);

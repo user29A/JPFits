@@ -840,7 +840,8 @@ namespace JPFITS
 		/// <param name="entryArray">The array to enter into the table.</param>
 		/// <param name="dimNElements">A vector giving the number of elements along each dimension of the array, to write as the TDIM key for the entry IF the entry is n &gt; 2 dimensional; pass nullptr if the entry is not n &gt; 2 dimensional.</param>
 		/// <param name="isComplex">A boolean to set whether the array should be interpreted as complex value pairings.</param>
-		void AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExists, String^ entryUnits, Object^ entryArray, array<int>^ dimNElements, bool isComplex);
+		/// <param name="addAsHeapVarLenArray">A boolean to set whether to save the array as a variable length array in the heap area.</param>
+		void AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExists, String^ entryUnits, Object^ entryArray, array<int>^ dimNElements, bool isComplex, bool addAsHeapVarLenArray);
 
 		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES.
 		/// <para>Do not use for n &gt; 2 dimensional and/or complex entries.</para></summary>
@@ -895,9 +896,9 @@ namespace JPFITS
 		}
 
 		/// <summary>TableDataTypes reports the number of columns in each table entry.</summary>
-		property array<int>^ TableDataInstances
+		property array<int>^ TableDataRepeats
 		{
-			array<int>^ get() { return TINSTANCES; }
+			array<int>^ get() { return TREPEATS; }
 		}
 
 		/// <summary>TableDataLabels reports the name of each table entry, i.e. the TTYPE values.</summary>
@@ -940,16 +941,17 @@ namespace JPFITS
 		#pragma region PRIVATECLASSMEMBERS
 		private:
 		int BITPIX = 0, NAXIS = 0, NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
-		__int64 PCOUNT = -1, THEAP = -1;
+		//__int64 PCOUNT = -1, THEAP = -1;
 		array<String^>^ TTYPES;//names of each table entry
 		array<String^>^ TFORMS;//FITS name for the table entry precisions
 		array<bool>^ TTYPEISCOMPLEX;//for tracking complex singles and doubles
 		array<bool>^ TTYPEISHEAPARRAYDESC;//for tracking array descriptor entries for heap area data
+		array<array<__int64>^>^ TTYPEHEAPARRAYNELSPOS;//for tracking array descriptor entries for heap area data
 		array<TypeCode>^ HEAPTCODES;//.NET typcodes for each table entry
 		array<array<int>^>^ TDIMS;//for tracking multidimensional (rank >= 3) arrays
 		array<String^>^ TUNITS;//FITS name for the table entry units
 		array<int>^ TBYTES;//number of total bytes for each table entry
-		array<int>^ TINSTANCES;//number of TFORM instances of each table entry
+		array<int>^ TREPEATS;//number of TFORM instances of the table entry
 		array<TypeCode>^ TCODES;//.NET typcodes for each table entry
 		array<String^>^ HEADER;
 		String^ FILENAME;
@@ -961,6 +963,7 @@ namespace JPFITS
 		array<unsigned char>^ HEAPDATA;
 
 		void MAKEBINTABLEBYTEARRAY(array<Object^>^ ExtensionEntryData);
+		void MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData);
 		array<String^>^ FORMATBINARYTABLEEXTENSIONHEADER();
 		int TFORMTONBYTES(String^ tform, int& instances);
 		TypeCode TFORMTYPECODE(String^ tform);
@@ -969,6 +972,8 @@ namespace JPFITS
 		int TYPECODETONBYTES(TypeCode typecode);
 		void EATRAWBINTABLEHEADER(ArrayList^ header);
 		Object^ GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeCode, array<int>^ &dimNElements);
+		void GETHEAPTTYPENELSPOS(int ttypeindex, __int64 &nels, __int64 & position);
+		void CUTHEAPTTYPE(int ttypeindex);
 		#pragma endregion
 	};
 
@@ -990,7 +995,7 @@ namespace JPFITS
 		array<String^>^ TFORMS;//FITS name for the table entry precisions
 		array<int>^ TBCOLS;
 		array<String^>^ TUNITS;//FITS name for the table entry units
-		array<int>^ TINSTANCES;//number of instances (columns) of each table entry
+		array<int>^ TREPEATS;//number of instances (columns) of each table entry
 
 		array<String^>^ HEADER;
 		String^ FILENAME;

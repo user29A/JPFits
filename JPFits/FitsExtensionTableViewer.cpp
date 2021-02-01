@@ -86,27 +86,37 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 		for (int i = 0; i < labels->Length; i++)
 			ExtensionTableGrid->Columns[i]->HeaderText = labels[i];
 
-		ExtensionTableGrid->RowCount = FITSBINTABLE->Naxis2;
-		DATATABLE = gcnew array<double, 2>(labels->Length, FITSBINTABLE->Naxis2);
+		DATATABLE = gcnew array<array<double>^>(labels->Length);
+		int maxrows = FITSBINTABLE->Naxis2;
 
 		for (int i = 0; i < labels->Length; i++)
 		{
-			array<int>^ dimNElements; /*int width, height;*/
-			array<double>^ entry = FITSBINTABLE->GetTTYPEEntry(labels[i], dimNElements/* width, height*/);
+			array<int>^ dimNElements;
+			array<double>^ entry = FITSBINTABLE->GetTTYPEEntry(labels[i], dimNElements);
 
-			if (/*width*/ dimNElements->Length != 1)
+			//MessageBox::Show(entry[0] + "  " + entry[1]);
+
+			if (dimNElements->Length != 1)
 			{
+				DATATABLE[i] = gcnew array<double>(dimNElements[1]);
+				if (dimNElements[1] > maxrows)
+					maxrows = dimNElements[1];
 				#pragma omp parallel for
-				for (int j = 0; j < FITSBINTABLE->Naxis2; j++)
-					DATATABLE[i, j] = Double::NaN;
+				for (int j = 0; j < dimNElements[1]; j++)
+					DATATABLE[i][j] = Double::NaN;
 			}
 			else
 			{
+				DATATABLE[i] = gcnew array<double>(dimNElements[0]);
+				if (dimNElements[0] > maxrows)
+					maxrows = dimNElements[0];
 				#pragma omp parallel for
-				for (int j = 0; j < FITSBINTABLE->Naxis2; j++)
-					DATATABLE[i, j] = entry[j];
+				for (int j = 0; j < dimNElements[0]; j++)
+					DATATABLE[i][j] = entry[j];
 			}
 		}
+
+		ExtensionTableGrid->RowCount = maxrows;
 	}
 	catch (Exception^ e)
 	{
@@ -126,17 +136,31 @@ void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_NewRowNeeded(System::O
 
 void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_CellValueNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewCellValueEventArgs^  e)
 {
-	e->Value = DATATABLE[e->ColumnIndex, e->RowIndex];
-	ExtensionTableGrid->Rows[e->RowIndex]->HeaderCell->Value = e->RowIndex.ToString();
+	try
+	{
+		e->Value = DATATABLE[e->ColumnIndex][e->RowIndex];
+		ExtensionTableGrid->Rows[e->RowIndex]->HeaderCell->Value = e->RowIndex.ToString();
+	}
+	catch (...)
+	{
+
+	}
 }
 
 void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_CellMouseClick(System::Object^  sender, System::Windows::Forms::DataGridViewCellMouseEventArgs^  e)
 {
-	if (Double::IsNaN(DATATABLE[e->ColumnIndex, e->RowIndex]))
+	try
 	{
-		String^ text = FITSBINTABLE->GetTTypeEntryRow(ExtensionTableGrid->Columns[e->ColumnIndex]->HeaderText, e->RowIndex);
-		Clipboard::SetText(text);
-		MessageBox::Show(text + "\r\r" + "copied to clipboard", ExtensionTableGrid->Columns[e->ColumnIndex]->HeaderText);
+		if (Double::IsNaN(DATATABLE[e->ColumnIndex][e->RowIndex]))
+		{
+			String^ text = FITSBINTABLE->GetTTypeEntryRow(ExtensionTableGrid->Columns[e->ColumnIndex]->HeaderText, e->RowIndex);
+			Clipboard::SetText(text);
+			MessageBox::Show(text + "\r\r" + "copied to clipboard", ExtensionTableGrid->Columns[e->ColumnIndex]->HeaderText);
+		}
+	}
+	catch (...)
+	{
+
 	}
 }
 
@@ -246,7 +270,7 @@ void JPFITS::FitsExtensionTableViewer::FitsExtensionTableViewer_ResizeEnd(System
 
 void JPFITS::FitsExtensionTableViewer::ViewAllChck_Click(System::Object^  sender, System::EventArgs^  e)
 {
-	this->ExtensionTableGrid->SuspendLayout();
+	/*this->ExtensionTableGrid->SuspendLayout();
 
 	if (ViewAllChck->Text == "View None")
 	{
@@ -281,7 +305,7 @@ void JPFITS::FitsExtensionTableViewer::ViewAllChck_Click(System::Object^  sender
 				ExtensionTableGrid[i, j]->Value = DATATABLE[i, j];
 	}
 
-	this->ExtensionTableGrid->ResumeLayout();
+	this->ExtensionTableGrid->ResumeLayout();*/
 }
 
 void JPFITS::FitsExtensionTableViewer::MenuChooseTableEntries_Click(System::Object^  sender, System::EventArgs^  e)
@@ -291,7 +315,7 @@ void JPFITS::FitsExtensionTableViewer::MenuChooseTableEntries_Click(System::Obje
 
 void JPFITS::FitsExtensionTableViewer::ViewAllChck_CheckedChanged(System::Object^  sender, System::EventArgs^  e)
 {
-	if (((ToolStripMenuItem^)sender)->Text->Contains("View"))
+	/*if (((ToolStripMenuItem^)sender)->Text->Contains("View"))
 		return;
 
 	if ((String^)(((ToolStripMenuItem^)sender)->Tag) == "ViewAll")
@@ -315,7 +339,7 @@ void JPFITS::FitsExtensionTableViewer::ViewAllChck_CheckedChanged(System::Object
 		for (int j = 0; j < DATATABLE->GetLength(1); j++)
 			ExtensionTableGrid[i, j]->Value = DATATABLE[(int)checked[i] - 2, j];
 
-	this->ExtensionTableGrid->ResumeLayout();
+	this->ExtensionTableGrid->ResumeLayout();*/
 }
 
 void JPFITS::FitsExtensionTableViewer::MenuChooseTableEntries_DropDownItemClicked(System::Object^  sender, System::Windows::Forms::ToolStripItemClickedEventArgs^  e)

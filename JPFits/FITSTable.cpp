@@ -101,7 +101,7 @@
 //	//			TTYPES = gcnew array<String^>(TFIELDS);
 //	//			TFORMS = gcnew array<String^>(TFIELDS);
 //	//			TBYTES = gcnew array<int>(TFIELDS);
-//	//			TINSTANCES = gcnew array<int>(TFIELDS);
+//	//			TREPEATS = gcnew array<int>(TFIELDS);
 //	//			TCODES = gcnew array<::TypeCode>(TFIELDS);
 //	//			TUNITS = gcnew array<String^>(TFIELDS);
 //	//			continue;
@@ -125,7 +125,7 @@
 //	//		TFORMS[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
 //	//		int instances = 1;
 //	//		TBYTES[ttypeindex] = TFORMTONBYTES(TFORMS[ttypeindex], instances);//need to convert the tform to Nbytes
-//	//		TINSTANCES[ttypeindex] = instances;
+//	//		TREPEATS[ttypeindex] = instances;
 //	//		TCODES[ttypeindex] = TFORMTYPECODE(TFORMS[ttypeindex]);
 //	//		continue;
 //	//	}
