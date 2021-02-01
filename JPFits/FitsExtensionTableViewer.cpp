@@ -94,8 +94,6 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 			array<int>^ dimNElements;
 			array<double>^ entry = FITSBINTABLE->GetTTYPEEntry(labels[i], dimNElements);
 
-			//MessageBox::Show(entry[0] + "  " + entry[1]);
-
 			if (dimNElements->Length != 1)
 			{
 				DATATABLE[i] = gcnew array<double>(dimNElements[1]);
@@ -204,9 +202,6 @@ void JPFITS::FitsExtensionTableViewer::FitsExtensionTableViewer_Load(System::Obj
 		this->Top = (int)GetReg("JPChart", /*this->Text + */"FitsTableTop");
 		this->Width = (int)GetReg("JPChart", /*this->Text + */"FitsTableWidth");
 		this->Height = (int)GetReg("JPChart", /*this->Text + */"FitsTableHeight");
-
-		//MessageBox::Show(((int)GetReg("JPChart", this->Text + "FitsTableWidth")).ToString());
-		//MessageBox::Show(this->Width.ToString());
 	}
 	//catch (...) {}
 }
@@ -244,8 +239,6 @@ void JPFITS::FitsExtensionTableViewer::FitsExtensionTableViewer_FormClosing(Syst
 	SetReg("JPChart", /*this->Text + */"FitsTableTop", this->Top);
 	SetReg("JPChart", /*this->Text + */"FitsTableWidth", this->Width);
 	SetReg("JPChart", /*this->Text + */"FitsTableHeight", this->Height);
-
-	//MessageBox::Show(this->Text + "FitsTableWidth" + this->Width.ToString());
 }
 
 void JPFITS::FitsExtensionTableViewer::toolStripMenuItem1_CheckedChanged(System::Object^  sender, System::EventArgs^  e)
@@ -363,8 +356,8 @@ void JPFITS::FitsExtensionTableViewer::PlotMenuItem_Click(System::Object^  sende
 		if (xind == -1)
 			x[i] = i;
 		else
-			x[i] = (double)ExtensionTableGrid[xind, i]->Value;// DATATABLE[xind, i];
-		y[i] = (double)ExtensionTableGrid[yind, i]->Value; //DATATABLE[yind, i];
+			x[i] = (double)ExtensionTableGrid[xind, i]->Value;
+		y[i] = (double)ExtensionTableGrid[yind, i]->Value;
 	}
 
 	String^ xlabel;
@@ -387,8 +380,7 @@ void JPFITS::FitsExtensionTableViewer::ViewHeaderMenu_Click(System::Object^  sen
 	HeaderListBox->Items->Clear();
 
 	FITSBinTable^ bt = gcnew FITSBinTable(FILENAME, EXTENSIONNAME);
-	//array<String^>^ header = JPFITS::FITSBinTable::GetExtensionHeader(FILENAME, EXTENSIONNAME);
-	
+
 	for (int i = 0; i < bt->Header->Length; i++)
 		HeaderListBox->Items->Add(bt->Header[i]);
 

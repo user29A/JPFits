@@ -58,8 +58,6 @@ JPFITS::FITSBinTable::FITSBinTable(String^ fileName, String^ extensionName)
 		fs->Position = fs->Position + theap - BINTABLE->Length;
 		HEAPDATA = gcnew array<unsigned char>(int(tableendposition + pcount - fs->Position));
 		fs->Read(HEAPDATA, 0, HEAPDATA->Length);
-
-		//MessageBox::Show(HEAPDATA->Length + " ");
 	}
 
 	fs->Close();
@@ -971,7 +969,7 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 			else
 			{
 				array<float, 2>^ arrya = gcnew array<float, 2>(2, naxis2);
-				//#pragma omp parallel for private(currentbyte)
+				#pragma omp parallel for private(currentbyte)
 				for (int i = 0; i < naxis2; i++)
 				{
 					array<unsigned char>^ sng = gcnew array<unsigned char>(4);
@@ -983,8 +981,6 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 						sng[1] = HEAPDATA[currentbyte + 2];
 						sng[0] = HEAPDATA[currentbyte + 3];
 						arrya[j, i] = BitConverter::ToSingle(sng, 0);
-
-						//MessageBox::Show(arrya[j, i] + "");
 					}
 				}
 				return arrya;
@@ -1056,7 +1052,7 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 		case ::TypeCode::Int32:
 		{
 			array<__int32>^ vector = gcnew array<__int32>(naxis2);
-			//#pragma omp parallel for private(currentbyte)
+			#pragma omp parallel for private(currentbyte)
 			for (int i = 0; i < naxis2; i++)
 			{
 				array<unsigned char>^ int32 = gcnew array<unsigned char>(4);
@@ -1066,8 +1062,6 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 				int32[1] = HEAPDATA[currentbyte + 2];
 				int32[0] = HEAPDATA[currentbyte + 3];
 				vector[i] = BitConverter::ToInt32(int32, 0);
-
-				//MessageBox::Show(currentbyte + " z" + vector[i]);
 			}
 			return vector;
 		}
@@ -1967,30 +1961,12 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 			return;
 		}
 
-	/*if (TFIELDS >= 1)//check array dimension
-	{
-		int naxis2;
-		if (((Array^)entryArray)->Rank == 1)
-			naxis2 = ((Array^)entryArray)->Length;
-		else
-			naxis2 = ((Array^)entryArray)->GetLength(1);
-		if (naxis2 != NAXIS2)
-		{
-			throw gcnew Exception("Error: all entry column heights, NAXIS2s, are not equal. Existing NAXIS2 = " + NAXIS2 + "; new entryArray NAXIS2 = " + naxis2);
-			return;
-		}
-	}*/
-
 	if (ttypeindex != -1)//then remove it
 		this->RemoveTTYPEEntry(ttypeEntry);
 	else
 		ttypeindex = TFIELDS;//then put the entry at the last column of the table...NB this is a zero-based index...TFIELDS will increment by one below
 
-
-
-
-
-
+	//either it was an add to a blank table, or a replacement, or an additional, so these either need set for the first time, or updated
 	if (TFIELDS == 0 && addAsHeapVarLenArray)
 		NAXIS2 = 1;
 	else if (TFIELDS == 0 && !addAsHeapVarLenArray)
@@ -2021,11 +1997,6 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 						NAXIS2 = ((Array^)entryArray)->GetLength(1);
 					break;
 				}
-
-
-
-
-
 
 	TFIELDS++;
 	array<Object^>^ newEntryDataObjs = gcnew array<Object^>(TFIELDS);
@@ -2068,7 +2039,7 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 				newTBYTES[i] = TYPECODETONBYTES(newTCODES[i]) * 2;
 				newHEAPTCODES[i] = Type::GetTypeCode((((Array^)entryArray)->GetType())->GetElementType());
 				newTTYPEISHEAPARRAYDESC[i] = addAsHeapVarLenArray;
-				newTTYPEHEAPARRAYNELSPOS[i] = nullptr;//needs info here????????????????? this gets set in MAKEBINTABLEBYTEARRAY......???????????
+				newTTYPEHEAPARRAYNELSPOS[i] = nullptr;//this gets set in MAKEBINTABLEBYTEARRAY......
 				if (isComplex)
 					if (newHEAPTCODES[i] == TypeCode::Double)
 						newTFORMS[i] = "QM";
@@ -2122,10 +2093,6 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 	NAXIS1 = 0;
 	for (int i = 0; i < TBYTES->Length; i++)
 		NAXIS1 += TBYTES[i];
-	/*if (((Array^)entryArray)->Rank == 1)
-		NAXIS2 = ((Array^)entryArray)->Length;
-	else
-		NAXIS2 = ((Array^)entryArray)->GetLength(1);*/
 
 	MAKEBINTABLEBYTEARRAY(newEntryDataObjs);
 }
@@ -2348,17 +2315,12 @@ void JPFITS::FITSBinTable::Write(String^ FileName, String^ ExtensionName, bool O
 	fs->Write(headerdata, 0, headerdata->Length);
 	fs->Write(BINTABLE, 0, BINTABLE->Length);
 
-
-
 	if (HEAPDATA!= nullptr)
 		fs->Write(HEAPDATA, 0, HEAPDATA->Length);
 	int Tbytes = BINTABLE->Length;
 	if (HEAPDATA != nullptr)
 		Tbytes += HEAPDATA->Length;
 
-
-
-	//int Nfillbytes = int(Math::Ceiling(double(BINTABLE->Length) / 2880.0)) * 2880 - BINTABLE->Length;
 	int Nfillbytes = int(Math::Ceiling(double(Tbytes) / 2880.0)) * 2880 - Tbytes;
 	for (int i = 0; i < Nfillbytes; i++)
 		fs->WriteByte(0);
@@ -2712,7 +2674,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 			{
 				if (!TTYPEISCOMPLEX[i])
 				{
-					//#pragma omp parallel for if(parallel)
+					#pragma omp parallel for if(parallel)
 					for (int y = 0; y < naxis2; y++)
 					{
 						array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
@@ -2730,7 +2692,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 				}
 				else
 				{
-					//#pragma omp parallel for if(parallel)
+					#pragma omp parallel for if(parallel)
 					for (int y = 0; y < naxis2; y++)
 					{
 						array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
@@ -2757,7 +2719,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 			{
 				if (!TTYPEISCOMPLEX[i])
 				{
-					//#pragma omp parallel for if(parallel)
+					#pragma omp parallel for if(parallel)
 					for (int y = 0; y < naxis2; y++)
 					{
 						array<unsigned char>^ sng = gcnew array<unsigned char>(4);
@@ -2771,8 +2733,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 				}
 				else
 				{
-					//MessageBox::Show(naxis2 + " rrrr");
-					//#pragma omp parallel for if(parallel)
+					#pragma omp parallel for if(parallel)
 					for (int y = 0; y < naxis2; y++)
 					{
 						array<unsigned char>^ sng = gcnew array<unsigned char>(4);
@@ -2785,8 +2746,6 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 							HEAPDATA[cc + 1] = sng[2];
 							HEAPDATA[cc + 2] = sng[1];
 							HEAPDATA[cc + 3] = sng[0];
-
-							//MessageBox::Show(((array<float, 2>^)ExtensionEntryData[i])[x, y] + " zz");
 						}
 					}
 				}
@@ -2795,7 +2754,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 
 			case TypeCode::Int64:
 			{
-				//#pragma omp parallel for if(parallel)
+				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
 				{
 					__int64	val = ((array<__int64>^)ExtensionEntryData[i])[y];
@@ -2815,7 +2774,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 			case TypeCode::UInt64:
 			{
 				unsigned __int64 bzero = 9223372036854775808;
-				//#pragma omp parallel for if(parallel)
+				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
 				{
 					unsigned __int64 val = (((array<__int64>^)ExtensionEntryData[i])[y] - bzero);
@@ -2834,7 +2793,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 
 			case TypeCode::Int32:
 			{
-				//#pragma omp parallel for if(parallel)
+				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
 				{
 					__int32 val = ((array<__int32>^)ExtensionEntryData[i])[y];
@@ -2850,7 +2809,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 			case TypeCode::UInt32:
 			{
 				unsigned __int32 bzero = 2147483648;
-				//#pragma omp parallel for if(parallel)
+				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
 				{
 					unsigned __int32 val = (((array<__int32>^)ExtensionEntryData[i])[y] - bzero);
@@ -2865,7 +2824,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 
 			case TypeCode::Int16:
 			{
-				//#pragma omp parallel for if(parallel)
+				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
 				{
 					__int16 val = ((array<__int16>^)ExtensionEntryData[i])[y];
@@ -2879,7 +2838,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 			case TypeCode::UInt16:
 			{
 				unsigned __int16 bzero = 32768;
-				//#pragma omp parallel for if(parallel)
+				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
 				{
 					unsigned __int16 val = (((array<__int16>^)ExtensionEntryData[i])[y] - bzero);
@@ -2892,7 +2851,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 
 			case TypeCode::SByte:
 			{
-				//#pragma omp parallel for if(parallel)
+				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
 					HEAPDATA[y] = (((array<__int8>^)ExtensionEntryData[i])[y]);
 				break;
@@ -2900,7 +2859,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 
 			case TypeCode::Byte:
 			{
-				//#pragma omp parallel for if(parallel)
+				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
 					HEAPDATA[y] = (((array<unsigned __int8>^)ExtensionEntryData[i])[y]);
 				break;
@@ -2908,7 +2867,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 
 			case TypeCode::Boolean:
 			{
-				//#pragma omp parallel for if(parallel)
+				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
 					HEAPDATA[y] = (((array<bool>^)ExtensionEntryData[i])[y]);
 				break;
@@ -3151,15 +3110,7 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER()
 					comment += " ";//pad right
 		}
 
-		/*if (key->Substring(0, 4) == "TDIM")
-		{
-			value = "'" + headerkeyvals[i] + "'";
-			comment = "";
-			header[i] = key + value + comment;
-			header[i] = header[i]->PadRight(80);
-		}
-		else*/
-			header[i] = key + value + comment;
+		header[i] = key + value + comment;
 	}
 
 	header[NKeys - 1] = "END                                                                             ";
@@ -3358,7 +3309,7 @@ int JPFITS::FITSBinTable::TYPECODETONBYTES(TypeCode typecode)
 void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 {
 	//reset
-	BITPIX = 0, NAXIS = 0, NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0/*, PCOUNT = -1, THEAP = -1*/;
+	BITPIX = 0, NAXIS = 0, NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
 
 	ArrayList^ extras = gcnew ArrayList();//for possible extras
 
@@ -3393,21 +3344,8 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 			if (strheaderline->Substring(0, 8)->Trim()->Equals("NAXIS2"))
 			{
 				NAXIS2 = ::Convert::ToInt32(strheaderline->Substring(10, 20));
-				//THEAP = NAXIS1 * NAXIS2;
 				continue;
 			}
-		/*if (PCOUNT == -1)
-			if (strheaderline->Substring(0, 8)->Trim()->Equals("PCOUNT"))
-			{
-				PCOUNT = ::Convert::ToInt64(strheaderline->Substring(10, 20));
-				continue;
-			}
-		if (THEAP == (NAXIS1 * NAXIS2))
-			if (strheaderline->Substring(0, 8)->Trim()->Equals("THEAP"))
-			{
-				THEAP = ::Convert::ToInt64(strheaderline->Substring(10, 20));
-				continue;
-			}*/
 		if (TFIELDS == 0)
 			if (strheaderline->Substring(0, 8)->Trim()->Equals("TFIELDS"))
 			{

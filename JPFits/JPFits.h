@@ -942,7 +942,6 @@ namespace JPFITS
 		#pragma region PRIVATECLASSMEMBERS
 		private:
 		int BITPIX = 0, NAXIS = 0, NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
-		//__int64 PCOUNT = -1, THEAP = -1;
 		array<String^>^ TTYPES;//names of each table entry
 		array<String^>^ TFORMS;//FITS name for the table entry precisions
 		array<bool>^ TTYPEISCOMPLEX;//for tracking complex singles and doubles
@@ -977,35 +976,6 @@ namespace JPFITS
 		void CUTHEAPTTYPE(int ttypeindex);
 		#pragma endregion
 	};
-
-	/*/// <summary> FITSTable class to create, read, interact with, modify components of, and write FITS TABLE Ascii table data extensions.</summary>
-	public ref class FITSTable
-	{
-		public:
-
-		FITSTable(String^ fileName, String^ extensionName);
-
-
-
-
-		#pragma region Private Class Members
-		private:
-		__int64 EXTENSIONPOSITIONSTART, EXTENSIONPOSITIONEND, EXTENSIONPOSITIONDATA;
-		int BITPIX = 0, NAXIS = 0, NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
-		array<String^>^ TTYPES;//names of each table entry
-		array<String^>^ TFORMS;//FITS name for the table entry precisions
-		array<int>^ TBCOLS;
-		array<String^>^ TUNITS;//FITS name for the table entry units
-		array<int>^ TREPEATS;//number of instances (columns) of each table entry
-
-		array<String^>^ HEADER;
-		String^ FILENAME;
-		String^ EXTENSIONNAME;
-		array<unsigned char>^ TABLE;
-
-		void EATRAWTABLEHEADER(ArrayList^ header);
-		#pragma endregion
-	};*/
 
 	/// <summary>JPMath class provides functionality for common mathematical operations.</summary>
 	public ref class JPMath

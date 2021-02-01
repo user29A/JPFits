@@ -63,9 +63,6 @@
     <ClCompile Include="FileOPS.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="FITSTable.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FitsFinder.h">
