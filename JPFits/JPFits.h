@@ -830,20 +830,21 @@ namespace JPFITS
 		/// <param name="entryArray">The vector or 2D array to enter into the table.</param>
 		void AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExists, String^ entryUnits, Object^ entryArray);
 
-		/// <summary>Add an n &gt; 2 dimensional and/or complex entry to the binary table. If entries already exist then the user must have formatted the n &gt; 2 dimensional array to match the existing table height NAXIS2.
+		/// <summary>Add an n &gt; 2 dimensional and/or complex entry to the binary table or heap area. If entries already exist then the user must have formatted the n &gt; 2 dimensional array to match the existing table height NAXIS2 if it is not being added as a heap array.
 		/// <para>Otherwise it is recommended to create this table with ONLY the n &gt; 2 dimensional entry formatted simply as a vector, non-repeated instance. The height or NAXIS2 will then be the number of elements of the n &gt; 2 dimensional array.</para>
 		/// <para>If adding a complex number array to the binary table, the entryArray must be either single or double floating point.</para>
-		/// <para>If complex the entryArray must be a factor of two columns repeats where the 1st and odd numbered columns are the spatial part, and the 2nd and even numbered columns are the temporal part.</para></summary>
+		/// <para>If complex the entryArray must be a factor of two columns repeats where the 1st and odd numbered columns are the spatial part, and the 2nd and even numbered columns are the temporal part.</para>
+		/// <para>If it is a variable length heap array then the entry must be supplied as a vector, unless it is complex in which case it is a pairing array ([2 x n]). If dimensions need to be recorded then supply the dimNelements argument.</para></summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
 		/// <param name="entryUnits">The physical units of the values of the array.</param>
 		/// <param name="entryArray">The array to enter into the table.</param>
 		/// <param name="dimNElements">A vector giving the number of elements along each dimension of the array, to write as the TDIM key for the entry IF the entry is n &gt; 2 dimensional; pass nullptr if the entry is not n &gt; 2 dimensional.</param>
 		/// <param name="isComplex">A boolean to set whether the array should be interpreted as complex value pairings.</param>
-		/// <param name="addAsHeapVarLenArray">A boolean to set whether to save the array as a variable length array in the heap area.</param>
+		/// <param name="addAsHeapVarLenArray">A boolean to set whether to save the array as a variable length array in the heap area. If it is, it must be formatted as a vector or a [2 x n] array of the spatial and temporal pairing of complex numbers.</param>
 		void AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExists, String^ entryUnits, Object^ entryArray, array<int>^ dimNElements, bool isComplex, bool addAsHeapVarLenArray);
 
-		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES.
+		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES INCLUDING THE HEAP.
 		/// <para>Do not use for n &gt; 2 dimensional and/or complex entries.</para></summary>
 		/// <param name="ttypeEntries">The names of the binary table extension entries, i.e. the TTYPE values.</param>
 		/// <param name="entryUnits">The physical units of the values of the arrays.</param>
