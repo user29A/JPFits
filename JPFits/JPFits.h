@@ -869,6 +869,7 @@ namespace JPFITS
 
 		/// <summary>Write the binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be replaced.</summary>
 		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
+		/// <param name="ExtensionName">The EXTNAME name of the extension. Can be empty (unnamed) but this is poor practice.</param>
 		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
 		void Write(String^ FileName, String^ ExtensionName, bool OverWriteExtensionIfExists);
 
@@ -952,6 +953,7 @@ namespace JPFITS
 		array<String^>^ TUNITS;//FITS name for the table entry units
 		array<int>^ TBYTES;//number of total bytes for each table entry
 		array<int>^ TREPEATS;//number of TFORM instances of the table entry
+		array<int>^ TROWS;//number of rows of each entry; same as NAXIS2 for the main bintable
 		array<TypeCode>^ TCODES;//.NET typcodes for each table entry
 		array<String^>^ HEADER;
 		String^ FILENAME;

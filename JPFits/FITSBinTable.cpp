@@ -1772,6 +1772,7 @@ void JPFITS::FITSBinTable::RemoveTTYPEEntry(String^ ttypeEntry)
 	array<String^>^ newTUNITS = gcnew array<String^>(TFIELDS - 1);
 	array<int>^ newTBYTES = gcnew array<int>(TFIELDS - 1);
 	array<int>^ newTREPEATS = gcnew array<int>(TFIELDS - 1);
+	array<int>^ newTROWS = gcnew array<int>(TFIELDS - 1);
 	array<TypeCode>^ newTCODES = gcnew array<TypeCode>(TFIELDS - 1);
 	array<array<int>^>^ newTDIMS = gcnew array<array<int>^>(TFIELDS - 1);
 	array<bool>^ newTTYPEISCOMPLEX = gcnew array<bool>(TFIELDS - 1);
@@ -1796,6 +1797,7 @@ void JPFITS::FITSBinTable::RemoveTTYPEEntry(String^ ttypeEntry)
 			newTUNITS[c] = TUNITS[i];
 			newTBYTES[c] = TBYTES[i];
 			newTREPEATS[c] = TREPEATS[i];
+			newTROWS[c] = TROWS[i];
 			newTCODES[c] = TCODES[i];
 			newTDIMS[c] = TDIMS[i];
 			newTTYPEISCOMPLEX[c] = TTYPEISCOMPLEX[i];
@@ -1811,6 +1813,7 @@ void JPFITS::FITSBinTable::RemoveTTYPEEntry(String^ ttypeEntry)
 	TUNITS = newTUNITS;
 	TBYTES = newTBYTES;
 	TREPEATS = newTREPEATS;
+	TROWS = newTROWS;
 	TCODES = newTCODES;
 	TDIMS = newTDIMS;
 	TTYPEISCOMPLEX = newTTYPEISCOMPLEX;
@@ -1864,6 +1867,7 @@ void JPFITS::FITSBinTable::SetTTYPEEntries(array<String^>^ ttypeEntries, array<S
 	TUNITS = entryUnits;
 	TCODES = gcnew array<TypeCode>(entryArrays->Length);
 	TREPEATS = gcnew array<int>(entryArrays->Length);
+	TROWS = gcnew array<int>(entryArrays->Length);
 	TFORMS = gcnew array<String^>(entryArrays->Length);
 	TBYTES = gcnew array<int>(entryArrays->Length);
 	TTYPEISCOMPLEX = gcnew array<bool>(entryArrays->Length);
@@ -1893,6 +1897,8 @@ void JPFITS::FITSBinTable::SetTTYPEEntries(array<String^>^ ttypeEntries, array<S
 		NAXIS2 = ((Array^)entryArrays[0])->Length;
 	else
 		NAXIS2 = ((Array^)entryArrays[0])->GetLength(1);
+	for (int i = 0; i < entryArrays->Length; i++)
+		TROWS[i] = NAXIS2;
 
 	MAKEBINTABLEBYTEARRAY(entryArrays);
 	HEAPDATA = nullptr;
@@ -1977,9 +1983,12 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 	else if (TFIELDS > 0 && addAsHeapVarLenArray)
 		NAXIS2 = NAXIS2;//no need to do anything...NAXIS2 already set
 	else// if (TFIELDS > 0 && !addAsHeapVarLenArray)
+	{
+		bool haveaddedtobintable = false;
 		for (int i = 0; i < TFIELDS; i++)
 			if (!TTYPEISHEAPARRAYDESC[i])
-				if (((Array^)entryArray)->Rank == 1 && ((Array^)entryArray)->Length != NAXIS2 || ((Array^)entryArray)->Rank > 1 && ((Array^)entryArray)->GetLength(1) != NAXIS2)
+			{
+				if (((Array^)entryArray)->Rank == 1 && ((Array^)entryArray)->Length != TROWS[i] || ((Array^)entryArray)->Rank > 1 && ((Array^)entryArray)->GetLength(1) != TROWS[i])
 				{
 					int naxis2;
 					if (((Array^)entryArray)->Rank == 1)
@@ -1989,14 +1998,14 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 					throw gcnew Exception("Error: Existing NAXIS2 = " + NAXIS2 + "; new entryArray NAXIS2 = " + naxis2 + ". Are you trying to add a variable length array?");
 					return;
 				}
-				else
-				{
-					if (((Array^)entryArray)->Rank == 1)
-						NAXIS2 = ((Array^)entryArray)->Length;
-					else
-						NAXIS2 = ((Array^)entryArray)->GetLength(1);
-					break;
-				}
+				haveaddedtobintable = true;
+			}
+		if (!haveaddedtobintable)
+			if (((Array^)entryArray)->Rank == 1)
+				NAXIS2 = ((Array^)entryArray)->Length;
+			else
+				NAXIS2 = ((Array^)entryArray)->GetLength(1);
+	}
 
 	TFIELDS++;
 	array<Object^>^ newEntryDataObjs = gcnew array<Object^>(TFIELDS);
@@ -2005,6 +2014,7 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 	array<String^>^ newTUNITS = gcnew array<String^>(TFIELDS);
 	array<int>^ newTBYTES = gcnew array<int>(TFIELDS);
 	array<int>^ newTREPEATS = gcnew array<int>(TFIELDS);
+	array<int>^ newTROWS = gcnew array<int>(TFIELDS);
 	array<TypeCode>^ newTCODES = gcnew array<TypeCode>(TFIELDS);
 	array<array<int>^>^ newTDIMS = gcnew array<array<int>^>(TFIELDS);
 	array<bool>^ newTTYPEISCOMPLEX = gcnew array<bool>(TFIELDS);
@@ -2054,7 +2064,11 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 			newTTYPES[i] = ttypeEntry;			
 			newTUNITS[i] = entryUnits;			
 			newTDIMS[i] = dimNElements;
-			newTTYPEISCOMPLEX[i] = isComplex;			
+			newTTYPEISCOMPLEX[i] = isComplex;
+			if (((Array^)entryArray)->Rank == 1)
+				newTROWS[i] = ((Array^)entryArray)->Length;
+			else
+				newTROWS[i] = ((Array^)entryArray)->GetLength(1);
 		}
 		else
 		{
@@ -2066,6 +2080,7 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 			newTUNITS[i] = TUNITS[c];
 			newTBYTES[i] = TBYTES[c];
 			newTREPEATS[i] = TREPEATS[c];
+			newTROWS[i] = TROWS[c];
 			newTCODES[i] = TCODES[c];
 			newTDIMS[i] = TDIMS[c];
 			newTTYPEISCOMPLEX[i] = TTYPEISCOMPLEX[c];
@@ -2080,6 +2095,7 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 	TUNITS = newTUNITS;
 	TBYTES = newTBYTES;
 	TREPEATS = newTREPEATS;
+	TROWS = newTROWS;
 	TCODES = newTCODES;
 	TDIMS = newTDIMS;
 	TTYPEISCOMPLEX = newTTYPEISCOMPLEX;
@@ -2853,7 +2869,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 			{
 				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
-					HEAPDATA[y] = (((array<__int8>^)ExtensionEntryData[i])[y]);
+					HEAPDATA[startpos + y] = (((array<__int8>^)ExtensionEntryData[i])[y]);
 				break;
 			}
 
@@ -2861,7 +2877,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 			{
 				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
-					HEAPDATA[y] = (((array<unsigned __int8>^)ExtensionEntryData[i])[y]);
+					HEAPDATA[startpos + y] = (((array<unsigned __int8>^)ExtensionEntryData[i])[y]);
 				break;
 			}
 
@@ -2869,7 +2885,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 			{
 				#pragma omp parallel for if(parallel)
 				for (int y = 0; y < naxis2; y++)
-					HEAPDATA[y] = (((array<bool>^)ExtensionEntryData[i])[y]);
+					HEAPDATA[startpos + y] = (((array<bool>^)ExtensionEntryData[i])[y]);
 				break;
 			}
 
@@ -2941,7 +2957,7 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER()
 			hcomslist->Add(TYPECODETONBYTES(TCODES[i]).ToString() + "-byte " + TYPECODESTRING(TCODES[i]));
 
 		//TZERO and TSCAL
-		if (TCODES[i] == TypeCode::SByte)
+		if (!TTYPEISHEAPARRAYDESC[i] && TCODES[i] == TypeCode::SByte || HEAPTCODES[i] == TypeCode::SByte)
 		{
 			hkeyslist->Add("TZERO" + (i + 1).ToString());
 			hvalslist->Add("-128");
@@ -2951,7 +2967,7 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER()
 			hvalslist->Add("1");
 			hcomslist->Add("data are not scaled");
 		}
-		else if (TCODES[i] == TypeCode::UInt16)
+		else if (!TTYPEISHEAPARRAYDESC[i] && TCODES[i] == TypeCode::UInt16 || HEAPTCODES[i] == TypeCode::UInt16)
 		{
 			hkeyslist->Add("TZERO" + (i + 1).ToString());
 			hvalslist->Add("32768");
@@ -2961,7 +2977,7 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER()
 			hvalslist->Add("1");
 			hcomslist->Add("data are not scaled");
 		}
-		else if (TCODES[i] == TypeCode::UInt32)
+		else if (!TTYPEISHEAPARRAYDESC[i] && TCODES[i] == TypeCode::UInt32 || HEAPTCODES[i] == TypeCode::UInt32)
 		{
 			hkeyslist->Add("TZERO" + (i + 1).ToString());
 			hvalslist->Add("2147483648");
@@ -2971,7 +2987,7 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER()
 			hvalslist->Add("1");
 			hcomslist->Add("data are not scaled");
 		}
-		else if (TCODES[i] == TypeCode::UInt64)
+		else if (!TTYPEISHEAPARRAYDESC[i] && TCODES[i] == TypeCode::UInt64 || HEAPTCODES[i] == TypeCode::UInt64)
 		{
 			hkeyslist->Add("TZERO" + (i + 1).ToString());
 			hvalslist->Add("9223372036854775808");
@@ -3354,6 +3370,7 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 				TFORMS = gcnew array<String^>(TFIELDS);
 				TBYTES = gcnew array<int>(TFIELDS);
 				TREPEATS = gcnew array<int>(TFIELDS);
+				TROWS = gcnew array<int>(TFIELDS);
 				TCODES = gcnew array<::TypeCode>(TFIELDS);
 				TUNITS = gcnew array<String^>(TFIELDS);
 				TTYPEISCOMPLEX = gcnew array<bool>(TFIELDS);
@@ -3382,13 +3399,14 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 			TFORMS[ttypeindex] = strheaderline->Substring(f + 1, l - f - 1)->Trim();
 			int instances = 1;
 			TBYTES[ttypeindex] = TFORMTONBYTES(TFORMS[ttypeindex], instances);
-			TREPEATS[ttypeindex] = instances;
+			TREPEATS[ttypeindex] = instances;	
 			if (TFORMS[ttypeindex]->Contains("Q") || TFORMS[ttypeindex]->Contains("P"))//heap form
 			{
 				__int64 nels, pos;
 				GETHEAPTTYPENELSPOS(ttypeindex, nels, pos);
 				TTYPEHEAPARRAYNELSPOS[ttypeindex] = gcnew array<__int64>(2) { nels, pos };
 				TTYPEISHEAPARRAYDESC[ttypeindex] = true;
+				TROWS[ttypeindex] = int(nels);
 				if (TFORMS[ttypeindex]->Contains("Q"))
 				{
 					TCODES[ttypeindex] = TFORMTYPECODE("Q");
@@ -3404,6 +3422,7 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 			}
 			else
 			{
+				TROWS[ttypeindex] = NAXIS2;
 				TCODES[ttypeindex] = TFORMTYPECODE(TFORMS[ttypeindex]);
 				if (TCODES[ttypeindex] == TypeCode::Double || TCODES[ttypeindex] == TypeCode::Single)
 					TTYPEISCOMPLEX[ttypeindex] = (TFORMS[ttypeindex]->Contains("M") || TFORMS[ttypeindex]->Contains("C"));
@@ -3452,38 +3471,72 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 		//then set this current tcode[typeindex] to what it should be
 		if (strheaderline->Substring(0, 8)->Trim()->Equals("TZERO" + (ttypeindex + 1).ToString()))
 		{
-			switch (TCODES[ttypeindex])
-			{
-				case TypeCode::Byte:
+			if (!TTYPEISHEAPARRAYDESC[ttypeindex])
+				switch (TCODES[ttypeindex])
 				{
-					if (Convert::ToSByte(strheaderline->Substring(10, 20)->Trim()) == -128)//then it is a signed
-						TCODES[ttypeindex] = TypeCode::SByte;
-					break;
+					case TypeCode::Byte:
+					{
+						if (Convert::ToSByte(strheaderline->Substring(10, 20)->Trim()) == -128)//then it is a signed
+							TCODES[ttypeindex] = TypeCode::SByte;
+						break;
+					}
+					case TypeCode::Int16:
+					{
+						if (Convert::ToUInt16(strheaderline->Substring(10, 20)->Trim()) == 32768)//then it is an unsigned
+							TCODES[ttypeindex] = TypeCode::UInt16;
+						break;
+					}
+					case TypeCode::Int32:
+					{
+						if (Convert::ToUInt32(strheaderline->Substring(10, 20)->Trim()) == 2147483648)//then it is an unsigned
+							TCODES[ttypeindex] = TypeCode::UInt32;
+						break;
+					}
+					case TypeCode::Int64:
+					{
+						if (Convert::ToUInt64(strheaderline->Substring(10, 20)->Trim()) == 9223372036854775808)//then it is an unsigned
+							TCODES[ttypeindex] = TypeCode::UInt64;
+						break;
+					}
+					default:
+					{
+						throw gcnew Exception("Unrecognized TypeCode in EATRAWBINTABLEHEADER at TZERO analysis");
+						break;
+					}
 				}
-				case TypeCode::Int16:
+			else
+				switch (HEAPTCODES[ttypeindex])
 				{
-					if (Convert::ToUInt16(strheaderline->Substring(10, 20)->Trim()) == 32768)//then it is an unsigned
-						TCODES[ttypeindex] = TypeCode::UInt16;
-					break;
+					case TypeCode::Byte:
+					{
+						if (Convert::ToSByte(strheaderline->Substring(10, 20)->Trim()) == -128)//then it is a signed
+							HEAPTCODES[ttypeindex] = TypeCode::SByte;
+						break;
+					}
+					case TypeCode::Int16:
+					{
+						if (Convert::ToUInt16(strheaderline->Substring(10, 20)->Trim()) == 32768)//then it is an unsigned
+							HEAPTCODES[ttypeindex] = TypeCode::UInt16;
+						break;
+					}
+					case TypeCode::Int32:
+					{
+						if (Convert::ToUInt32(strheaderline->Substring(10, 20)->Trim()) == 2147483648)//then it is an unsigned
+							HEAPTCODES[ttypeindex] = TypeCode::UInt32;
+						break;
+					}
+					case TypeCode::Int64:
+					{
+						if (Convert::ToUInt64(strheaderline->Substring(10, 20)->Trim()) == 9223372036854775808)//then it is an unsigned
+							HEAPTCODES[ttypeindex] = TypeCode::UInt64;
+						break;
+					}
+					default:
+					{
+						throw gcnew Exception("Unrecognized TypeCode in EATRAWBINTABLEHEADER at TZERO analysis");
+						break;
+					}
 				}
-				case TypeCode::Int32:
-				{
-					if (Convert::ToUInt32(strheaderline->Substring(10, 20)->Trim()) == 2147483648)//then it is an unsigned
-						TCODES[ttypeindex] = TypeCode::UInt32;
-					break;
-				}
-				case TypeCode::Int64:
-				{
-					if (Convert::ToUInt64(strheaderline->Substring(10, 20)->Trim()) == 9223372036854775808)//then it is an unsigned
-						TCODES[ttypeindex] = TypeCode::UInt64;
-					break;
-				}
-				default:
-				{
-					throw gcnew Exception("Unrecognized TypeCode in EATRAWBINTABLEHEADER at TZERO analysis");
-					break;
-				}
-			}
 			continue;
 		}
 
