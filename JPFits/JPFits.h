@@ -65,7 +65,7 @@ namespace JPFITS
 		/// <param name="has_extensions">Returns whether or not the FITS file may contain extensions.</param>
 		static bool SCANPRIMARYUNIT(FileStream^ fs, bool scanpastprimarydata, ArrayList^ header_return, bool &has_extensions);
 
-		/// <summary>Find the FITS extension table of the given type and name. Returns false if the XTENSION type of the specified EXTNAME is not found.</summary>
+		/// <summary>Find the FITS extension table of the given type and name. Returns false if the XTENSION type of the specified EXTNAME is not found. If extension_name is found the FileStream fs will be placed at the beginning of the extension's main data table block.</summary>
 		/// <param name="fs">The FileStream of the FITS file.
 		/// <para>If EXTNAME is found the FileStream fs will be placed at the beginning of the extension's main data table block.</para>
 		/// <para>If EXTNAME is NOT found it will be at the end of the file.</para></param>
@@ -875,7 +875,7 @@ namespace JPFITS
 
 		/// <summary>Remove a binary table extension from the given FITS file.</summary>
 		/// <param name="FileName">The full-path file name.</param>
-		/// <param name="ExtensionName">The name of the binary table extension.  If the extension isn't found, an exception is thrown.</param>
+		/// <param name="ExtensionName">The name of the binary table extension. If the extension isn't found, an exception is thrown.</param>
 		static void RemoveExtension(String^ FileName, String^ ExtensionName);
 
 		/// <summary>Checks if the binary extension exists inside the given FITS file.</summary>

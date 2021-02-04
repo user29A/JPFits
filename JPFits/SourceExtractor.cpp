@@ -456,8 +456,11 @@ void JPFITS::SourceExtractor::BGWRKR_DoWork(System::Object^  sender, System::Com
 							if (r2 > KRAD2)
 								continue;
 
-							SOURCE_BOOLEAN_MAP[ii, jj] = true;//this kernel radius position has a source detected
-							SOURCE_INDEX_MAP[ii, jj] = src_index;//this is the source index of the given detection kernel radius position
+							if (ii > 0 && jj > 0 && ii < SOURCE_BOOLEAN_MAP->GetLength(0) && jj < SOURCE_BOOLEAN_MAP->GetLength(1))
+							{
+								SOURCE_BOOLEAN_MAP[ii, jj] = true;//this kernel radius position has a source detected
+								SOURCE_INDEX_MAP[ii, jj] = src_index;//this is the source index of the given detection kernel radius position
+							}
 						}
 					}
 

@@ -112,18 +112,17 @@ bool JPFITS::FITSFILEOPS::SCANPRIMARYUNIT(FileStream^ fs, bool scanpastprimaryda
 	if (!FITSformat)
 		return false;
 
-	//if primary header has image data, may skip past it
+	//if primary header has image data, may skip past it, otherwise stay at primary data start
 	if (scanpastprimarydata)
 		if (naxis != 0)
 		{
 			__int64 NBytes = __int64(::Math::Abs(bitpix)) / 8;
 			for (int i = 0; i < naxisn->Length; i++)
 				NBytes *= naxisn[i];
-			fs->Seek(__int64(Math::Ceiling(double(NBytes) / 2880) * 2880), ::SeekOrigin::Current);
+			fs->Seek(__int64(Math::Ceiling(double(NBytes) / 2880) * 2880), ::SeekOrigin::Current);//should now be at the 1st extension header
 		}
 
 	return true;
-	//should now be at the 1st extension header
 }
 
 array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, String^ extension_type)

@@ -840,47 +840,8 @@ void JPFITS::FITSBinTable::GETHEAPTTYPENELSPOS(int ttypeindex, __int64 &nels, __
 
 Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeCode, array<int>^ &dimNElements)
 {
-	int byteoffset = 0;
-	for (int i = 0; i < ttypeindex; i++)
-		byteoffset += TBYTES[i];
-
 	__int64 nels, position;
-	if (TFORMS[ttypeindex]->Contains("P"))
-	{
-		array<unsigned char>^ int32 = gcnew array<unsigned char>(4);
-		int32[3] = BINTABLE[byteoffset];
-		int32[2] = BINTABLE[byteoffset + 1];
-		int32[1] = BINTABLE[byteoffset + 2];
-		int32[0] = BINTABLE[byteoffset + 3];
-		nels = (__int64)BitConverter::ToInt32(int32, 0);
-		int32[3] = BINTABLE[byteoffset + 4];
-		int32[2] = BINTABLE[byteoffset + 5];
-		int32[1] = BINTABLE[byteoffset + 6];
-		int32[0] = BINTABLE[byteoffset + 7];
-		position = (__int64)BitConverter::ToInt32(int32, 0);
-	}
-	else//"Q"
-	{
-		array<unsigned char>^ i64 = gcnew array<unsigned char>(8);
-		i64[7] = BINTABLE[byteoffset];
-		i64[6] = BINTABLE[byteoffset + 1];
-		i64[5] = BINTABLE[byteoffset + 2];
-		i64[4] = BINTABLE[byteoffset + 3];
-		i64[3] = BINTABLE[byteoffset + 4];
-		i64[2] = BINTABLE[byteoffset + 5];
-		i64[1] = BINTABLE[byteoffset + 6];
-		i64[0] = BINTABLE[byteoffset + 7];
-		nels = BitConverter::ToInt64(i64, 0);
-		i64[7] = BINTABLE[byteoffset + 8];
-		i64[6] = BINTABLE[byteoffset + 9];
-		i64[5] = BINTABLE[byteoffset + 10];
-		i64[4] = BINTABLE[byteoffset + 11];
-		i64[3] = BINTABLE[byteoffset + 12];
-		i64[2] = BINTABLE[byteoffset + 13];
-		i64[1] = BINTABLE[byteoffset + 14];
-		i64[0] = BINTABLE[byteoffset + 15];
-		position = BitConverter::ToInt64(i64, 0);
-	}
+	GETHEAPTTYPENELSPOS(ttypeindex, nels, position);
 
 	objectTypeCode = HEAPTCODES[ttypeindex];
 
@@ -896,7 +857,7 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 	int naxis2 = (int)nels;
 	if (TTYPEISCOMPLEX[ttypeindex])
 		naxis2 /= 2;
-	byteoffset = (int)position;
+	int byteoffset = (int)position;
 
 	switch (objectTypeCode)
 	{
@@ -1145,47 +1106,8 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 
 void JPFITS::FITSBinTable::CUTHEAPTTYPE(int ttypeindex)
 {
-	int byteoffset = 0;
-	for (int i = 0; i < ttypeindex; i++)
-		byteoffset += TBYTES[i];
-
 	__int64 nels, position;
-	if (TFORMS[ttypeindex]->Contains("P"))
-	{
-		array<unsigned char>^ int32 = gcnew array<unsigned char>(4);
-		int32[3] = BINTABLE[byteoffset];
-		int32[2] = BINTABLE[byteoffset + 1];
-		int32[1] = BINTABLE[byteoffset + 2];
-		int32[0] = BINTABLE[byteoffset + 3];
-		nels = (__int64)BitConverter::ToInt32(int32, 0);
-		int32[3] = BINTABLE[byteoffset + 4];
-		int32[2] = BINTABLE[byteoffset + 5];
-		int32[1] = BINTABLE[byteoffset + 6];
-		int32[0] = BINTABLE[byteoffset + 7];
-		position = (__int64)BitConverter::ToInt32(int32, 0);
-	}
-	else//"Q"
-	{
-		array<unsigned char>^ i64 = gcnew array<unsigned char>(8);
-		i64[7] = BINTABLE[byteoffset];
-		i64[6] = BINTABLE[byteoffset + 1];
-		i64[5] = BINTABLE[byteoffset + 2];
-		i64[4] = BINTABLE[byteoffset + 3];
-		i64[3] = BINTABLE[byteoffset + 4];
-		i64[2] = BINTABLE[byteoffset + 5];
-		i64[1] = BINTABLE[byteoffset + 6];
-		i64[0] = BINTABLE[byteoffset + 7];
-		nels = BitConverter::ToInt64(i64, 0);
-		i64[7] = BINTABLE[byteoffset + 8];
-		i64[6] = BINTABLE[byteoffset + 9];
-		i64[5] = BINTABLE[byteoffset + 10];
-		i64[4] = BINTABLE[byteoffset + 11];
-		i64[3] = BINTABLE[byteoffset + 12];
-		i64[2] = BINTABLE[byteoffset + 13];
-		i64[1] = BINTABLE[byteoffset + 14];
-		i64[0] = BINTABLE[byteoffset + 15];
-		position = BitConverter::ToInt64(i64, 0);
-	}
+	GETHEAPTTYPENELSPOS(ttypeindex, nels, position);
 
 	int nbytes = TYPECODETONBYTES(HEAPTCODES[ttypeindex]) * (int)nels;
 	if (TTYPEISCOMPLEX[ttypeindex])
@@ -2941,20 +2863,20 @@ array<String^>^ JPFITS::FITSBinTable::FORMATBINARYTABLEEXTENSIONHEADER()
 	//KEY formats
 	for (int i = 0; i < TTYPES->Length; i++)
 	{
-		//TTYPE
-		hkeyslist->Add("TTYPE" + (i + 1).ToString());
-		hvalslist->Add(TTYPES[i]);
-		hcomslist->Add("label for field " + (i + 1).ToString());
-
 		//TFORM
 		hkeyslist->Add("TFORM" + (i + 1).ToString());
 		hvalslist->Add(TFORMS[i]);
 		if (TTYPEISHEAPARRAYDESC[i])
-			hcomslist->Add((2 * TYPECODETONBYTES(TCODES[i])).ToString() + "-byte " + TYPECODESTRING(TCODES[i]) + " heap array descriptor");
+			hcomslist->Add((2 * TYPECODETONBYTES(TCODES[i])).ToString() + "-byte " + TYPECODESTRING(TCODES[i]) + " heap descriptor for " + TYPECODESTRING(HEAPTCODES[i]));
 		else if (TTYPEISCOMPLEX[i])
 			hcomslist->Add((2 * TYPECODETONBYTES(TCODES[i])).ToString() + "-byte " + TYPECODESTRING(TCODES[i]) + " complex pair"); 
 		else
 			hcomslist->Add(TYPECODETONBYTES(TCODES[i]).ToString() + "-byte " + TYPECODESTRING(TCODES[i]));
+
+		//TTYPE
+		hkeyslist->Add("TTYPE" + (i + 1).ToString());
+		hvalslist->Add(TTYPES[i]);
+		hcomslist->Add("label for field " + (i + 1).ToString());
 
 		//TZERO and TSCAL
 		if (!TTYPEISHEAPARRAYDESC[i] && TCODES[i] == TypeCode::SByte || HEAPTCODES[i] == TypeCode::SByte)
