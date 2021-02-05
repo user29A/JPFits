@@ -2112,6 +2112,61 @@ namespace JPFITS
 			bool get() { return BGWRKR->IsBusy; }
 		}
 
+		property double PixelSaturation
+		{
+			double get() { return PIX_SAT; }
+		}
+
+		property double KernelRadius
+		{
+			double get() { return KERNEL_RADIUS; }
+		}
+
+		property double SourceSeparation
+		{
+			double get() { return SOURCE_SEPARATION; }
+		}
+
+		property double PixelMaximum
+		{
+			double get() { return PIX_MAX; }
+		}
+
+		property double PixelMinimum
+		{
+			double get() { return PIX_MIN; }
+		}
+
+		property double KernelMaximum
+		{
+			double get() { return KERNEL_MAX; }
+		}
+
+		property double KernelMinimum
+		{
+			double get() { return KERNEL_MIN; }
+		}
+
+		property bool AutoBackground
+		{
+			bool get() { return AUTO_BG; }
+		}
+
+		property bool SavePointSources
+		{
+			bool get() { return SAVE_PS; }
+		}
+
+		property bool SearchROI
+		{
+			bool get() { return SEARCH_ROI; }
+		}
+
+		property bool PSEParametersSet
+		{
+			bool get() { return PSEPARAMSSET; }
+		}
+
 		/// <summary>Searches for sources withn a 2D image array.</summary>
 		/// <param name="image">The 2D image array to find sources in.</param>
 		/// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
@@ -2194,6 +2249,7 @@ namespace JPFITS
 		String^ FIT_EQUATION;
 		bool WCS_GENERATED = false;
 		bool VIEWFITS = false;
+		bool PSEPARAMSSET = false;
 
 		int IMAGEWIDTH, IMAGEHEIGHT;
 		int N_SRC = 0;								// number of sources found

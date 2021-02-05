@@ -186,6 +186,7 @@ void JPFITS::SourceExtractor::Extract_Sources(array<double, 2>^ image, double pi
 	SAVE_PS_FILENAME = kernel_filename_template;
 	SOURCE_BOOLEAN_MAP = gcnew array<bool, 2>(IMAGEWIDTH, IMAGEHEIGHT);
 	SOURCE_INDEX_MAP = gcnew array<int, 2>(IMAGEWIDTH, IMAGEHEIGHT);
+	PSEPARAMSSET = true;
 	#pragma omp parallel for
 	for (int i = 0; i < IMAGE->GetLength(0); i++)
 		for (int j = 0; j < IMAGE->GetLength(1); j++)
