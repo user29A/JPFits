@@ -49,6 +49,51 @@ JPFITS::SourceExtractor::SourceExtractor(array<double>^ XCoords, array<double>^ 
 	this->Centroids_Y = YCoords;
 }
 
+JPFITS::SourceExtractor::SourceExtractor(JPFITS::FITSBinTable^ BinTablePSE)
+{
+	PSEPARAMSSET = Convert::ToBoolean(BinTablePSE->GetExtraHeaderKeyValue("PSESET"));
+	if (PSEPARAMSSET)
+	{
+		PIX_SAT = Convert::ToDouble(BinTablePSE->GetExtraHeaderKeyValue("PIXSAT"));
+		KERNEL_RADIUS = Convert::ToInt32(BinTablePSE->GetExtraHeaderKeyValue("KERNRAD"));
+		KERNEL_WIDTH = KERNEL_RADIUS * 2 + 1;
+		SOURCE_SEPARATION = Convert::ToInt32(BinTablePSE->GetExtraHeaderKeyValue("SRCSEP"));
+		PIX_MIN = Convert::ToDouble(BinTablePSE->GetExtraHeaderKeyValue("PIXMIN"));
+		PIX_MAX = Convert::ToDouble(BinTablePSE->GetExtraHeaderKeyValue("PIXMAX"));
+		KERNEL_MIN = Convert::ToDouble(BinTablePSE->GetExtraHeaderKeyValue("KERNMIN"));
+		KERNEL_MAX = Convert::ToDouble(BinTablePSE->GetExtraHeaderKeyValue("KERNMAX"));
+		AUTO_BG = Convert::ToBoolean(BinTablePSE->GetExtraHeaderKeyValue("AUTOBG"));
+		SEARCH_ROI = Convert::ToBoolean(BinTablePSE->GetExtraHeaderKeyValue("ROIONLY"));
+		SAVE_PS = Convert::ToBoolean(BinTablePSE->GetExtraHeaderKeyValue("SAVESRC"));
+		//SAVE_PS_FILENAME = kernel_filename_template;
+		//SOURCE_BOOLEAN_MAP = gcnew array<bool, 2>(IMAGEWIDTH, IMAGEHEIGHT);
+		//SOURCE_INDEX_MAP = gcnew array<int, 2>(IMAGEWIDTH, IMAGEHEIGHT);
+	}
+	N_SRC = BinTablePSE->Naxis2;
+	CENTROIDS_X = BinTablePSE->GetTTYPEEntry("PSE X-Centroid");
+	CENTROIDS_Y = BinTablePSE->GetTTYPEEntry("PSE Y-Centroid");
+	CENTROIDS_AMPLITUDE = BinTablePSE->GetTTYPEEntry("PSE Amplitude");
+	CENTROIDS_VOLUME = BinTablePSE->GetTTYPEEntry("PSE Volume");
+	CENTROIDS_BGESTIMATE = BinTablePSE->GetTTYPEEntry("PSE Background");
+	
+	if (BinTablePSE->TTYPEEntryExists("PSE RA (deg)"))
+		CENTROIDS_RA_DEG = BinTablePSE->GetTTYPEEntry("PSE RA (deg)");
+	if (BinTablePSE->TTYPEEntryExists("PSE Dec (deg)"))
+		CENTROIDS_DEC_DEG = BinTablePSE->GetTTYPEEntry("PSE Dec (deg)");
+	if (BinTablePSE->TTYPEEntryExists("PSE RA (sxgsml)"))
+	{
+		TypeCode t;
+		array<int>^ d;
+		CENTROIDS_RA_HMS = (array<String^>^)BinTablePSE->GetTTYPEEntry("PSE RA (sxgsml)", t, d);
+	}
+	if (BinTablePSE->TTYPEEntryExists("PSE Dec (sxgsml)"))
+	{
+		TypeCode t;
+		array<int>^ d;
+		CENTROIDS_DEC_DMS = (array<String^>^)BinTablePSE->GetTTYPEEntry("PSE Dec (sxgsml)", t, d);
+	}
+}
+
 inline array<double, 2>^ JPFITS::SourceExtractor::GetKernel(array<double, 2>^ image, int x0, int y0, int radius)
 {
 	int width = radius * 2 + 1, kx = -1, ky = 0, x, y, xmin = x0 - radius, ymin = y0 - radius;
@@ -951,15 +996,15 @@ void JPFITS::SourceExtractor::GENERATEPSETABLE()
 
 	int c = 0;
 
-	PSE_TABLE[c++, 0] = "Pixel X-Centroid";
-	PSE_TABLE[c++, 0] = "Pixel Y-Centroid";
-	PSE_TABLE[c++, 0] = "Pixel Amplitude";
-	PSE_TABLE[c++, 0] = "Pixel Volume";
-	PSE_TABLE[c++, 0] = "Pixel Background";
-	PSE_TABLE[c++, 0] = "Pixel Right Ascension (deg)";
-	PSE_TABLE[c++, 0] = "Pixel Declination (deg)";
-	PSE_TABLE[c++, 0] = "Pixel Right Ascension (hms)";
-	PSE_TABLE[c++, 0] = "Pixel Declination (d ' '')";
+	PSE_TABLE[c++, 0] = "PSE X-Centroid";
+	PSE_TABLE[c++, 0] = "PSE Y-Centroid";
+	PSE_TABLE[c++, 0] = "PSE Amplitude";
+	PSE_TABLE[c++, 0] = "PSE Volume";
+	PSE_TABLE[c++, 0] = "PSE Background";
+	PSE_TABLE[c++, 0] = "PSE RA (deg)";
+	PSE_TABLE[c++, 0] = "PSE Dec (deg)";
+	PSE_TABLE[c++, 0] = "PSE RA (sxgsml)";
+	PSE_TABLE[c++, 0] = "PSE Dec (sxgsml)";
 
 	if (FITTED)
 	{
@@ -968,10 +1013,10 @@ void JPFITS::SourceExtractor::GENERATEPSETABLE()
 		PSE_TABLE[c++, 0] = "Fit Amplitude";
 		PSE_TABLE[c++, 0] = "Fit Volume";
 		PSE_TABLE[c++, 0] = "Fit Background";
-		PSE_TABLE[c++, 0] = "Fit Right Ascension (deg)";
-		PSE_TABLE[c++, 0] = "Fit Declination (deg)";
-		PSE_TABLE[c++, 0] = "Fit Right Ascension (hms)";
-		PSE_TABLE[c++, 0] = "Fit Declination (d ' '')";
+		PSE_TABLE[c++, 0] = "Fit RA (deg)";
+		PSE_TABLE[c++, 0] = "Fit Dec (deg)";
+		PSE_TABLE[c++, 0] = "Fit RA (sxgsml)";
+		PSE_TABLE[c++, 0] = "Fit Dec (sxgsml)";
 		PSE_TABLE[c++, 0] = "Fit FWHM_X";
 		PSE_TABLE[c++, 0] = "Fit FWHM_Y";
 		PSE_TABLE[c++, 0] = "Fit Phi";

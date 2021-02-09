@@ -393,6 +393,14 @@ void JPFITS::FITSImage::SETBITPIX(System::TypeCode Precision)
 			break;
 		}
 
+		case TypeCode::Single:
+		{
+			BITPIX = -32;
+			BZERO = 0;
+			BSCALE = 1;
+			break;
+		}
+
 		case TypeCode::Double:
 		{
 			BITPIX = -64;

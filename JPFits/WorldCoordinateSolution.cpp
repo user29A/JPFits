@@ -220,8 +220,8 @@ void JPFITS::WorldCoordinateSolution::Get_Coordinate(double X_pix, double Y_pix,
 	if (d < 0)
 		sign = "-";
 
-	cval1_sxgsml = h.ToString("00") + "h " + m.ToString("00") + "m " + s.ToString("00.##") + "s";
-	cval2_sxgsml = sign + deg.ToString("00") + "d " + am.ToString("00") + "' " + as.ToString("00.##") + "''";
+	cval1_sxgsml = h.ToString("00") + ":" + m.ToString("00") + ":" + s.ToString("00.00");
+	cval2_sxgsml = sign + deg.ToString("00") + ":" + am.ToString("00") + ":" + as.ToString("00.00");
 }
 
 void JPFITS::WorldCoordinateSolution::Get_Coordinates(array<double>^ X_pix, array<double>^ Y_pix, bool zero_based_pixels, String^ WCS_Type, array<double>^ &cval1, array<double>^ &cval2)

@@ -1083,76 +1083,83 @@ void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 		for (int j = 0; j < 80; j++)
 			data[i * 80 + j] = (unsigned char)HEADER[i][j];
 
-	if (Precision == TypeCode::Char)
+	int cc = 0;
+
+	switch (Precision)
 	{
-		char val = 0;
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc, val)
-		for (int j = 0; j < NAXIS2; j++)
-			for (int i = 0; i < NAXIS1; i++)
-			{
-				cc = NHead + (j*NAXIS1 + i) * 2;
-				val = char((DIMAGE[i, j] - bzero) / bscale);
-				data[cc] = val;
-			}
-	}
-
-	if (Precision == TypeCode::UInt16 || Precision == TypeCode::Int16)//use signed Int16 in FITS standard...bzero is used to scale to UInt.
-	{
-		__int16 val = 0;
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc, val)
-		for (int j = 0; j < NAXIS2; j++)
-			for (int i = 0; i < NAXIS1; i++)
-			{
-				cc = NHead + (j*NAXIS1 + i) * 2;
-				val = __int16((DIMAGE[i, j] - bzero) / bscale);
-				data[cc] = ((val >> 8) & 0xff);
-				data[cc + 1] = (val & 0xff);
-			}
-	}
-
-	if (Precision == TypeCode::UInt32 || Precision == TypeCode::Int32)
-	{
-		__int32 val = 0;
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc, val)
-		for (int j = 0; j < NAXIS2; j++)
-			for (int i = 0; i < NAXIS1; i++)
-			{
-				cc = NHead + (j*NAXIS1 + i) * 4;
-				val = __int32((DIMAGE[i, j] - bzero) / bscale);
-				data[cc] = ((val >> 24) & 0xff);
-				data[cc + 1] = ((val >> 16) & 0xff);
-				data[cc + 2] = ((val >> 8) & 0xff);
-				data[cc + 3] = (val & 0xff);
-			}
-	}
-
-	if (Precision == TypeCode::Double)
-	{
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc)
-		for (int j = 0; j < NAXIS2; j++)
+		case TypeCode::Byte:
+		case TypeCode::SByte:
 		{
-			array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-			for (int i = 0; i < NAXIS1; i++)
+			__int8 val = 0;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val)
+			for (int j = 0; j < NAXIS2; j++)
+				for (int i = 0; i < NAXIS1; i++)
+				{
+					cc = NHead + (j*NAXIS1 + i) * 2;
+					val = __int8((DIMAGE[i, j] - bzero) / bscale);
+					data[cc] = val;
+				}
+			break;
+		}
+
+		case TypeCode::UInt16:
+		case TypeCode::Int16:
+		{
+			__int16 val = 0;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val)
+			for (int j = 0; j < NAXIS2; j++)
+				for (int i = 0; i < NAXIS1; i++)
+				{
+					cc = NHead + (j*NAXIS1 + i) * 2;
+					val = __int16((DIMAGE[i, j] - bzero) / bscale);
+					data[cc] = ((val >> 8) & 0xff);
+					data[cc + 1] = (val & 0xff);
+				}
+			break;
+		}
+
+		case TypeCode::UInt32:
+		case TypeCode::Int32:
+		{
+			__int32 val = 0;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val)
+			for (int j = 0; j < NAXIS2; j++)
+				for (int i = 0; i < NAXIS1; i++)
+				{
+					cc = NHead + (j*NAXIS1 + i) * 4;
+					val = __int32((DIMAGE[i, j] - bzero) / bscale);
+					data[cc] = ((val >> 24) & 0xff);
+					data[cc + 1] = ((val >> 16) & 0xff);
+					data[cc + 2] = ((val >> 8) & 0xff);
+					data[cc + 3] = (val & 0xff);
+				}
+			break;
+		}
+
+		case TypeCode::Double:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc)
+			for (int j = 0; j < NAXIS2; j++)
 			{
-				cc = NHead + (j*NAXIS1 + i) * 8;
-				dbl = BitConverter::GetBytes((DIMAGE[i, j] - bzero) / bscale);
-				data[cc] = dbl[7];
-				data[cc + 1] = dbl[6];
-				data[cc + 2] = dbl[5];
-				data[cc + 3] = dbl[4];
-				data[cc + 4] = dbl[3];
-				data[cc + 5] = dbl[2];
-				data[cc + 6] = dbl[1];
-				data[cc + 7] = dbl[0];
+				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+				for (int i = 0; i < NAXIS1; i++)
+				{
+					cc = NHead + (j*NAXIS1 + i) * 8;
+					dbl = BitConverter::GetBytes((DIMAGE[i, j] - bzero) / bscale);
+					data[cc] = dbl[7];
+					data[cc + 1] = dbl[6];
+					data[cc + 2] = dbl[5];
+					data[cc + 3] = dbl[4];
+					data[cc + 4] = dbl[3];
+					data[cc + 5] = dbl[2];
+					data[cc + 6] = dbl[1];
+					data[cc + 7] = dbl[0];
+				}
 			}
+			break;
 		}
 	}
 

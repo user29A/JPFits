@@ -244,7 +244,7 @@ namespace JPFITS
 		#pragma endregion
 
 		#pragma region HEADEROPS
-			/// <summary>GetKeyValue returns the value of the primary header key named Key. Returns empty String if the key is not found.</summary>
+		/// <summary>GetKeyValue returns the value of the primary header key named Key. Returns empty String if the key is not found.</summary>
 		/// <param name="Key">The header key to find the value of.</param>
 		String^ GetKeyValue(String^ Key);
 
@@ -797,6 +797,8 @@ namespace JPFITS
 		/// <param name="extensionName">The BINTABLE EXTNAME name of the extension. If an empty string is passed the first nameless extension will be found, if one exists.</param>
 		FITSBinTable(String^ fileName, String^ extensionName);
 
+		bool TTYPEEntryExists(String^ ttypeEntry);
+
 		/// <summary>Return a binary table entry as a double 1-D array, assuming it is a single colunmn entry. If the entry has more than one column, use the overload function to get its dimensions.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		array<double>^ GetTTYPEEntry(String^ ttypeEntry);
@@ -841,8 +843,8 @@ namespace JPFITS
 		/// <param name="entryArray">The array to enter into the table.</param>
 		/// <param name="dimNElements">A vector giving the number of elements along each dimension of the array, to write as the TDIM key for the entry IF the entry is n &gt; 2 dimensional; pass nullptr if the entry is not n &gt; 2 dimensional.</param>
 		/// <param name="isComplex">A boolean to set whether the array should be interpreted as complex value pairings.</param>
-		/// <param name="addAsHeapVarLenArray">A boolean to set whether to save the array as a variable length array in the heap area. If it is, it must be formatted as a vector or a [2 x n] array of the spatial and temporal pairing of complex numbers.</param>
-		void AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExists, String^ entryUnits, Object^ entryArray, array<int>^ dimNElements, bool isComplex, bool addAsHeapVarLenArray);
+		/// <param name="addAsHeapVarRepeatArray">A boolean to set whether to save the array as a variable repeat array in the heap area.</param>
+		void AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExists, String^ entryUnits, Object^ entryArray, array<int>^ dimNElements, bool isComplex, bool addAsHeapVarRepeatArray);
 
 		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES INCLUDING THE HEAP.
 		/// <para>Do not use for n &gt; 2 dimensional and/or complex entries.</para></summary>
@@ -856,6 +858,8 @@ namespace JPFITS
 		/// <param name="keyValue">The value of the key. Pass numeric types as a string.</param>
 		/// <param name="keyComment">The comment of the key.</param>
 		void AddExtraHeaderKey(String^ keyName, String^ keyValue, String^ keyComment);
+
+		String^ GetExtraHeaderKeyValue(String^ keyName);
 
 		/// <summary>Remove the extra header key with the given name and value.</summary>
 		void RemoveExtraHeaderKey(String^ keyName, String^ keyValue);
@@ -892,9 +896,20 @@ namespace JPFITS
 		}
 
 		/// <summary>TableDataTypes reports the .NET typecodes for each entry in the table.</summary>
-		property array<TypeCode>^ TableDataTypes
+		property TypeCode TableDataTypes[int]
 		{
-			array<TypeCode>^ get() { return TCODES; }
+			TypeCode get(int n) 
+			{
+				if (TTYPEISHEAPARRAYDESC[n])
+					return HEAPTCODES[n];
+				else
+					return TCODES[n];
+			}
+		}
+
+		property bool TTYPEIsHeapVariableRepeatEntry[int]
+		{
+			bool get(int n) { return TTYPEISHEAPARRAYDESC[n]; }
 		}
 
 		/// <summary>TableDataTypes reports the number of columns in each table entry.</summary>
@@ -919,6 +934,11 @@ namespace JPFITS
 		property array<String^>^ Header
 		{
 			array<String^>^ get() { return HEADER; }
+		}
+
+		property String^ ExtensionNameEXTNAME
+		{
+			String^ get() { return EXTENSIONNAME; }
 		}
 
 		/// <summary>Return the width, in bytes, of the table.</summary>
@@ -947,13 +967,12 @@ namespace JPFITS
 		array<String^>^ TFORMS;//FITS name for the table entry precisions
 		array<bool>^ TTYPEISCOMPLEX;//for tracking complex singles and doubles
 		array<bool>^ TTYPEISHEAPARRAYDESC;//for tracking array descriptor entries for heap area data
-		array<array<__int64>^>^ TTYPEHEAPARRAYNELSPOS;//for tracking array descriptor entries for heap area data
+		array<array<int, 2>^>^ TTYPEHEAPARRAYNELSPOS;//for tracking array descriptor entries for heap area data
 		array<TypeCode>^ HEAPTCODES;//.NET typcodes for each table entry
 		array<array<int>^>^ TDIMS;//for tracking multidimensional (rank >= 3) arrays
 		array<String^>^ TUNITS;//FITS name for the table entry units
 		array<int>^ TBYTES;//number of total bytes for each table entry
 		array<int>^ TREPEATS;//number of TFORM instances of the table entry
-		array<int>^ TROWS;//number of rows of each entry; same as NAXIS2 for the main bintable
 		array<TypeCode>^ TCODES;//.NET typcodes for each table entry
 		array<String^>^ HEADER;
 		String^ FILENAME;
@@ -966,6 +985,7 @@ namespace JPFITS
 
 		void MAKEBINTABLEBYTEARRAY(array<Object^>^ ExtensionEntryData);
 		void MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData);
+		void MAKETTYPEHEAPARRAYNELSPOS(array<Object^>^ ExtensionEntryData, __int64 &totalBytes);
 		array<String^>^ FORMATBINARYTABLEEXTENSIONHEADER();
 		int TFORMTONBYTES(String^ tform, int& instances);
 		TypeCode TFORMTYPECODE(String^ tform);
@@ -974,8 +994,8 @@ namespace JPFITS
 		int TYPECODETONBYTES(TypeCode typecode);
 		void EATRAWBINTABLEHEADER(ArrayList^ header);
 		Object^ GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeCode, array<int>^ &dimNElements);
-		void GETHEAPTTYPENELSPOS(int ttypeindex, __int64 &nels, __int64 & position);
-		void CUTHEAPTTYPE(int ttypeindex);
+		array<int, 2>^ GETHEAPTTYPENELSPOS(int ttypeindex);
+		void REMOVEHEAPTTYPE(int ttypeindex);
 		#pragma endregion
 	};
 
@@ -2024,6 +2044,7 @@ namespace JPFITS
 	public:
 		SourceExtractor();
 		SourceExtractor(array<double>^ XCoords, array<double>^ YCoords);
+		SourceExtractor(JPFITS::FITSBinTable^ BinTablePSE);
 		~SourceExtractor();
 
 		/// <summary>Gets a metadata table of the extracted sources.</summary>
@@ -2156,6 +2177,11 @@ namespace JPFITS
 		{
 			bool get() { return SAVE_PS; }
 		}
+
+		/*property String^ SavePointSourcesFileNameTemplate
+		{
+			String^ get() { return SAVE_PS_FILENAME; }
+		}*/
 
 		property bool SearchROI
 		{

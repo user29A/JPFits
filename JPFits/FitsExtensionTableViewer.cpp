@@ -82,44 +82,56 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 		ExtensionTableGrid->Columns->Clear();
 		ExtensionTableGrid->Rows->Clear();
 		ExtensionTableGrid->ColumnCount = labels->Length;
+		ExtensionTableGrid->RowCount = FITSBINTABLE->Naxis2;
 
 		for (int i = 0; i < labels->Length; i++)
 			ExtensionTableGrid->Columns[i]->HeaderText = labels[i];
 
-		DATATABLE = gcnew array<array<double>^>(labels->Length);
-		int maxrows = FITSBINTABLE->Naxis2;
+		DATATABLE = gcnew array<Object^>(labels->Length);
 
 		for (int i = 0; i < labels->Length; i++)
 		{
 			array<int>^ dimNElements;
-			array<double>^ entry = FITSBINTABLE->GetTTYPEEntry(labels[i], dimNElements);
-
-			if (dimNElements->Length != 1)
-			{
-				DATATABLE[i] = gcnew array<double>(dimNElements[1]);
-				if (dimNElements[1] > maxrows)
-					maxrows = dimNElements[1];
-				#pragma omp parallel for
-				for (int j = 0; j < dimNElements[1]; j++)
-					DATATABLE[i][j] = Double::NaN;
-			}
+			TypeCode type;
+			Object^ entry;
+			
+			if (FITSBINTABLE->TableDataTypes[i] == TypeCode::Char || FITSBINTABLE->TTYPEIsHeapVariableRepeatEntry[i])
+				entry = FITSBINTABLE->GetTTYPEEntry(labels[i], type, dimNElements);
 			else
 			{
-				DATATABLE[i] = gcnew array<double>(dimNElements[0]);
-				if (dimNElements[0] > maxrows)
-					maxrows = dimNElements[0];
-				#pragma omp parallel for
-				for (int j = 0; j < dimNElements[0]; j++)
-					DATATABLE[i][j] = entry[j];
+				entry = FITSBINTABLE->GetTTYPEEntry(labels[i], dimNElements);
+				type = TypeCode::Double;
 			}
-		}
 
-		ExtensionTableGrid->RowCount = maxrows;
+			if (type != ::TypeCode::Char && !FITSBINTABLE->TTYPEIsHeapVariableRepeatEntry[i])
+				if (dimNElements->Length != 1)
+				{
+					DATATABLE[i] = gcnew array<double>(FITSBINTABLE->Naxis2);
+
+					#pragma omp parallel for
+					for (int j = 0; j < FITSBINTABLE->Naxis2; j++)
+						((array<double>^)DATATABLE[i])[j] = Double::NaN;
+				}
+				else
+					DATATABLE[i] = (array<double>^)entry;
+			else if (type == ::TypeCode::Char)
+				DATATABLE[i] = (array<String^>^)entry;
+			else if (FITSBINTABLE->TTYPEIsHeapVariableRepeatEntry[i])
+			{
+				DATATABLE[i] = gcnew array<double>(FITSBINTABLE->Naxis2);
+				#pragma omp parallel for
+				for (int j = 0; j < FITSBINTABLE->Naxis2; j++)
+					((array<double>^)DATATABLE[i])[j] = Double::NaN;
+			}
+		}		
 	}
 	catch (Exception^ e)
 	{
 		MessageBox::Show(e->Data + "	" + e->InnerException + "	" + e->Message + "	" + e->Source + "	" + e->StackTrace + "	" + e->TargetSite);
 	}
+
+	this->BringToFront();
+	this->Activate();
 }
 
 void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_Scroll(System::Object^  sender, System::Windows::Forms::ScrollEventArgs^  e)
@@ -136,8 +148,12 @@ void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_CellValueNeeded(System
 {
 	try
 	{
-		e->Value = DATATABLE[e->ColumnIndex][e->RowIndex];
-		ExtensionTableGrid->Rows[e->RowIndex]->HeaderCell->Value = e->RowIndex.ToString();
+		if (FITSBINTABLE->TableDataTypes[e->ColumnIndex] == TypeCode::Char)
+			e->Value = ((array<String^>^)DATATABLE[e->ColumnIndex])[e->RowIndex];
+		else
+			e->Value = ((array<double>^)DATATABLE[e->ColumnIndex])[e->RowIndex];
+
+		ExtensionTableGrid->Rows[e->RowIndex]->HeaderCell->Value = (e->RowIndex + 1).ToString();
 	}
 	catch (...)
 	{
@@ -149,7 +165,7 @@ void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_CellMouseClick(System:
 {
 	try
 	{
-		if (Double::IsNaN(DATATABLE[e->ColumnIndex][e->RowIndex]))
+		if (Double::IsNaN(((array<double>^)DATATABLE[e->ColumnIndex])[e->RowIndex]))
 		{
 			String^ text = FITSBINTABLE->GetTTypeEntryRow(ExtensionTableGrid->Columns[e->ColumnIndex]->HeaderText, e->RowIndex);
 			Clipboard::SetText(text);
@@ -191,6 +207,12 @@ void JPFITS::FitsExtensionTableViewer::MenuChooseTable_CheckedChanged(System::Ob
 			MenuChooseTableEntries->DropDownItems->RemoveAt(2);
 
 		PopulateTable(text);
+	}
+
+	if (HEADERFRONT)
+	{
+		HEADERFRONT = !HEADERFRONT;
+		ViewHeaderMenu->PerformClick();
 	}
 }
 
@@ -384,10 +406,10 @@ void JPFITS::FitsExtensionTableViewer::ViewHeaderMenu_Click(System::Object^  sen
 	for (int i = 0; i < bt->Header->Length; i++)
 		HeaderListBox->Items->Add(bt->Header[i]);
 
-	if (!headerfront)
+	if (!HEADERFRONT)
 		HeaderListBox->BringToFront();
 	else
 		HeaderListBox->SendToBack();
-	headerfront = !headerfront;
+	HEADERFRONT = !HEADERFRONT;
 }
 

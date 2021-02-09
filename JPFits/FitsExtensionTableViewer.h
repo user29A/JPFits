@@ -158,6 +158,7 @@ namespace JPFITS {
 			// 
 			// menuStrip1
 			// 
+			this->menuStrip1->ImageScalingSize = System::Drawing::Size(24, 24);
 			this->menuStrip1->Items->AddRange(gcnew cli::array< System::Windows::Forms::ToolStripItem^  >(5) {
 				this->MenuFile, this->MenuChooseTable,
 					this->MenuChooseTableEntries, this->PlotEntryMenu, this->ViewHeaderMenu
@@ -285,14 +286,17 @@ namespace JPFITS {
 			this->button1->Name = L"button1";
 			this->button1->Size = System::Drawing::Size(75, 23);
 			this->button1->TabIndex = 2;
-			this->button1->Text = L"button1";
+			this->button1->Text = L"cancelbtn";
 			this->button1->UseVisualStyleBackColor = true;
 			this->button1->Click += gcnew System::EventHandler(this, &FitsExtensionTableViewer::button1_Click);
 			// 
 			// HeaderListBox
 			// 
 			this->HeaderListBox->Dock = System::Windows::Forms::DockStyle::Fill;
+			this->HeaderListBox->Font = (gcnew System::Drawing::Font(L"Courier New", 9.75F, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
+				static_cast<System::Byte>(0)));
 			this->HeaderListBox->FormattingEnabled = true;
+			this->HeaderListBox->ItemHeight = 16;
 			this->HeaderListBox->Location = System::Drawing::Point(0, 0);
 			this->HeaderListBox->Name = L"HeaderListBox";
 			this->HeaderListBox->Size = System::Drawing::Size(583, 353);
@@ -313,8 +317,8 @@ namespace JPFITS {
 			this->ClientSize = System::Drawing::Size(583, 353);
 			this->Controls->Add(this->ExtensionTableGrid);
 			this->Controls->Add(this->menuStrip1);
-			this->Controls->Add(this->button1);
 			this->Controls->Add(this->HeaderListBox);
+			this->Controls->Add(this->button1);
 			this->Icon = (cli::safe_cast<System::Drawing::Icon^>(resources->GetObject(L"$this.Icon")));
 			this->MainMenuStrip = this->menuStrip1;
 			this->Name = L"FitsExtensionTableViewer";
@@ -328,6 +332,8 @@ namespace JPFITS {
 			this->ResizeEnd += gcnew System::EventHandler(this, &FitsExtensionTableViewer::FitsExtensionTableViewer_ResizeEnd);
 			this->LocationChanged += gcnew System::EventHandler(this, &FitsExtensionTableViewer::FitsExtensionTableViewer_LocationChanged);
 			this->SizeChanged += gcnew System::EventHandler(this, &FitsExtensionTableViewer::FitsExtensionTableViewer_SizeChanged);
+			this->MouseEnter += gcnew System::EventHandler(this, &FitsExtensionTableViewer::FitsExtensionTableViewer_MouseEnter);
+			this->MouseHover += gcnew System::EventHandler(this, &FitsExtensionTableViewer::FitsExtensionTableViewer_MouseHover);
 			(cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->ExtensionTableGrid))->EndInit();
 			this->menuStrip1->ResumeLayout(false);
 			this->menuStrip1->PerformLayout();
@@ -339,13 +345,13 @@ namespace JPFITS {
 
 String^ FILENAME;
 String^ EXTENSIONNAME;
-array<array<double>^>^ DATATABLE;
+array<Object^>^ DATATABLE;
 FITSBinTable^ FITSBINTABLE;
 
 void OpenFITSImage(String^ FileName);
 void PopulateTable(String^ ExtensionName);
 bool MenuChooseTable_OPENED = false;
-bool headerfront = false;
+bool HEADERFRONT = false;
 
 private: System::Void FitsExtensionTableViewer_ResizeBegin(System::Object^  sender, System::EventArgs^  e);
 private: System::Void FitsExtensionTableViewer_ResizeEnd(System::Object^  sender, System::EventArgs^  e);
@@ -386,5 +392,7 @@ private: System::Void ExtensionTableGrid_Scroll(System::Object^  sender, System:
 private: System::Void ExtensionTableGrid_NewRowNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewRowEventArgs^  e);
 private: System::Void ExtensionTableGrid_CellValueNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewCellValueEventArgs^  e);
 private: System::Void ExtensionTableGrid_CellMouseClick(System::Object^  sender, System::Windows::Forms::DataGridViewCellMouseEventArgs^  e);
+private: System::Void FitsExtensionTableViewer_MouseEnter(System::Object^  sender, System::EventArgs^  e) { this->BringToFront(); this->Activate(); }
+private: System::Void FitsExtensionTableViewer_MouseHover(System::Object^  sender, System::EventArgs^  e) { this->BringToFront(); this->Activate(); }
 };
 }
