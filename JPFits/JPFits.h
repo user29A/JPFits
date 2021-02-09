@@ -797,6 +797,8 @@ namespace JPFITS
 		/// <param name="extensionName">The BINTABLE EXTNAME name of the extension. If an empty string is passed the first nameless extension will be found, if one exists.</param>
 		FITSBinTable(String^ fileName, String^ extensionName);
 
+		/// <summary>Check if a TTYPE entry exists within the bintable.</summary>
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		bool TTYPEEntryExists(String^ ttypeEntry);
 
 		/// <summary>Return a binary table entry as a double 1-D array, assuming it is a single colunmn entry. If the entry has more than one column, use the overload function to get its dimensions.</summary>
@@ -806,14 +808,14 @@ namespace JPFITS
 		/// <summary>Return a binary table entry as a double 1-D array.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="dimNElements">A vector to return the number of elements along each dimension of the Object. 
-		/// <para>Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</para></param>
+		/// <para>Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats, i.e. columns) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</para></param>
 		array<double>^ GetTTYPEEntry(String^ ttypeEntry, array<int>^ &dimNElements);
 
 		/// <summary>Return a binary table entry as an Object. Its type and rank are given to the user. If you just need a double precision array to work on, use the overload for that.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="objectTypeCode">The TypeCode precision of the underlying array in the object.</param>
 		/// <param name="dimNElements">A vector to return the number of elements along each dimension of the Object. 
-		/// <para>Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</para></param>
+		/// <para>Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats, i.e. columns) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</para></param>
 		Object^ GetTTYPEEntry(String^ ttypeEntry, TypeCode &objectTypeCode, array<int>^ &dimNElements);
 
 		/// <summary>Use this to access individual elements of the table with a String return. Useful for looking at TTYPEs with multiple instances.</summary>
@@ -821,35 +823,36 @@ namespace JPFITS
 		/// <param name="rowindex">The row index of the column.</param>
 		String^ GetTTypeEntryRow(String^ ttypeEntry, int rowindex);
 
-		/// <summary>Remove one of the entries from the binary table. Inefficient if the table has a very large number of entries with very large number of elements.</summary>
+		/// <summary>Remove one of the entries from the binary table. Inefficient if the table has a very large number of entries with very large number of elements. Operates on heap-stored data if required.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		void RemoveTTYPEEntry(String^ ttypeEntry);
 
 		/// <summary>Add an entry to the binary table. Useful when dealing with a small table. Use SetTTYPEEntries for a large table to set all entries at once.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
-		/// <param name="entryUnits">The physical units of the values of the array.</param>
+		/// <param name="entryUnits">The physical units of the values of the array. Pass empty string if not required.</param>
 		/// <param name="entryArray">The vector or 2D array to enter into the table.</param>
 		void AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExists, String^ entryUnits, Object^ entryArray);
 
-		/// <summary>Add an n &gt; 2 dimensional and/or complex entry to the binary table or heap area. If entries already exist then the user must have formatted the n &gt; 2 dimensional array to match the existing table height NAXIS2 if it is not being added as a heap array.
+		/// <summary>Add an n &gt; 2 dimensional and/or complex entry to the binary table or heap area. If entries already exist then the user must have formatted the n &gt; 2 dimensional array to match the existing table height NAXIS2.
 		/// <para>Otherwise it is recommended to create this table with ONLY the n &gt; 2 dimensional entry formatted simply as a vector, non-repeated instance. The height or NAXIS2 will then be the number of elements of the n &gt; 2 dimensional array.</para>
+		/// <para>If dimensions need to be recorded then supply the dimNelements argument.</para>
 		/// <para>If adding a complex number array to the binary table, the entryArray must be either single or double floating point.</para>
 		/// <para>If complex the entryArray must be a factor of two columns repeats where the 1st and odd numbered columns are the spatial part, and the 2nd and even numbered columns are the temporal part.</para>
-		/// <para>If it is a variable length heap array then the entry must be supplied as a vector, unless it is complex in which case it is a pairing array ([2 x n]). If dimensions need to be recorded then supply the dimNelements argument.</para></summary>
+		/// <para>If it is a variable length heap array then the entry must be supplied as an array of arrays, or an array of Strings; if complex each subarray must contain an even pairing of values.</para></summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
-		/// <param name="entryUnits">The physical units of the values of the array.</param>
+		/// <param name="entryUnits">The physical units of the values of the array. Pass empty string if not required.</param>
 		/// <param name="entryArray">The array to enter into the table.</param>
 		/// <param name="dimNElements">A vector giving the number of elements along each dimension of the array, to write as the TDIM key for the entry IF the entry is n &gt; 2 dimensional; pass nullptr if the entry is not n &gt; 2 dimensional.</param>
 		/// <param name="isComplex">A boolean to set whether the array should be interpreted as complex value pairings.</param>
-		/// <param name="addAsHeapVarRepeatArray">A boolean to set whether to save the array as a variable repeat array in the heap area.</param>
+		/// <param name="addAsHeapVarRepeatArray">A boolean to set whether to save the array as a variable repeat array in the heap area. If true, the entryArray must be an array of arrays or an array of Strings.</param>
 		void AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExists, String^ entryUnits, Object^ entryArray, array<int>^ dimNElements, bool isComplex, bool addAsHeapVarRepeatArray);
 
 		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES INCLUDING THE HEAP.
 		/// <para>Do not use for n &gt; 2 dimensional and/or complex entries.</para></summary>
 		/// <param name="ttypeEntries">The names of the binary table extension entries, i.e. the TTYPE values.</param>
-		/// <param name="entryUnits">The physical units of the values of the arrays.</param>
+		/// <param name="entryUnits">The physical units of the values of the arrays. Pass nullptr if not needed, or with null elements or empty elements where not required, etc.</param>
 		/// <param name="entryArrays">An array of vectors or 2D arrays to enter into the table.</param>
 		void SetTTYPEEntries(array<String^>^ ttypeEntries, array<String^>^ entryUnits, array<Object^>^ entryArrays);
 
@@ -859,6 +862,8 @@ namespace JPFITS
 		/// <param name="keyComment">The comment of the key.</param>
 		void AddExtraHeaderKey(String^ keyName, String^ keyValue, String^ keyComment);
 
+		/// <summary>Get the value of an extra Key. If the key doesn't exist, an empty String is returned.</summary>
+		/// <param name="keyName">The name of the key.</param>
 		String^ GetExtraHeaderKeyValue(String^ keyName);
 
 		/// <summary>Remove the extra header key with the given name and value.</summary>
