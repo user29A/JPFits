@@ -917,8 +917,7 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
 
 				for (int j = 0; j < row->Length; j++)
-				{
-					pos += j * 8;
+				{					
 					dbl[7] = HEAPDATA[pos];
 					dbl[6] = HEAPDATA[pos + 1];
 					dbl[5] = HEAPDATA[pos + 2];
@@ -928,6 +927,7 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 					dbl[1] = HEAPDATA[pos + 6];
 					dbl[0] = HEAPDATA[pos + 7];
 					row[j] = BitConverter::ToDouble(dbl, 0);
+					pos += 8;
 				}
 				arrya[i] = row;
 			}
@@ -945,13 +945,13 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 				array<unsigned char>^ sng = gcnew array<unsigned char>(4);
 					
 				for (int j = 0; j < row->Length; j++)
-				{
-					pos += j * 4;
+				{					
 					sng[3] = HEAPDATA[pos];
 					sng[2] = HEAPDATA[pos + 1];
 					sng[1] = HEAPDATA[pos + 2];
 					sng[0] = HEAPDATA[pos + 3];
 					row[j] = BitConverter::ToSingle(sng, 0);
+					pos += 4;
 				}
 				arrya[i] = row;
 			}
@@ -970,7 +970,6 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 
 				for (int j = 0; j < row->Length; j++)
 				{
-					pos += j * 8;
 					i64[7] = HEAPDATA[pos];
 					i64[6] = HEAPDATA[pos + 1];
 					i64[5] = HEAPDATA[pos + 2];
@@ -980,6 +979,7 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 					i64[1] = HEAPDATA[pos + 6];
 					i64[0] = HEAPDATA[pos + 7];
 					row[j] = BitConverter::ToInt64(i64, 0);
+					pos += 8;
 				}
 				arrya[i] = row;
 			}
@@ -999,7 +999,6 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 
 				for (int j = 0; j < row->Length; j++)
 				{
-					pos += j * 8;
 					ui64[7] = HEAPDATA[pos];
 					ui64[6] = HEAPDATA[pos + 1];
 					ui64[5] = HEAPDATA[pos + 2];
@@ -1009,6 +1008,7 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 					ui64[1] = HEAPDATA[pos + 6];
 					ui64[0] = HEAPDATA[pos + 7];
 					row[j] = BitConverter::ToInt64(ui64, 0) + bzero;
+					pos += 8;
 				}
 				arrya[i] = row;
 			}
@@ -1026,13 +1026,13 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 				array<unsigned char>^ int32 = gcnew array<unsigned char>(4);
 
 				for (int j = 0; j < row->Length; j++)
-				{
-					pos += j * 4;
+				{					
 					int32[3] = HEAPDATA[pos];
 					int32[2] = HEAPDATA[pos + 1];
 					int32[1] = HEAPDATA[pos + 2];
 					int32[0] = HEAPDATA[pos + 3];
 					row[j] = BitConverter::ToInt32(int32, 0);
+					pos += 4;
 				}
 				arrya[i] = row;
 			}
@@ -1052,12 +1052,12 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 
 				for (int j = 0; j < row->Length; j++)
 				{
-					pos += j * 4;
 					uint32[3] = HEAPDATA[pos];
 					uint32[2] = HEAPDATA[pos + 1];
 					uint32[1] = HEAPDATA[pos + 2];
 					uint32[0] = HEAPDATA[pos + 3];
 					row[j] = BitConverter::ToInt32(uint32, 0) + bzero;
+					pos += 4;
 				}
 				arrya[i] = row;
 			}
@@ -1075,11 +1075,11 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 				array<unsigned char>^ int16 = gcnew array<unsigned char>(2);
 
 				for (int j = 0; j < row->Length; j++)
-				{
-					pos += j * 2;
+				{					
 					int16[1] = HEAPDATA[pos];
 					int16[0] = HEAPDATA[pos + 1];
 					row[j] = BitConverter::ToInt16(int16, 0);
+					pos += 2;
 				}
 				arrya[i] = row;
 			}
@@ -1099,10 +1099,10 @@ Object^ JPFITS::FITSBinTable::GETHEAPTTYPE(int ttypeindex, TypeCode &objectTypeC
 
 				for (int j = 0; j < row->Length; j++)
 				{
-					pos += j * 2;
 					int16[1] = HEAPDATA[pos];
 					int16[0] = HEAPDATA[pos + 1];
 					row[j] = BitConverter::ToInt16(int16, 0) + bzero;
+					pos += 2;
 				}
 				arrya[i] = row;
 			}
@@ -1545,8 +1545,7 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 			{
 				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
 				for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
-				{
-					currentbyte += j * 8;
+				{					
 					dbl[7] = HEAPDATA[currentbyte];
 					dbl[6] = HEAPDATA[currentbyte + 1];
 					dbl[5] = HEAPDATA[currentbyte + 2];
@@ -1556,6 +1555,7 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 					dbl[1] = HEAPDATA[currentbyte + 6];
 					dbl[0] = HEAPDATA[currentbyte + 7];
 					str += BitConverter::ToDouble(dbl, 0).ToString() + "; ";
+					currentbyte += 8;
 				}
 				return str;
 			}
@@ -1564,13 +1564,13 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 			{
 				array<unsigned char>^ sng = gcnew array<unsigned char>(4);
 				for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
-				{
-					currentbyte += j * 4;
+				{					
 					sng[3] = HEAPDATA[currentbyte];
 					sng[2] = HEAPDATA[currentbyte + 1];
 					sng[1] = HEAPDATA[currentbyte + 2];
 					sng[0] = HEAPDATA[currentbyte + 3];
 					str += BitConverter::ToSingle(sng, 0).ToString() + "; ";
+					currentbyte += 4;
 				}
 				return str;
 			}
@@ -1579,8 +1579,7 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 			{
 				array<unsigned char>^ i64 = gcnew array<unsigned char>(8);
 				for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
-				{
-					currentbyte += j * 8;
+				{					
 					i64[7] = HEAPDATA[currentbyte];
 					i64[6] = HEAPDATA[currentbyte + 1];
 					i64[5] = HEAPDATA[currentbyte + 2];
@@ -1590,6 +1589,7 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 					i64[1] = HEAPDATA[currentbyte + 6];
 					i64[0] = HEAPDATA[currentbyte + 7];
 					str += BitConverter::ToInt64(i64, 0).ToString() + "; ";
+					currentbyte += 8;
 				}				
 				return str;
 			}
@@ -1600,7 +1600,6 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 				array<unsigned char>^ ui64 = gcnew array<unsigned char>(8);
 				for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 				{
-					currentbyte += j * 8;
 					ui64[7] = HEAPDATA[currentbyte];
 					ui64[6] = HEAPDATA[currentbyte + 1];
 					ui64[5] = HEAPDATA[currentbyte + 2];
@@ -1610,6 +1609,7 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 					ui64[1] = HEAPDATA[currentbyte + 6];
 					ui64[0] = HEAPDATA[currentbyte + 7];
 					str += (BitConverter::ToInt64(ui64, 0) + bzero).ToString() + "; ";
+					currentbyte += 8;
 				}
 				return str;
 			}
@@ -1618,13 +1618,13 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 			{
 				array<unsigned char>^ int32 = gcnew array<unsigned char>(4);
 				for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
-				{
-					currentbyte += j * 4;
+				{					
 					int32[3] = HEAPDATA[currentbyte];
 					int32[2] = HEAPDATA[currentbyte + 1];
 					int32[1] = HEAPDATA[currentbyte + 2];
 					int32[0] = HEAPDATA[currentbyte + 3];
 					str += BitConverter::ToInt32(int32, 0).ToString() + "; ";
+					currentbyte += 4;
 				}
 				return str;
 			}
@@ -1634,13 +1634,13 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 				unsigned __int32 bzero = 2147483648;
 				array<unsigned char>^ uint32 = gcnew array<unsigned char>(4);
 				for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
-				{
-					currentbyte += j * 4;
+				{					
 					uint32[3] = HEAPDATA[currentbyte];
 					uint32[2] = HEAPDATA[currentbyte + 1];
 					uint32[1] = HEAPDATA[currentbyte + 2];
 					uint32[0] = HEAPDATA[currentbyte + 3];
 					str += (BitConverter::ToInt32(uint32, 0) + bzero).ToString() + "; ";
+					currentbyte += 4;
 				}
 				return str;
 			}
@@ -1649,11 +1649,11 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 			{
 				array<unsigned char>^ int16 = gcnew array<unsigned char>(2);
 				for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
-				{
-					currentbyte += j * 2;
+				{					
 					int16[1] = HEAPDATA[currentbyte];
 					int16[0] = HEAPDATA[currentbyte + 1];
 					str += BitConverter::ToInt16(int16, 0).ToString() + "; ";
+					currentbyte += 2;
 				}
 				return str;
 			}
@@ -1664,10 +1664,10 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 				array<unsigned char>^ uint16 = gcnew array<unsigned char>(2);
 				for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 				{
-					currentbyte += j * 2;
 					uint16[1] = HEAPDATA[currentbyte];
 					uint16[0] = HEAPDATA[currentbyte + 1];
 					str += (BitConverter::ToInt16(uint16, 0) + bzero).ToString() + "; ";
+					currentbyte += 2;
 				}
 				return str;
 			}
@@ -1682,14 +1682,14 @@ String^ JPFITS::FITSBinTable::GetTTypeEntryRow(String^ ttypeEntry, int rowindex)
 			case ::TypeCode::Byte:
 			{
 				for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
-					str += ((unsigned __int8)HEAPDATA[currentbyte]).ToString() + "; ";
+					str += ((unsigned __int8)HEAPDATA[currentbyte + j]).ToString() + "; ";
 				return str;
 			}
 			
 			case ::TypeCode::Boolean:
 			{
 				for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
-					str += Convert::ToBoolean(HEAPDATA[currentbyte]).ToString() + "; ";
+					str += Convert::ToBoolean(HEAPDATA[currentbyte + j]).ToString() + "; ";
 				return str;
 			}
 
@@ -1841,7 +1841,10 @@ void JPFITS::FITSBinTable::SetTTYPEEntries(array<String^>^ ttypeEntries, array<S
 
 	TFIELDS = entryArrays->Length;
 	TTYPES = ttypeEntries;
-	TUNITS = entryUnits;
+	if (entryUnits != nullptr)
+		TUNITS = entryUnits;
+	else
+		TUNITS = gcnew array<String^>(entryArrays->Length);
 	TCODES = gcnew array<TypeCode>(entryArrays->Length);
 	TREPEATS = gcnew array<int>(entryArrays->Length);
 	TFORMS = gcnew array<String^>(entryArrays->Length);
@@ -1922,7 +1925,7 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 
 	bool isheapvarrepeatString = false;
 	if (addAsHeapVarRepeatArray)
-		if (Type::GetTypeCode((((Array^)entryArray)->GetValue(0))->GetType()->GetElementType()) == TypeCode::Empty)
+		if (Type::GetTypeCode(entryArray->GetType()->GetElementType()) == TypeCode::String)
 			isheapvarrepeatString = true;
 
 	if (isComplex && isheapvarrepeatString)
@@ -1965,7 +1968,7 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 			return;
 		}
 	}
-	
+
 	if (addAsHeapVarRepeatArray && !isheapvarrepeatString)
 		for (int i = 0; i < ((Array^)entryArray)->Length; i++)
 			if (((Array^)(((Array^)entryArray)->GetValue(i)))->Rank != 1)
@@ -2011,7 +2014,7 @@ void JPFITS::FITSBinTable::AddTTYPEEntry(String^ ttypeEntry, bool replaceIfExist
 				naxis2 = ((Array^)entryArray)->Length;
 			else
 				naxis2 = ((Array^)entryArray)->GetLength(1);
-			throw gcnew Exception("Error: Existing NAXIS2 = " + NAXIS2 + "; new entryArray NAXIS2 = " + naxis2 + ".");
+			throw gcnew Exception("Error: Existing NAXIS2 = " + NAXIS2 + "; new entryArray '" + ttypeEntry + "'  NAXIS2 = " + naxis2 + ".");
 			return;
 		}
 
@@ -2747,7 +2750,6 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 					for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 					{
 						dbl = BitConverter::GetBytes(((array<double>^)(((array<array<double>^>^)(ExtensionEntryData[i]))[y]))[x]);
-						pos += x * 8;
 						HEAPDATA[pos] = dbl[7];
 						HEAPDATA[pos + 1] = dbl[6];
 						HEAPDATA[pos + 2] = dbl[5];
@@ -2756,6 +2758,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 						HEAPDATA[pos + 5] = dbl[2];
 						HEAPDATA[pos + 6] = dbl[1];
 						HEAPDATA[pos + 7] = dbl[0];
+						pos += 8;
 					}
 				}
 				break;
@@ -2772,11 +2775,11 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 					for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 					{
 						sng = BitConverter::GetBytes(((array<float>^)(((array<array<float>^>^)(ExtensionEntryData[i]))[y]))[x]);
-						pos += x * 4;
 						HEAPDATA[pos] = sng[3];
 						HEAPDATA[pos + 1] = sng[2];
 						HEAPDATA[pos + 2] = sng[1];
 						HEAPDATA[pos + 3] = sng[0];
+						pos += 4;
 					}
 				}
 				break;
@@ -2793,7 +2796,6 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 					for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 					{
 						val = ((array<__int64>^)(((array<array<__int64>^>^)(ExtensionEntryData[i]))[y]))[x];
-						pos += x * 8;
 						HEAPDATA[pos] = ((val >> 56) & 0xff);
 						HEAPDATA[pos + 1] = ((val >> 48) & 0xff);
 						HEAPDATA[pos + 2] = ((val >> 40) & 0xff);
@@ -2802,6 +2804,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 						HEAPDATA[pos + 5] = ((val >> 16) & 0xff);
 						HEAPDATA[pos + 6] = ((val >> 8) & 0xff);
 						HEAPDATA[pos + 7] = (val & 0xff);
+						pos += 8;
 					}
 				}
 				break;
@@ -2819,7 +2822,6 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 					for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 					{
 						val = (((array<__int64>^)(((array<array<__int64>^>^)(ExtensionEntryData[i]))[y]))[x] - bzero);
-						pos += x * 8;
 						HEAPDATA[pos] = ((val >> 56) & 0xff);
 						HEAPDATA[pos + 1] = ((val >> 48) & 0xff);
 						HEAPDATA[pos + 2] = ((val >> 40) & 0xff);
@@ -2828,6 +2830,7 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 						HEAPDATA[pos + 5] = ((val >> 16) & 0xff);
 						HEAPDATA[pos + 6] = ((val >> 8) & 0xff);
 						HEAPDATA[pos + 7] = (val & 0xff);
+						pos += 8;
 					}
 				}
 				break;
@@ -2839,16 +2842,16 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 				for (int y = 0; y < NAXIS2; y++)
 				{
 					__int32 val;
-					int pos = TTYPEHEAPARRAYNELSPOS[i][1, y];
+					int pos = TTYPEHEAPARRAYNELSPOS[i][1, y];	
 
 					for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
-					{
-						val = ((array<__int32>^)(((array<array<__int32>^>^)(ExtensionEntryData[i]))[y]))[x];
-						pos += x * 4;
+					{						
+						val = ((array<__int32>^)(((array<array<__int32>^>^)(ExtensionEntryData[i]))[y]))[x];						
 						HEAPDATA[pos] = ((val >> 24) & 0xff);
 						HEAPDATA[pos + 1] = ((val >> 16) & 0xff);
 						HEAPDATA[pos + 2] = ((val >> 8) & 0xff);
 						HEAPDATA[pos + 3] = (val & 0xff);
+						pos += 4;
 					}
 				}
 				break;
@@ -2866,11 +2869,11 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 					for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 					{
 						val = (((array<__int32>^)(((array<array<__int32>^>^)(ExtensionEntryData[i]))[y]))[x] - bzero);
-						pos += x * 4;
 						HEAPDATA[pos] = ((val >> 24) & 0xff);
 						HEAPDATA[pos + 1] = ((val >> 16) & 0xff);
 						HEAPDATA[pos + 2] = ((val >> 8) & 0xff);
 						HEAPDATA[pos + 3] = (val & 0xff);
+						pos += 4;
 					}
 				}
 				break;
@@ -2887,9 +2890,9 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 					for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 					{
 						val = ((array<__int16>^)(((array<array<__int16>^>^)(ExtensionEntryData[i]))[y]))[x];
-						pos += x * 2;
 						HEAPDATA[pos] = ((val >> 8) & 0xff);
 						HEAPDATA[pos + 1] = (val & 0xff);
+						pos += 2;
 					}
 				}
 				break;
@@ -2907,9 +2910,9 @@ void JPFITS::FITSBinTable::MAKEHEAPBYTEARRAY(array<Object^>^ ExtensionEntryData)
 					for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 					{
 						val = (((array<__int16>^)(((array<array<__int16>^>^)(ExtensionEntryData[i]))[y]))[x] - bzero);
-						pos += x * 2;
 						HEAPDATA[pos] = ((val >> 8) & 0xff);
 						HEAPDATA[pos + 1] = (val & 0xff);
+						pos += 2;
 					}
 				}
 				break;

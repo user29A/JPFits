@@ -839,7 +839,7 @@ namespace JPFITS
 		/// <para>If dimensions need to be recorded then supply the dimNelements argument.</para>
 		/// <para>If adding a complex number array to the binary table, the entryArray must be either single or double floating point.</para>
 		/// <para>If complex the entryArray must be a factor of two columns repeats where the 1st and odd numbered columns are the spatial part, and the 2nd and even numbered columns are the temporal part.</para>
-		/// <para>If it is a variable length heap array then the entry must be supplied as an array of arrays, or an array of Strings; if complex each subarray must contain an even pairing of values.</para></summary>
+		/// <para>If it is a variable repeat heap array then the entry must be supplied as an array of arrays, or an array of Strings; if complex each subarray must contain an even pairing of values.</para></summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
 		/// <param name="entryUnits">The physical units of the values of the array. Pass empty string if not required.</param>
@@ -912,12 +912,19 @@ namespace JPFITS
 			}
 		}
 
+		/// <summary>Returns wheather the TTYPE entry at the given entry index is a variable repeat array.</summary>
 		property bool TTYPEIsHeapVariableRepeatEntry[int]
 		{
 			bool get(int n) { return TTYPEISHEAPARRAYDESC[n]; }
 		}
 
-		/// <summary>TableDataTypes reports the number of columns in each table entry.</summary>
+		/// <summary>Returns the number of elements (repeats) for a given heap entry at a given row.</summary>
+		property int TTYPERowRepeatsHeapEntry[int, int]
+		{
+			int get(int ttypeIndex, int row) { return TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, row]; }
+		}
+
+		/// <summary>TableDataTypes reports the number of columns or repeats in each table entry. Variable repeat entries only report 1...use </summary>
 		property array<int>^ TableDataRepeats
 		{
 			array<int>^ get() { return TREPEATS; }

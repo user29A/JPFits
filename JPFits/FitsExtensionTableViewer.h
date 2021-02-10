@@ -147,13 +147,17 @@ namespace JPFITS {
 			dataGridViewCellStyle1->SelectionForeColor = System::Drawing::SystemColors::HighlightText;
 			dataGridViewCellStyle1->WrapMode = System::Windows::Forms::DataGridViewTriState::True;
 			this->ExtensionTableGrid->RowHeadersDefaultCellStyle = dataGridViewCellStyle1;
-			this->ExtensionTableGrid->RowHeadersWidth = 75;
+			this->ExtensionTableGrid->RowHeadersWidth = 125;
 			this->ExtensionTableGrid->Size = System::Drawing::Size(583, 329);
 			this->ExtensionTableGrid->TabIndex = 0;
 			this->ExtensionTableGrid->VirtualMode = true;
 			this->ExtensionTableGrid->CellMouseClick += gcnew System::Windows::Forms::DataGridViewCellMouseEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_CellMouseClick);
 			this->ExtensionTableGrid->CellValueNeeded += gcnew System::Windows::Forms::DataGridViewCellValueEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_CellValueNeeded);
 			this->ExtensionTableGrid->NewRowNeeded += gcnew System::Windows::Forms::DataGridViewRowEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_NewRowNeeded);
+			this->ExtensionTableGrid->RowPostPaint += gcnew System::Windows::Forms::DataGridViewRowPostPaintEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_RowPostPaint);
+			this->ExtensionTableGrid->RowPrePaint += gcnew System::Windows::Forms::DataGridViewRowPrePaintEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_RowPrePaint);
+			this->ExtensionTableGrid->RowsAdded += gcnew System::Windows::Forms::DataGridViewRowsAddedEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_RowsAdded);
+			this->ExtensionTableGrid->RowValidated += gcnew System::Windows::Forms::DataGridViewCellEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_RowValidated);
 			this->ExtensionTableGrid->Scroll += gcnew System::Windows::Forms::ScrollEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_Scroll);
 			// 
 			// menuStrip1
@@ -394,5 +398,9 @@ private: System::Void ExtensionTableGrid_CellValueNeeded(System::Object^  sender
 private: System::Void ExtensionTableGrid_CellMouseClick(System::Object^  sender, System::Windows::Forms::DataGridViewCellMouseEventArgs^  e);
 private: System::Void FitsExtensionTableViewer_MouseEnter(System::Object^  sender, System::EventArgs^  e) { this->BringToFront(); this->Activate(); }
 private: System::Void FitsExtensionTableViewer_MouseHover(System::Object^  sender, System::EventArgs^  e) { this->BringToFront(); this->Activate(); }
+private: System::Void ExtensionTableGrid_RowValidated(System::Object^  sender, System::Windows::Forms::DataGridViewCellEventArgs^  e);
+private: System::Void ExtensionTableGrid_RowPostPaint(System::Object^  sender, System::Windows::Forms::DataGridViewRowPostPaintEventArgs^  e);
+private: System::Void ExtensionTableGrid_RowPrePaint(System::Object^  sender, System::Windows::Forms::DataGridViewRowPrePaintEventArgs^  e);
+private: System::Void ExtensionTableGrid_RowsAdded(System::Object^  sender, System::Windows::Forms::DataGridViewRowsAddedEventArgs^  e);
 };
 }

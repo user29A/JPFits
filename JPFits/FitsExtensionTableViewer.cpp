@@ -44,9 +44,9 @@ void JPFITS::FitsExtensionTableViewer::OpenFITSImage(String^ FileName)
 
 		this->Show();
 
-		if (list->Length == 1)
+		//if (list->Length == 1)
 			PopulateTable(list[0]);
-		else
+		//else
 			MenuChooseTable->ShowDropDown();
 	}
 	catch (Exception^ e)
@@ -134,14 +134,20 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 	this->Activate();
 }
 
-void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_Scroll(System::Object^  sender, System::Windows::Forms::ScrollEventArgs^  e)
-{
-	
-}
+void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_Scroll(System::Object^  sender, System::Windows::Forms::ScrollEventArgs^  e){}
 
-void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_NewRowNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewRowEventArgs^  e)
-{
+void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_NewRowNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewRowEventArgs^  e){}
 
+void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_RowValidated(System::Object^  sender, System::Windows::Forms::DataGridViewCellEventArgs^  e){}
+
+void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_RowPostPaint(System::Object^  sender, System::Windows::Forms::DataGridViewRowPostPaintEventArgs^  e){}
+
+void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_RowPrePaint(System::Object^  sender, System::Windows::Forms::DataGridViewRowPrePaintEventArgs^  e){}
+
+void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_RowsAdded(System::Object^  sender, System::Windows::Forms::DataGridViewRowsAddedEventArgs^  e)
+{
+	for (int i = 0; i < e->RowCount; i++)
+		ExtensionTableGrid->Rows[e->RowIndex + i]->HeaderCell->Value = (e->RowIndex + i + 1).ToString();
 }
 
 void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_CellValueNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewCellValueEventArgs^  e)
@@ -153,7 +159,7 @@ void JPFITS::FitsExtensionTableViewer::ExtensionTableGrid_CellValueNeeded(System
 		else
 			e->Value = ((array<double>^)DATATABLE[e->ColumnIndex])[e->RowIndex];
 
-		ExtensionTableGrid->Rows[e->RowIndex]->HeaderCell->Value = (e->RowIndex + 1).ToString();
+		//ExtensionTableGrid->Rows[e->RowIndex]->HeaderCell->Value = (e->RowIndex + 1).ToString();
 	}
 	catch (...)
 	{
