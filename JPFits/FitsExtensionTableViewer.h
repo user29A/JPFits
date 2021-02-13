@@ -133,7 +133,8 @@ namespace JPFITS {
 			this->ExtensionTableGrid->ClipboardCopyMode = System::Windows::Forms::DataGridViewClipboardCopyMode::EnableWithoutHeaderText;
 			this->ExtensionTableGrid->ColumnHeadersHeightSizeMode = System::Windows::Forms::DataGridViewColumnHeadersHeightSizeMode::AutoSize;
 			this->ExtensionTableGrid->Dock = System::Windows::Forms::DockStyle::Fill;
-			this->ExtensionTableGrid->Location = System::Drawing::Point(0, 24);
+			this->ExtensionTableGrid->Location = System::Drawing::Point(0, 35);
+			this->ExtensionTableGrid->Margin = System::Windows::Forms::Padding(4, 5, 4, 5);
 			this->ExtensionTableGrid->Name = L"ExtensionTableGrid";
 			this->ExtensionTableGrid->ReadOnly = true;
 			dataGridViewCellStyle1->Alignment = System::Windows::Forms::DataGridViewContentAlignment::MiddleLeft;
@@ -148,16 +149,12 @@ namespace JPFITS {
 			dataGridViewCellStyle1->WrapMode = System::Windows::Forms::DataGridViewTriState::True;
 			this->ExtensionTableGrid->RowHeadersDefaultCellStyle = dataGridViewCellStyle1;
 			this->ExtensionTableGrid->RowHeadersWidth = 125;
-			this->ExtensionTableGrid->Size = System::Drawing::Size(583, 329);
+			this->ExtensionTableGrid->Size = System::Drawing::Size(874, 508);
 			this->ExtensionTableGrid->TabIndex = 0;
 			this->ExtensionTableGrid->VirtualMode = true;
 			this->ExtensionTableGrid->CellMouseClick += gcnew System::Windows::Forms::DataGridViewCellMouseEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_CellMouseClick);
 			this->ExtensionTableGrid->CellValueNeeded += gcnew System::Windows::Forms::DataGridViewCellValueEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_CellValueNeeded);
-			this->ExtensionTableGrid->NewRowNeeded += gcnew System::Windows::Forms::DataGridViewRowEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_NewRowNeeded);
-			this->ExtensionTableGrid->RowPostPaint += gcnew System::Windows::Forms::DataGridViewRowPostPaintEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_RowPostPaint);
-			this->ExtensionTableGrid->RowPrePaint += gcnew System::Windows::Forms::DataGridViewRowPrePaintEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_RowPrePaint);
 			this->ExtensionTableGrid->RowsAdded += gcnew System::Windows::Forms::DataGridViewRowsAddedEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_RowsAdded);
-			this->ExtensionTableGrid->RowValidated += gcnew System::Windows::Forms::DataGridViewCellEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_RowValidated);
 			this->ExtensionTableGrid->Scroll += gcnew System::Windows::Forms::ScrollEventHandler(this, &FitsExtensionTableViewer::ExtensionTableGrid_Scroll);
 			// 
 			// menuStrip1
@@ -169,7 +166,8 @@ namespace JPFITS {
 			});
 			this->menuStrip1->Location = System::Drawing::Point(0, 0);
 			this->menuStrip1->Name = L"menuStrip1";
-			this->menuStrip1->Size = System::Drawing::Size(583, 24);
+			this->menuStrip1->Padding = System::Windows::Forms::Padding(9, 3, 0, 3);
+			this->menuStrip1->Size = System::Drawing::Size(874, 35);
 			this->menuStrip1->TabIndex = 1;
 			this->menuStrip1->Text = L"menuStrip1";
 			// 
@@ -177,20 +175,20 @@ namespace JPFITS {
 			// 
 			this->MenuFile->DropDownItems->AddRange(gcnew cli::array< System::Windows::Forms::ToolStripItem^  >(1) { this->FileOpenMenu });
 			this->MenuFile->Name = L"MenuFile";
-			this->MenuFile->Size = System::Drawing::Size(37, 20);
+			this->MenuFile->Size = System::Drawing::Size(50, 29);
 			this->MenuFile->Text = L"File";
 			// 
 			// FileOpenMenu
 			// 
 			this->FileOpenMenu->Name = L"FileOpenMenu";
-			this->FileOpenMenu->Size = System::Drawing::Size(103, 22);
+			this->FileOpenMenu->Size = System::Drawing::Size(140, 30);
 			this->FileOpenMenu->Text = L"Open";
 			this->FileOpenMenu->Click += gcnew System::EventHandler(this, &FitsExtensionTableViewer::FileOpenMenu_Click);
 			// 
 			// MenuChooseTable
 			// 
 			this->MenuChooseTable->Name = L"MenuChooseTable";
-			this->MenuChooseTable->Size = System::Drawing::Size(51, 20);
+			this->MenuChooseTable->Size = System::Drawing::Size(72, 29);
 			this->MenuChooseTable->Text = L"Tables";
 			// 
 			// MenuChooseTableEntries
@@ -200,7 +198,7 @@ namespace JPFITS {
 					this->toolStripSeparator1
 			});
 			this->MenuChooseTableEntries->Name = L"MenuChooseTableEntries";
-			this->MenuChooseTableEntries->Size = System::Drawing::Size(84, 20);
+			this->MenuChooseTableEntries->Size = System::Drawing::Size(121, 29);
 			this->MenuChooseTableEntries->Text = L"Table Entries";
 			this->MenuChooseTableEntries->DropDownItemClicked += gcnew System::Windows::Forms::ToolStripItemClickedEventHandler(this, &FitsExtensionTableViewer::MenuChooseTableEntries_DropDownItemClicked);
 			this->MenuChooseTableEntries->Click += gcnew System::EventHandler(this, &FitsExtensionTableViewer::MenuChooseTableEntries_Click);
@@ -209,7 +207,7 @@ namespace JPFITS {
 			// ViewAllChck
 			// 
 			this->ViewAllChck->Name = L"ViewAllChck";
-			this->ViewAllChck->Size = System::Drawing::Size(131, 22);
+			this->ViewAllChck->Size = System::Drawing::Size(181, 30);
 			this->ViewAllChck->Text = L"View None";
 			this->ViewAllChck->CheckedChanged += gcnew System::EventHandler(this, &FitsExtensionTableViewer::ViewAllChck_CheckedChanged);
 			this->ViewAllChck->Click += gcnew System::EventHandler(this, &FitsExtensionTableViewer::ViewAllChck_Click);
@@ -217,7 +215,7 @@ namespace JPFITS {
 			// toolStripSeparator1
 			// 
 			this->toolStripSeparator1->Name = L"toolStripSeparator1";
-			this->toolStripSeparator1->Size = System::Drawing::Size(128, 6);
+			this->toolStripSeparator1->Size = System::Drawing::Size(178, 6);
 			// 
 			// PlotEntryMenu
 			// 
@@ -226,7 +224,7 @@ namespace JPFITS {
 					this->XDrop, this->toolStripSeparator2, this->toolStripMenuItem2, this->YDrop, this->toolStripSeparator3, this->PlotMenuItem
 			});
 			this->PlotEntryMenu->Name = L"PlotEntryMenu";
-			this->PlotEntryMenu->Size = System::Drawing::Size(70, 20);
+			this->PlotEntryMenu->Size = System::Drawing::Size(100, 29);
 			this->PlotEntryMenu->Text = L"Plot Entry";
 			// 
 			// PlotXChck
@@ -235,7 +233,7 @@ namespace JPFITS {
 			this->PlotXChck->CheckOnClick = true;
 			this->PlotXChck->CheckState = System::Windows::Forms::CheckState::Checked;
 			this->PlotXChck->Name = L"PlotXChck";
-			this->PlotXChck->Size = System::Drawing::Size(181, 22);
+			this->PlotXChck->Size = System::Drawing::Size(203, 30);
 			this->PlotXChck->Text = L"X";
 			this->PlotXChck->CheckedChanged += gcnew System::EventHandler(this, &FitsExtensionTableViewer::toolStripMenuItem1_CheckedChanged);
 			// 
@@ -244,17 +242,17 @@ namespace JPFITS {
 			this->XDrop->BackColor = System::Drawing::Color::Gainsboro;
 			this->XDrop->DropDownStyle = System::Windows::Forms::ComboBoxStyle::DropDownList;
 			this->XDrop->Name = L"XDrop";
-			this->XDrop->Size = System::Drawing::Size(121, 23);
+			this->XDrop->Size = System::Drawing::Size(121, 33);
 			// 
 			// toolStripSeparator2
 			// 
 			this->toolStripSeparator2->Name = L"toolStripSeparator2";
-			this->toolStripSeparator2->Size = System::Drawing::Size(178, 6);
+			this->toolStripSeparator2->Size = System::Drawing::Size(200, 6);
 			// 
 			// toolStripMenuItem2
 			// 
 			this->toolStripMenuItem2->Name = L"toolStripMenuItem2";
-			this->toolStripMenuItem2->Size = System::Drawing::Size(181, 22);
+			this->toolStripMenuItem2->Size = System::Drawing::Size(203, 30);
 			this->toolStripMenuItem2->Text = L"Y";
 			// 
 			// YDrop
@@ -262,33 +260,34 @@ namespace JPFITS {
 			this->YDrop->BackColor = System::Drawing::Color::Gainsboro;
 			this->YDrop->DropDownStyle = System::Windows::Forms::ComboBoxStyle::DropDownList;
 			this->YDrop->Name = L"YDrop";
-			this->YDrop->Size = System::Drawing::Size(121, 23);
+			this->YDrop->Size = System::Drawing::Size(121, 33);
 			// 
 			// toolStripSeparator3
 			// 
 			this->toolStripSeparator3->Name = L"toolStripSeparator3";
-			this->toolStripSeparator3->Size = System::Drawing::Size(178, 6);
+			this->toolStripSeparator3->Size = System::Drawing::Size(200, 6);
 			// 
 			// PlotMenuItem
 			// 
 			this->PlotMenuItem->Name = L"PlotMenuItem";
-			this->PlotMenuItem->Size = System::Drawing::Size(181, 22);
+			this->PlotMenuItem->Size = System::Drawing::Size(203, 30);
 			this->PlotMenuItem->Text = L"Plot Selection";
 			this->PlotMenuItem->Click += gcnew System::EventHandler(this, &FitsExtensionTableViewer::PlotMenuItem_Click);
 			// 
 			// ViewHeaderMenu
 			// 
 			this->ViewHeaderMenu->Name = L"ViewHeaderMenu";
-			this->ViewHeaderMenu->Size = System::Drawing::Size(85, 20);
+			this->ViewHeaderMenu->Size = System::Drawing::Size(123, 29);
 			this->ViewHeaderMenu->Text = L"View Header";
 			this->ViewHeaderMenu->Click += gcnew System::EventHandler(this, &FitsExtensionTableViewer::ViewHeaderMenu_Click);
 			// 
 			// button1
 			// 
 			this->button1->DialogResult = System::Windows::Forms::DialogResult::Cancel;
-			this->button1->Location = System::Drawing::Point(239, 133);
+			this->button1->Location = System::Drawing::Point(358, 205);
+			this->button1->Margin = System::Windows::Forms::Padding(4, 5, 4, 5);
 			this->button1->Name = L"button1";
-			this->button1->Size = System::Drawing::Size(75, 23);
+			this->button1->Size = System::Drawing::Size(112, 35);
 			this->button1->TabIndex = 2;
 			this->button1->Text = L"cancelbtn";
 			this->button1->UseVisualStyleBackColor = true;
@@ -300,10 +299,11 @@ namespace JPFITS {
 			this->HeaderListBox->Font = (gcnew System::Drawing::Font(L"Courier New", 9.75F, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
 				static_cast<System::Byte>(0)));
 			this->HeaderListBox->FormattingEnabled = true;
-			this->HeaderListBox->ItemHeight = 16;
+			this->HeaderListBox->ItemHeight = 22;
 			this->HeaderListBox->Location = System::Drawing::Point(0, 0);
+			this->HeaderListBox->Margin = System::Windows::Forms::Padding(4, 5, 4, 5);
 			this->HeaderListBox->Name = L"HeaderListBox";
-			this->HeaderListBox->Size = System::Drawing::Size(583, 353);
+			this->HeaderListBox->Size = System::Drawing::Size(874, 543);
 			this->HeaderListBox->TabIndex = 3;
 			// 
 			// toolTip1
@@ -315,16 +315,17 @@ namespace JPFITS {
 			// 
 			// FitsExtensionTableViewer
 			// 
-			this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
+			this->AutoScaleDimensions = System::Drawing::SizeF(9, 20);
 			this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
 			this->CancelButton = this->button1;
-			this->ClientSize = System::Drawing::Size(583, 353);
+			this->ClientSize = System::Drawing::Size(874, 543);
 			this->Controls->Add(this->ExtensionTableGrid);
 			this->Controls->Add(this->menuStrip1);
 			this->Controls->Add(this->HeaderListBox);
 			this->Controls->Add(this->button1);
 			this->Icon = (cli::safe_cast<System::Drawing::Icon^>(resources->GetObject(L"$this.Icon")));
 			this->MainMenuStrip = this->menuStrip1;
+			this->Margin = System::Windows::Forms::Padding(4, 5, 4, 5);
 			this->Name = L"FitsExtensionTableViewer";
 			this->StartPosition = System::Windows::Forms::FormStartPosition::CenterParent;
 			this->Text = L"FitsExtensionTableViewer";
@@ -392,15 +393,11 @@ private: System::Void FitsExtensionTableViewer_LocationChanged(System::Object^  
 	SetReg("JPChart", this->Text + "FitsTableHeight", this->Height);
 }
 private: System::Void FitsExtensionTableViewer_Shown(System::Object^  sender, System::EventArgs^  e);
-private: System::Void ExtensionTableGrid_Scroll(System::Object^  sender, System::Windows::Forms::ScrollEventArgs^  e);
-private: System::Void ExtensionTableGrid_NewRowNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewRowEventArgs^  e);
 private: System::Void ExtensionTableGrid_CellValueNeeded(System::Object^  sender, System::Windows::Forms::DataGridViewCellValueEventArgs^  e);
 private: System::Void ExtensionTableGrid_CellMouseClick(System::Object^  sender, System::Windows::Forms::DataGridViewCellMouseEventArgs^  e);
 private: System::Void FitsExtensionTableViewer_MouseEnter(System::Object^  sender, System::EventArgs^  e) { this->BringToFront(); this->Activate(); }
 private: System::Void FitsExtensionTableViewer_MouseHover(System::Object^  sender, System::EventArgs^  e) { this->BringToFront(); this->Activate(); }
-private: System::Void ExtensionTableGrid_RowValidated(System::Object^  sender, System::Windows::Forms::DataGridViewCellEventArgs^  e);
-private: System::Void ExtensionTableGrid_RowPostPaint(System::Object^  sender, System::Windows::Forms::DataGridViewRowPostPaintEventArgs^  e);
-private: System::Void ExtensionTableGrid_RowPrePaint(System::Object^  sender, System::Windows::Forms::DataGridViewRowPrePaintEventArgs^  e);
 private: System::Void ExtensionTableGrid_RowsAdded(System::Object^  sender, System::Windows::Forms::DataGridViewRowsAddedEventArgs^  e);
+private: System::Void ExtensionTableGrid_Scroll(System::Object^  sender, System::Windows::Forms::ScrollEventArgs^  e);
 };
 }

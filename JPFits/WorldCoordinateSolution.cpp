@@ -267,29 +267,29 @@ void JPFITS::WorldCoordinateSolution::SET_CDMATRIXINV()
 
 void JPFITS::WorldCoordinateSolution::Get_WCS(FITSImage^ FITS)
 {
-	if (FITS->GetKeyValue("CD1_1") == "")
+	if (FITS->Header->GetKeyValue("CD1_1") == "")
 		throw gcnew Exception("Error: CD matrix not found...");
 
 	CDMATRIX = gcnew array<double, 2>(2, 2);
 	CDMATRIXINV = gcnew array<double, 2>(2, 2);
 
 	CTYPEN = gcnew array<String^>(2);
-	CTYPEN[0] = FITS->GetKeyValue("CTYPE1");
-	CTYPEN[1] = FITS->GetKeyValue("CTYPE2");
+	CTYPEN[0] = FITS->Header->GetKeyValue("CTYPE1");
+	CTYPEN[1] = FITS->Header->GetKeyValue("CTYPE2");
 
 	CRPIXN = gcnew array<double>(2);
-	CRPIXN[0] = Convert::ToDouble(FITS->GetKeyValue("CRPIX1"));
-	CRPIXN[1] = Convert::ToDouble(FITS->GetKeyValue("CRPIX2"));
+	CRPIXN[0] = Convert::ToDouble(FITS->Header->GetKeyValue("CRPIX1"));
+	CRPIXN[1] = Convert::ToDouble(FITS->Header->GetKeyValue("CRPIX2"));
 
 	CRVALN = gcnew array<double>(2);
-	CRVALN[0] = Convert::ToDouble(FITS->GetKeyValue("CRVAL1"));
-	CRVALN[1] = Convert::ToDouble(FITS->GetKeyValue("CRVAL2"));
+	CRVALN[0] = Convert::ToDouble(FITS->Header->GetKeyValue("CRVAL1"));
+	CRVALN[1] = Convert::ToDouble(FITS->Header->GetKeyValue("CRVAL2"));
 
 	CDMATRIX = gcnew array<double, 2>(2, 2);
-	CDMATRIX[0, 0] = Convert::ToDouble(FITS->GetKeyValue("CD1_1"));
-	CDMATRIX[1, 0] = Convert::ToDouble(FITS->GetKeyValue("CD1_2"));
-	CDMATRIX[0, 1] = Convert::ToDouble(FITS->GetKeyValue("CD2_1"));
-	CDMATRIX[1, 1] = Convert::ToDouble(FITS->GetKeyValue("CD2_2"));
+	CDMATRIX[0, 0] = Convert::ToDouble(FITS->Header->GetKeyValue("CD1_1"));
+	CDMATRIX[1, 0] = Convert::ToDouble(FITS->Header->GetKeyValue("CD1_2"));
+	CDMATRIX[0, 1] = Convert::ToDouble(FITS->Header->GetKeyValue("CD2_1"));
+	CDMATRIX[1, 1] = Convert::ToDouble(FITS->Header->GetKeyValue("CD2_2"));
 
 	CD1_1 = CDMATRIX[0, 0];
 	CD1_2 = CDMATRIX[1, 0];
@@ -308,28 +308,28 @@ void JPFITS::WorldCoordinateSolution::Get_WCS(FITSImage^ FITS)
 
 	try
 	{
-		CDELTN[0] = Convert::ToDouble(FITS->GetKeyValue("CDELT1"));
-		CDELTN[1] = Convert::ToDouble(FITS->GetKeyValue("CDELT2"));
-		CROTAN[0] = Convert::ToDouble(FITS->GetKeyValue("CROTA1"));
-		CROTAN[1] = Convert::ToDouble(FITS->GetKeyValue("CROTA2"));
-		CPIX1RM = Convert::ToDouble(FITS->GetKeyValue("CPIX1RM"));
-		CPIX1RS = Convert::ToDouble(FITS->GetKeyValue("CPIX1RS"));
-		CVAL1RM = Convert::ToDouble(FITS->GetKeyValue("CVAL1RM"));
-		CVAL1RS = Convert::ToDouble(FITS->GetKeyValue("CVAL1RS"));
-		CPIX2RM = Convert::ToDouble(FITS->GetKeyValue("CPIX2RM"));
-		CPIX2RS = Convert::ToDouble(FITS->GetKeyValue("CPIX2RS"));
-		CVAL2RM = Convert::ToDouble(FITS->GetKeyValue("CVAL2RM"));
-		CVAL2RS = Convert::ToDouble(FITS->GetKeyValue("CVAL2RS"));
-		CPIXRM = Convert::ToDouble(FITS->GetKeyValue("CPIXRM"));
-		CPIXRS = Convert::ToDouble(FITS->GetKeyValue("CPIXRS"));
-		CVALRM = Convert::ToDouble(FITS->GetKeyValue("CVALRM"));
-		CVALRS = Convert::ToDouble(FITS->GetKeyValue("CVALRS"));
+		CDELTN[0] = Convert::ToDouble(FITS->Header->GetKeyValue("CDELT1"));
+		CDELTN[1] = Convert::ToDouble(FITS->Header->GetKeyValue("CDELT2"));
+		CROTAN[0] = Convert::ToDouble(FITS->Header->GetKeyValue("CROTA1"));
+		CROTAN[1] = Convert::ToDouble(FITS->Header->GetKeyValue("CROTA2"));
+		CPIX1RM = Convert::ToDouble(FITS->Header->GetKeyValue("CPIX1RM"));
+		CPIX1RS = Convert::ToDouble(FITS->Header->GetKeyValue("CPIX1RS"));
+		CVAL1RM = Convert::ToDouble(FITS->Header->GetKeyValue("CVAL1RM"));
+		CVAL1RS = Convert::ToDouble(FITS->Header->GetKeyValue("CVAL1RS"));
+		CPIX2RM = Convert::ToDouble(FITS->Header->GetKeyValue("CPIX2RM"));
+		CPIX2RS = Convert::ToDouble(FITS->Header->GetKeyValue("CPIX2RS"));
+		CVAL2RM = Convert::ToDouble(FITS->Header->GetKeyValue("CVAL2RM"));
+		CVAL2RS = Convert::ToDouble(FITS->Header->GetKeyValue("CVAL2RS"));
+		CPIXRM = Convert::ToDouble(FITS->Header->GetKeyValue("CPIXRM"));
+		CPIXRS = Convert::ToDouble(FITS->Header->GetKeyValue("CPIXRS"));
+		CVALRM = Convert::ToDouble(FITS->Header->GetKeyValue("CVALRM"));
+		CVALRS = Convert::ToDouble(FITS->Header->GetKeyValue("CVALRS"));
 
 		int num = 0, key = 0;
 		while (key != -1)
 		{
 			num++;
-			key = FITS->GetKeyIndex("WCP1_" + num.ToString("000"));
+			key = FITS->Header->GetKeyIndex("WCP1_" + num.ToString("000"), false);
 		}
 		num--;
 		CPIX1 = gcnew array<double>(num);
@@ -339,10 +339,10 @@ void JPFITS::WorldCoordinateSolution::Get_WCS(FITSImage^ FITS)
 		num = 1;
 		for (int i = 0; i < CPIX1->Length; i++)
 		{
-			CPIX1[i] = Convert::ToDouble(FITS->GetKeyValue("WCP1_" + num.ToString("000")));
-			CPIX2[i] = Convert::ToDouble(FITS->GetKeyValue("WCP2_" + num.ToString("000")));
-			CVAL1[i] = Convert::ToDouble(FITS->GetKeyValue("WCV1_" + num.ToString("000")));
-			CVAL2[i] = Convert::ToDouble(FITS->GetKeyValue("WCV2_" + num.ToString("000")));
+			CPIX1[i] = Convert::ToDouble(FITS->Header->GetKeyValue("WCP1_" + num.ToString("000")));
+			CPIX2[i] = Convert::ToDouble(FITS->Header->GetKeyValue("WCP2_" + num.ToString("000")));
+			CVAL1[i] = Convert::ToDouble(FITS->Header->GetKeyValue("WCV1_" + num.ToString("000")));
+			CVAL2[i] = Convert::ToDouble(FITS->Header->GetKeyValue("WCV2_" + num.ToString("000")));
 			num++;
 		}
 	}
@@ -360,111 +360,111 @@ void JPFITS::WorldCoordinateSolution::Get_WCS(String^ FITS_filename)
 
 void JPFITS::WorldCoordinateSolution::CopyTo(FITSImage^ FITS)
 {
-	FITS->SetKey("CTYPE1", CTYPEN[0], "WCS type of horizontal coordinate transformation", true, -1);
-	FITS->SetKey("CTYPE2", CTYPEN[1], "WCS type of vertical coordinate transformation", true, -1);
-	FITS->SetKey("CRPIX1", CRPIXN[0].ToString("F5"), "WCS coordinate reference pixel on axis 1", true, -1);
-	FITS->SetKey("CRPIX2", CRPIXN[1].ToString("F5"), "WCS coordinate reference pixel on axis 2", true, -1);
-	FITS->SetKey("CRVAL1", CRVALN[0].ToString("F8"), "WCS coordinate reference value on axis 1 (deg)", true, -1);
-	FITS->SetKey("CRVAL2", CRVALN[1].ToString("F8"), "WCS coordinate reference value on axis 2 (deg)", true, -1);
-	FITS->SetKey("CD1_1", CDMATRIX[0, 0].ToString("0.0#######e+00"), "WCS rotation and scaling matrix", true, -1);
-	FITS->SetKey("CD1_2", CDMATRIX[1, 0].ToString("0.0#######e+00"), "WCS rotation and scaling matrix", true, -1);
-	FITS->SetKey("CD2_1", CDMATRIX[0, 1].ToString("0.0#######e+00"), "WCS rotation and scaling matrix", true, -1);
-	FITS->SetKey("CD2_2", CDMATRIX[1, 1].ToString("0.0#######e+00"), "WCS rotation and scaling matrix", true, -1);
-	FITS->SetKey("CDELT1", CDELTN[0].ToString("F8"), "WCS plate scale on axis 1 (arcsec per pixel)", true, -1);
-	FITS->SetKey("CDELT2", CDELTN[1].ToString("F8"), "WCS plate Scale on axis 2 (arcsec per pixel)", true, -1);
-	FITS->SetKey("CROTA1", CROTAN[0].ToString("F8"), "WCS field rotation angle on axis 1 (degrees)", true, -1);
-	FITS->SetKey("CROTA2", CROTAN[1].ToString("F8"), "WCS field rotation angle on axis 2 (degrees)", true, -1);
+	FITS->Header->SetKey("CTYPE1", CTYPEN[0], "WCS type of horizontal coordinate transformation", true, -1);
+	FITS->Header->SetKey("CTYPE2", CTYPEN[1], "WCS type of vertical coordinate transformation", true, -1);
+	FITS->Header->SetKey("CRPIX1", CRPIXN[0].ToString("F5"), "WCS coordinate reference pixel on axis 1", true, -1);
+	FITS->Header->SetKey("CRPIX2", CRPIXN[1].ToString("F5"), "WCS coordinate reference pixel on axis 2", true, -1);
+	FITS->Header->SetKey("CRVAL1", CRVALN[0].ToString("F8"), "WCS coordinate reference value on axis 1 (deg)", true, -1);
+	FITS->Header->SetKey("CRVAL2", CRVALN[1].ToString("F8"), "WCS coordinate reference value on axis 2 (deg)", true, -1);
+	FITS->Header->SetKey("CD1_1", CDMATRIX[0, 0].ToString("0.0#######e+00"), "WCS rotation and scaling matrix", true, -1);
+	FITS->Header->SetKey("CD1_2", CDMATRIX[1, 0].ToString("0.0#######e+00"), "WCS rotation and scaling matrix", true, -1);
+	FITS->Header->SetKey("CD2_1", CDMATRIX[0, 1].ToString("0.0#######e+00"), "WCS rotation and scaling matrix", true, -1);
+	FITS->Header->SetKey("CD2_2", CDMATRIX[1, 1].ToString("0.0#######e+00"), "WCS rotation and scaling matrix", true, -1);
+	FITS->Header->SetKey("CDELT1", CDELTN[0].ToString("F8"), "WCS plate scale on axis 1 (arcsec per pixel)", true, -1);
+	FITS->Header->SetKey("CDELT2", CDELTN[1].ToString("F8"), "WCS plate Scale on axis 2 (arcsec per pixel)", true, -1);
+	FITS->Header->SetKey("CROTA1", CROTAN[0].ToString("F8"), "WCS field rotation angle on axis 1 (degrees)", true, -1);
+	FITS->Header->SetKey("CROTA2", CROTAN[1].ToString("F8"), "WCS field rotation angle on axis 2 (degrees)", true, -1);
 
 	double cval1, cval2;
 	String^ scval1;
 	String^ scval2;
 	Get_Coordinate(FITS->Width / 2, FITS->Height / 2, false, "TAN", cval1, cval2, scval1, scval2);
-	FITS->SetKey("CCVALD1", cval1.ToString("F8"), "WCS field center on axis 1 (degrees)", true, -1);
-	FITS->SetKey("CCVALD2", cval2.ToString("F8"), "WCS field center on axis 2 (degrees)", true, -1);
-	FITS->SetKey("CCVALS1", scval1, "WCS field center on axis 1 (sexigesimal h m s)", true, -1);
-	FITS->SetKey("CCVALS2", scval2, "WCS field center on axis 2 (sexigesimal d am as)", true, -1);
-	FITS->SetKey("CPIX1RM", CPIX1RM.ToString("G"), "Mean of WCS residuals on axis 1 (pixels)", true, -1);
-	FITS->SetKey("CPIX1RS", CPIX1RS.ToString("G"), "Standard dev of WCS residuals on axis 1 (pixels)", true, -1);
-	FITS->SetKey("CVAL1RM", CVAL1RM.ToString("G"), "Mean of WCS residuals on axis 1 (arcsec)", true, -1);
-	FITS->SetKey("CVAL1RS", CVAL1RS.ToString("G"), "Standard dev of WCS residuals on axis 1 (arcsec)", true, -1);
-	FITS->SetKey("CPIX2RM", CPIX2RM.ToString("G"), "Mean of WCS residuals on axis 2 (pixels)", true, -1);
-	FITS->SetKey("CPIX2RS", CPIX2RS.ToString("G"), "Standard dev of WCS residuals on axis 2 (pixels)", true, -1);
-	FITS->SetKey("CVAL2RM", CVAL2RM.ToString("G"), "Mean of WCS residuals on axis 2 (arcsec)", true, -1);
-	FITS->SetKey("CVAL2RS", CVAL2RS.ToString("G"), "Standard dev of WCS residuals on axis 2 (arcsec)", true, -1);
-	FITS->SetKey("CPIXRM", CPIXRM.ToString("G"), "Mean of WCS residuals (pixels)", true, -1);
-	FITS->SetKey("CPIXRS", CPIXRS.ToString("G"), "Standard dev of WCS residuals (pixels)", true, -1);
-	FITS->SetKey("CVALRM", CVALRM.ToString("G"), "Mean of WCS residuals (arcsec)", true, -1);
-	FITS->SetKey("CVALRS", CVALRS.ToString("G"), "Standard dev of WCS residuals (arcsec)", true, -1);
+	FITS->Header->SetKey("CCVALD1", cval1.ToString("F8"), "WCS field center on axis 1 (degrees)", true, -1);
+	FITS->Header->SetKey("CCVALD2", cval2.ToString("F8"), "WCS field center on axis 2 (degrees)", true, -1);
+	FITS->Header->SetKey("CCVALS1", scval1, "WCS field center on axis 1 (sexigesimal h m s)", true, -1);
+	FITS->Header->SetKey("CCVALS2", scval2, "WCS field center on axis 2 (sexigesimal d am as)", true, -1);
+	FITS->Header->SetKey("CPIX1RM", CPIX1RM.ToString("G"), "Mean of WCS residuals on axis 1 (pixels)", true, -1);
+	FITS->Header->SetKey("CPIX1RS", CPIX1RS.ToString("G"), "Standard dev of WCS residuals on axis 1 (pixels)", true, -1);
+	FITS->Header->SetKey("CVAL1RM", CVAL1RM.ToString("G"), "Mean of WCS residuals on axis 1 (arcsec)", true, -1);
+	FITS->Header->SetKey("CVAL1RS", CVAL1RS.ToString("G"), "Standard dev of WCS residuals on axis 1 (arcsec)", true, -1);
+	FITS->Header->SetKey("CPIX2RM", CPIX2RM.ToString("G"), "Mean of WCS residuals on axis 2 (pixels)", true, -1);
+	FITS->Header->SetKey("CPIX2RS", CPIX2RS.ToString("G"), "Standard dev of WCS residuals on axis 2 (pixels)", true, -1);
+	FITS->Header->SetKey("CVAL2RM", CVAL2RM.ToString("G"), "Mean of WCS residuals on axis 2 (arcsec)", true, -1);
+	FITS->Header->SetKey("CVAL2RS", CVAL2RS.ToString("G"), "Standard dev of WCS residuals on axis 2 (arcsec)", true, -1);
+	FITS->Header->SetKey("CPIXRM", CPIXRM.ToString("G"), "Mean of WCS residuals (pixels)", true, -1);
+	FITS->Header->SetKey("CPIXRS", CPIXRS.ToString("G"), "Standard dev of WCS residuals (pixels)", true, -1);
+	FITS->Header->SetKey("CVALRM", CVALRM.ToString("G"), "Mean of WCS residuals (arcsec)", true, -1);
+	FITS->Header->SetKey("CVALRS", CVALRS.ToString("G"), "Standard dev of WCS residuals (arcsec)", true, -1);
 
 	int key = 0, num = 1;
 	while (key != -1)
 	{
-		key = FITS->GetKeyIndex("WCP1_" + num.ToString("000"));
-		FITS->RemoveKey(key);
-		key = FITS->GetKeyIndex("WCP2_" + num.ToString("000"));
-		FITS->RemoveKey(key);
-		key = FITS->GetKeyIndex("WCV1_" + num.ToString("000"));
-		FITS->RemoveKey(key);
-		key = FITS->GetKeyIndex("WCV2_" + num.ToString("000"));
-		FITS->RemoveKey(key);
+		key = FITS->Header->GetKeyIndex("WCP1_" + num.ToString("000"), false);
+		FITS->Header->RemoveKey(key);
+		key = FITS->Header->GetKeyIndex("WCP2_" + num.ToString("000"), false);
+		FITS->Header->RemoveKey(key);
+		key = FITS->Header->GetKeyIndex("WCV1_" + num.ToString("000"), false);
+		FITS->Header->RemoveKey(key);
+		key = FITS->Header->GetKeyIndex("WCV2_" + num.ToString("000"), false);
+		FITS->Header->RemoveKey(key);
 		num++;
 	}
 
 	num = 1;
 	for (int i = 0; i < CPIX1->Length; i++)
 	{
-		FITS->SetKey("WCP1_" + num.ToString("000"), CPIX1[i].ToString("F5"), "WCS coordinate pixel on axis 1", true, -1);
-		FITS->SetKey("WCP2_" + num.ToString("000"), CPIX2[i].ToString("F5"), "WCS coordinate pixel on axis 2", true, -1);
-		FITS->SetKey("WCV1_" + num.ToString("000"), CVAL1[i].ToString("F8"), "WCS coordinate value on axis 1 (degrees)", true, -1);
-		FITS->SetKey("WCV2_" + num.ToString("000"), CVAL2[i].ToString("F8"), "WCS coordinate value on axis 2 (degrees)", true, -1);
+		FITS->Header->SetKey("WCP1_" + num.ToString("000"), CPIX1[i].ToString("F5"), "WCS coordinate pixel on axis 1", true, -1);
+		FITS->Header->SetKey("WCP2_" + num.ToString("000"), CPIX2[i].ToString("F5"), "WCS coordinate pixel on axis 2", true, -1);
+		FITS->Header->SetKey("WCV1_" + num.ToString("000"), CVAL1[i].ToString("F8"), "WCS coordinate value on axis 1 (degrees)", true, -1);
+		FITS->Header->SetKey("WCV2_" + num.ToString("000"), CVAL2[i].ToString("F8"), "WCS coordinate value on axis 2 (degrees)", true, -1);
 		num++;
 	}
 }
 
 void JPFITS::WorldCoordinateSolution::Clear(FITSImage^ FITS)
 {
-	FITS->RemoveKey("CTYPE1");
-	FITS->RemoveKey("CTYPE2");
-	FITS->RemoveKey("CRPIX1");
-	FITS->RemoveKey("CRPIX2");
-	FITS->RemoveKey("CRVAL1");
-	FITS->RemoveKey("CRVAL2");
-	FITS->RemoveKey("CD1_1");
-	FITS->RemoveKey("CD1_2");
-	FITS->RemoveKey("CD2_1");
-	FITS->RemoveKey("CD2_2");
-	FITS->RemoveKey("CDELT1");
-	FITS->RemoveKey("CDELT2");
-	FITS->RemoveKey("CROTA1");
-	FITS->RemoveKey("CROTA2");
-	FITS->RemoveKey("CCVALD1");
-	FITS->RemoveKey("CCVALD2");
-	FITS->RemoveKey("CCVALS1");
-	FITS->RemoveKey("CCVALS2");
-	FITS->RemoveKey("CPIX1RM");
-	FITS->RemoveKey("CPIX1RS");
-	FITS->RemoveKey("CVAL1RM");
-	FITS->RemoveKey("CVAL1RS");
-	FITS->RemoveKey("CPIX2RM");
-	FITS->RemoveKey("CPIX2RS");
-	FITS->RemoveKey("CVAL2RM");
-	FITS->RemoveKey("CVAL2RS");
-	FITS->RemoveKey("CPIXRM");
-	FITS->RemoveKey("CPIXRS");
-	FITS->RemoveKey("CVALRM");
-	FITS->RemoveKey("CVALRS");
+	FITS->Header->RemoveKey("CTYPE1");
+	FITS->Header->RemoveKey("CTYPE2");
+	FITS->Header->RemoveKey("CRPIX1");
+	FITS->Header->RemoveKey("CRPIX2");
+	FITS->Header->RemoveKey("CRVAL1");
+	FITS->Header->RemoveKey("CRVAL2");
+	FITS->Header->RemoveKey("CD1_1");
+	FITS->Header->RemoveKey("CD1_2");
+	FITS->Header->RemoveKey("CD2_1");
+	FITS->Header->RemoveKey("CD2_2");
+	FITS->Header->RemoveKey("CDELT1");
+	FITS->Header->RemoveKey("CDELT2");
+	FITS->Header->RemoveKey("CROTA1");
+	FITS->Header->RemoveKey("CROTA2");
+	FITS->Header->RemoveKey("CCVALD1");
+	FITS->Header->RemoveKey("CCVALD2");
+	FITS->Header->RemoveKey("CCVALS1");
+	FITS->Header->RemoveKey("CCVALS2");
+	FITS->Header->RemoveKey("CPIX1RM");
+	FITS->Header->RemoveKey("CPIX1RS");
+	FITS->Header->RemoveKey("CVAL1RM");
+	FITS->Header->RemoveKey("CVAL1RS");
+	FITS->Header->RemoveKey("CPIX2RM");
+	FITS->Header->RemoveKey("CPIX2RS");
+	FITS->Header->RemoveKey("CVAL2RM");
+	FITS->Header->RemoveKey("CVAL2RS");
+	FITS->Header->RemoveKey("CPIXRM");
+	FITS->Header->RemoveKey("CPIXRS");
+	FITS->Header->RemoveKey("CVALRM");
+	FITS->Header->RemoveKey("CVALRS");
 
 	int key = 0, num = 1;
 	while (key != -1)
 	{
-		key = FITS->GetKeyIndex("WCP1_" + num.ToString("000"));
-		FITS->RemoveKey(key);
-		key = FITS->GetKeyIndex("WCP2_" + num.ToString("000"));
-		FITS->RemoveKey(key);
-		key = FITS->GetKeyIndex("WCV1_" + num.ToString("000"));
-		FITS->RemoveKey(key);
-		key = FITS->GetKeyIndex("WCV2_" + num.ToString("000"));
-		FITS->RemoveKey(key);
+		key = FITS->Header->GetKeyIndex("WCP1_" + num.ToString("000"), false);
+		FITS->Header->RemoveKey(key);
+		key = FITS->Header->GetKeyIndex("WCP2_" + num.ToString("000"), false);
+		FITS->Header->RemoveKey(key);
+		key = FITS->Header->GetKeyIndex("WCV1_" + num.ToString("000"), false);
+		FITS->Header->RemoveKey(key);
+		key = FITS->Header->GetKeyIndex("WCV2_" + num.ToString("000"), false);
+		FITS->Header->RemoveKey(key);
 		num++;
 	}
 }
@@ -472,7 +472,7 @@ void JPFITS::WorldCoordinateSolution::Clear(FITSImage^ FITS)
 bool JPFITS::WorldCoordinateSolution::Exists(FITSImage^ FITS, array<String^>^ WCS_CTYPEN)
 {
 	for (int i = 1; i <= WCS_CTYPEN->Length; i++)
-		if (!FITS->GetKeyValue("CTYPE" + i.ToString())->Contains(WCS_CTYPEN[i - 1]))
+		if (!FITS->Header->GetKeyValue("CTYPE" + i.ToString())->Contains(WCS_CTYPEN[i - 1]))
 			return false;
 	
 	return true;

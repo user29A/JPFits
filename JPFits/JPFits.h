@@ -83,13 +83,187 @@ namespace JPFITS
 		/// <param name="FileName">The full file name to read from disk.</param>
 		/// <param name="extension_type">The XTENSION extension type, either: &quot;BINTABLE&quot;, &quot;TABLE&quot;, or &quot;IMAGE&quot;.</param>
 		static array<String^>^ GETALLEXTENSIONNAMES(String^ FileName, String^ extension_type);
+	};
 
-		/// <summary>Makes a formatted header block with the supplied keys, and sets the first key to either SIMPLE = T or XTENSION = "IMAGE".</summary>
-		static array<String^>^ GETFORMATTEDIMAGEHEADER(array<String^>^ imageHeaderKeys, array<String^>^ imageHeaderKeyValues, array<String^>^ imageHeaderKeyComments, bool isExtension);
+	/// <summary> FITSImageHeader class to create, read, interact with, modify components of, and write FITSImage headers. The FITSImage class contains an instance of this and is accessed there via FITSImage->Header.</summary>
+	public ref class FITSImageHeader
+	{
+		public:
 
-		/// <summary>Makes a basic formatted header block with NAXIS = 0, and EXTEND keyword as either true or false.</summary>
-		static array<String^>^ MAKEPRIMARYDEFFORMATTEDHEADER(bool containsExtensions);
+		#pragma region CONSTRUCTORS
 
+		/// <summary>Constructor. Creates an instance of a FITSImageHeader, with options to indicate whether extensions are present, and sets essential keywords for a given image it will be the header for.
+		/// <para>If the image is to be an extension, then use GetFormattedHeaderBlock to pull the header out with SIMPLE = T changed to XTENSION = IMAGE for writing.</para></summary>
+		/// <param name="mayContainExtensions">If true, heyword EXTEND = T is added, otherwise it is left out.</param>
+		/// <param name="image">If image is nullptr, then NAXIS = 0 and there are no NAXISn keywords or BSCALE or BZERO. Otherwise NAXIS, NAXISn, BSCALE and BZERO are set as per the image dimensions.
+		/// <para>If the image will be saved at a different precision than double, use  SetBITPIXNAXISBSCZ(precision, image) at write time.</para></param>
+		FITSImageHeader(bool mayContainExtensions, array<double, 2>^ image);
+
+		/// <summary>Constructor. Creates an instance of a FITSImageHeader out of a list of header lines. Typically the headerlines would be returned from FITSFILEOPS::SCANPRIMARYUNIT.</summary>
+		/// <param name="headerlines">A list of header lines to be extrated and formatted into keys, values, and comments, or as comment lines.</param>
+		/// <param name="populate_nonessential">If false, non-essential key lines will be ignored. Saves a little bit of construction time if you don't need those, but they'll be lost if you re-write the file without them.</param>
+		FITSImageHeader(ArrayList^ headerlines, bool populate_nonessential);
+		#pragma endregion
+
+		#pragma region HEADEROPS
+
+		/// <summary>GetKeyName returns the key of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
+		/// <param name="index">The zero-based line number to get the key name from.</param>
+		String^ GetKeyName(int index);
+
+		/// <summary>GetKeyValue returns the value of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
+		/// <param name="index">The zero-based line number to get the key value from.</param>
+		String^ GetKeyValue(int index);
+
+		/// <summary>GetKeyComment returns the comment of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
+		/// <param name="index">The zero-based line number to get the key comment from.</param>
+		String^ GetKeyComment(int index);
+
+		/// <summary>GetKeyValue returns the value of the primary header key named Key. Returns empty String if the key is not found.</summary>
+		/// <param name="Key">The header key to find the value of.</param>
+		String^ GetKeyValue(String^ Key);
+
+		/// <summary>GetKeyComment returns the comment of the primary header key named Key. Returns empty String if the key is not found.</summary>
+		/// <param name="Key">The header key to find the comment of.</param>
+		String^ GetKeyComment(String^ Key);		
+
+		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key named Key. Returns -1 if the key is not found.</summary>
+		/// <param name="Key">The header key to find the index of.</param>
+		/// <param name="KeyIsFullLineFormatted">If true then the entire formatted 80-element long line is compared; helpful if multiple keys have the same name or are formatted as comment lines.</param>
+		int	GetKeyIndex(String^ Key, bool KeyIsFullLineFormatted);
+
+		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key with matching value. Returns -1 if the key and value combination is not found.</summary>
+		/// <param name="Key">The header key to find the index of.</param>
+		/// <param name="Value">The header key value to find the index of.</param>
+		int	GetKeyIndex(String^ Key, String^ Value);
+
+		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key with matching value and comment. Returns -1 if the key, value and comment combination is not found.</summary>
+		/// <param name="Key">The header key to find the index of.</param>
+		/// <param name="Value">The header key value to find the index of.</param>
+		/// <param name="Comment">The header key comment to find the index of.</param>
+		int	GetKeyIndex(String^ Key, String^ Value, String^ Comment);
+
+		/// <summary>SetKey sets the value of the key. If the key already exists then the value will be replaced but the comment will remain the same.</summary>
+		/// <param name="Key">The header key to access.</param>
+		/// <param name="Value">The header key value to set.</param>
+		/// <param name="AddIfNotFound">Optionally add the key to the header if it isn't found.</param>
+		/// <param name="AddAtIndex">If the key wasn't found, add at this zero-based index. Use -1 to append to the end of the header (before END key).</param>
+		void SetKey(String^ Key, String^ Value, bool AddIfNotFound, int AddAtIndex);
+
+		/// <summary>SetKey sets the value and comment of the key. If the key already exists then the value and comment will be replaced.</summary>
+		/// <param name="Key">The header key to access.</param>
+		/// <param name="Value">The header key value to set.</param>
+		/// <param name="Comment">The header key comment to set.</param>
+		/// <param name="AddIfNotFound">Optionally add the key to the header if it isn't found.</param>
+		/// <param name="AddAtIndex">If the key wasn't found, add at this zero-based index. Use -1 to append to the end of the header (before END key).</param>
+		void SetKey(String^ Key, String^ Value, String^ Comment, bool AddIfNotFound, int AddAtIndex);
+
+		/// <summary>SetKey sets the key, value and comment of the key at the given header index. This will overwrite whatever key exists at that index.</summary>
+		/// <param name="index">The 0-based index of the header key to access. If the index does not occur within the header, then nothing happens.</param>
+		/// <param name="Key">The header key to set.</param>
+		/// <param name="Value">The header key value to set.</param>
+		/// <param name="Comment">The header key comment to set.</param>
+		void SetKey(int index, String^ Key, String^ Value, String^ Comment);
+
+		/// <summary>AddKey adds a new key with value and comment to the primary header.</summary>
+		/// <param name="NewKey">The header key to add.</param>
+		/// <param name="NewValue">The header key value to add.</param>
+		/// <param name="NewComment">The header key comment to add.</param>
+		/// <param name="KeyIndex">Add at this zero-based index. Use -1 to append to the end of the header (before END key).</param>
+		void AddKey(String^ NewKey, String^ NewValue, String^ NewComment, int KeyIndex);
+
+		/// <summary>AddCommentKey adds a new key line formatted as a comment.
+		/// <para>If the length of the commentKeyLine is more than 80 elements, the comment will be continued on subsequent lines until depleted.</para>
+		/// <para>If the user wishes the line to begin with COMMENT, then write the input commentKeyLine beginning as such.</para>
+		/// <para>If the user wishes the line to be blank, then pass commentKeyLine as an empty string or as only containing blanks (whitespace).</para></summary>
+		/// <param name="commentKeyLine">The comment line.</param>
+		/// <param name="keyIndex">Insert at this zero-based index. Use -1 to append to the end of the header (before END key). If keyIndex exceeds the header, the line is appended to the end of the header.</param>
+		void AddCommentKeyLine(String^ commentKeyLine, int keyIndex);
+
+		/// <summary>RemoveKey removes the key at the given index from the primary header.</summary>
+		/// <param name="KeyIndex">The zero-based index of the key to remove. If the index is outside of the range of the header nothing happens.</param>
+		void RemoveKey(int KeyIndex);
+
+		/// <summary>RemoveKey removes the given key from the primary header. If there is more than one key with the given name, only the first occurence will be removed.</summary>
+		/// <param name="Key">The name of the header key to remove.</param>
+		void RemoveKey(String^ Key);
+
+		/// <summary>RemoveKey removes the given key with matching value from the primary header. If there is more than one key with the given name and value, only the first occurence will be removed.</summary>
+		/// <param name="Key">The name of the header key to remove.</param>
+		/// <param name="Value">The corresponding header key value to remove.</param>
+		void RemoveKey(String^ Key, String^ Value);
+
+		/// <summary>RemoveAllKeys clears all keys from the primary header. Essential keywords will remain. image is supplied to re-create essential keywords, or pass nullptr to set NAXIS = 0.</summary>
+		void RemoveAllKeys(array<double, 2>^ image);
+
+		/// <summary>Copies a header from another FITSImageHeader into this one. Restricted keywords are neither copied nor overwritten.</summary>
+		void CopyHeaderFrom(JPFITS::FITSImageHeader^ sourceHeader);
+
+		/// <summary>This sets the BITPIX, NAXIS, NAXISn, BSCALE and BZERO keywords of the header given the TypeCode and the image. If the image is null then NAXIS = 0 and any NAXISn keywords are removed as well as BSCALE and BZERO.</summary>
+		void SetBITPIXNAXISBSCZ(TypeCode precision, array<double, 2>^ image);
+
+		//void SetBITPIXNAXISBSCZ(Object^ image);
+
+		/// <summary>Returns a formatted header block with the existing keys, and sets the first key to either SIMPLE = T or XTENSION = IMAGE. If a full 2880-multiple block is needed, set keysOnly to false.</summary>
+		/// <param name="asExtension">If true then the first keyword is set to XTENSION = IMAGE, otherwise it is SIMPLE = T.</param>
+		/// <param name="keysOnly">If true then only the existing keywords are returned formatted, otherwise if you need the entire 2880-multiple block pass false. True typically needed for display, false typically needed for writing.</param>
+		array<String^>^ GetFormattedHeaderBlock(bool asExtension, bool keysOnly);
+
+		/// <summary>ValidKeyEdit returns whether the given key is an essential key and shouldn't be user-modified.</summary>
+		/// <param name="EditingKey">The name of the header key to remove.</param>
+		static bool VALIDKEYEDIT(String^ EditingKey);
+
+		#pragma endregion
+
+		#pragma region HEADEPROPERTIES
+		/// <summary>HeaderKeys accesses a string array of all keys of the primary header.
+		/// <para>Individual String^ keys may be accessed by indexing HeaderKeys[i].</para></summary>
+		property array<String^>^ HeaderKeys
+		{
+			array<String^>^ get() { return HEADERKEYS; }
+		}
+
+		/// <summary>HeaderKeyValues accesses a string array of all key values of the primary header.
+		/// <para>Individual String^ values may be accessed by indexing HeaderKeyValues[i].</para></summary>
+		property array<String^>^ HeaderKeyValues
+		{
+			array<String^>^ get() { return HEADERKEYVALS; }
+		}
+
+		/// <summary>HeaderKeyComments accesses a string array of all key comments of the primary header.
+		/// <para>Individual String^ comments may be accessed by indexing HeaderKeyComments[i].</para></summary>
+		property array<String^>^ HeaderKeyComments
+		{
+			array<String^>^ get() { return HEADERKEYCOMS; }
+		}
+
+		/// <summary>Returns a formatted header line from the existing key at the lineIndex</summary>
+		property String^ HeaderLine[int]
+		{
+			String^ get(int i) { return GET_FORMATTED_HEADERLINE(i); }
+		}
+
+		/// <summary>Returns whether a header line at an index is formatted as a comment line.</summary>
+		property bool HeaderLineIsComment[int]
+		{
+			bool get(int i) { return HEADERLINEISCOMMENT[i]; }
+		}
+		#pragma endregion
+
+		#pragma region PRIVATEMEMBERS
+		private:
+
+		//Header things
+		array<String^>^ HEADERKEYS;
+		array<String^>^ HEADERKEYVALS;
+		array<String^>^ HEADERKEYCOMS;
+		array<bool>^ HEADERLINEISCOMMENT;
+
+		static array<String^>^ INVALIDEDITKEYS = { "SIMPLE", "EXTEND", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "BZERO", "BSCALE", "END", "PCOUNT", "GCOUNT", "THEAP", "GROUPS", "XTENSION", "TFIELDS" };
+		void MAKE_DEFAULT_HEADER(bool mayContainExtensions, array<double, 2>^ image);//make a default header
+		String^ GET_FORMATTED_HEADERLINE(int lineIndex);//returns a formatted header line from the existing key at the lineIndex
+
+		#pragma endregion
 	};
 
 	/// <summary> FITSImage class to create, read, interact with, modify components of, and write FITS Primary image data and its Header.</summary>
@@ -243,94 +417,6 @@ namespace JPFITS
 		void FlipHorizontal();
 		#pragma endregion
 
-		#pragma region HEADEROPS
-		/// <summary>GetKeyValue returns the value of the primary header key named Key. Returns empty String if the key is not found.</summary>
-		/// <param name="Key">The header key to find the value of.</param>
-		String^ GetKeyValue(String^ Key);
-
-		/// <summary>GetKeyComment returns the comment of the primary header key named Key. Returns empty String if the key is not found.</summary>
-		/// <param name="Key">The header key to find the comment of.</param>
-		String^ GetKeyComment(String^ Key);
-
-		/// <summary>GetKeyName returns the key of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
-		/// <param name="index">The zero-based line number to get the key name from.</param>
-		String^ GetKeyName(int index);
-
-		/// <summary>GetKeyValue returns the value of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
-		/// <param name="index">The zero-based line number to get the key value from.</param>
-		String^ GetKeyValue(int index);
-
-		/// <summary>GetKeyComment returns the comment of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
-		/// <param name="index">The zero-based line number to get the key comment from.</param>
-		String^ GetKeyComment(int index);
-
-		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key named Key. Returns -1 if the key is not found.</summary>
-		/// <param name="Key">The header key to find the index of.</param>
-		int	GetKeyIndex(String^ Key);
-
-		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key with matching value. Returns -1 if the key and value combination is not found.</summary>
-		/// <param name="Key">The header key to find the index of.</param>
-		/// <param name="Value">The header key value to find the index of.</param>
-		int	GetKeyIndex(String^ Key, String^ Value);
-
-		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key with matching value and comment. Returns -1 if the key, value and comment combination is not found.</summary>
-		/// <param name="Key">The header key to find the index of.</param>
-		/// <param name="Value">The header key value to find the index of.</param>
-		/// <param name="Comment">The header key comment to find the index of.</param>
-		int	GetKeyIndex(String^ Key, String^ Value, String^ Comment);
-
-		/// <summary>SetKey sets the value of the key. If the key already exists then the value will be replaced but the comment will remain the same.</summary>
-		/// <param name="Key">The header key to access.</param>
-		/// <param name="Value">The header key value to set.</param>
-		/// <param name="AddIfNotFound">Optionally add the key to the header if it isn't found.</param>
-		/// <param name="AddAtIndex">If the key wasn't found, add at this zero-based index.  Use -1 to append to the end of the header (before END key).</param>
-		void SetKey(String^ Key, String^ Value, bool AddIfNotFound, int AddAtIndex);
-
-		/// <summary>SetKey sets the value and comment of the key.</summary>
-		/// <param name="Key">The header key to access.</param>
-		/// <param name="Value">The header key value to set.</param>
-		/// <param name="Comment">The header key comment to set.</param>
-		/// <param name="AddIfNotFound">Optionally add the key to the header if it isn't found.</param>
-		/// <param name="AddAtIndex">If the key wasn't found, add at this zero-based index.  Use -1 to append to the end of the header (before END key).</param>
-		void SetKey(String^ Key, String^ Value, String^ Comment, bool AddIfNotFound, int AddAtIndex);
-
-		/// <summary>SetKey sets the key, value and comment of the key at the given header index.</summary>
-		/// <param name="index">The 0-based index of the header key to access. If the index does not occur within the header, then nothing happens.</param>
-		/// <param name="Key">The header key to set.</param>
-		/// <param name="Value">The header key value to set.</param>
-		/// <param name="Comment">The header key comment to set.</param>
-		void SetKey(int index, String^ Key, String^ Value, String^ Comment);
-
-		/// <summary>AddKey adds a new key with value and comment to the primary header.</summary>
-		/// <param name="NewKey">The header key to add.</param>
-		/// <param name="NewValue">The header key value to add.</param>
-		/// <param name="NewComment">The header key comment to add.</param>
-		/// <param name="KeyIndex">Add at this zero-based index.  Use -1 to append to the end of the header (before END key).</param>
-		void AddKey(String^ NewKey, String^ NewValue, String^ NewComment, int KeyIndex);
-
-		/// <summary>RemoveKey removes the key at the given index from the primary header.</summary>
-		/// <param name="KeyIndex">The zero-based index of the key to remove.  If the index is outside of the range of the header nothing happens.</param>
-		void RemoveKey(int KeyIndex);
-
-		/// <summary>RemoveKey removes the given key from the primary header.  If there is more than one key with the given name, only the first occurence will be removed.</summary>
-		/// <param name="Key">The name of the header key to remove.</param>
-		void RemoveKey(String^ Key);
-
-		/// <summary>RemoveKey removes the given key with matching value from the primary header.  If there is more than one key with the given name and value, only the first occurence will be removed.</summary>
-		/// <param name="Key">The name of the header key to remove.</param>
-		/// <param name="Key">The corresponding header key value to remove.</param>
-		void RemoveKey(String^ Key, String^ Value);
-
-		/// <summary>RemoveAllKeys clears all keys from the primary header.  Essential keywords will remain.</summary>
-		void RemoveAllKeys();
-
-		/// <summary>ValidKeyEdit returns whether the given key is an essential key and shouldn't be user-modified.</summary>
-		static bool	ValidKeyEdit(String^ EditingKey);
-
-		/// <summary>CopyHeader copies the header from the given source FITSImage to the current FITSImage object.</summary>
-		void CopyHeader(JPFITS::FITSImage^ source);
-		#pragma endregion
-
 		#pragma region OPERATORS
 		static array<double, 2>^ operator +(FITSImage^ lhs_img, FITSImage^ rhs_img);
 		static array<double, 2>^ operator +(FITSImage^ lhs_img, double scalar);
@@ -463,35 +549,12 @@ namespace JPFITS
 			void set(array<double, 2>^ img) { SetImage(img, true, true); }
 		}
 
-		/// <summary>HeaderKeys accesses a string array of all keys of the primary header.
-		/// <para>Individual String^ keys may be accessed by indexing HeaderKeys[i].</para></summary>
-		property array<String^>^ HeaderKeys
-		{
-			array<String^>^ get() { return HEADERKEYS; }
-			//void set(array<String^>^ hkeys) { HEADERKEYS = hkeys; }
-		}
-
-		/// <summary>HeaderKeyValues accesses a string array of all key values of the primary header.
-		/// <para>Individual String^ values may be accessed by indexing HeaderKeyValues[i].</para></summary>
-		property array<String^>^ HeaderKeyValues
-		{
-			array<String^>^ get() { return HEADERKEYVALS; }
-			//void set(array<String^>^ hkeyvals) { HEADERKEYVALS = hkeyvals; }
-		}
-
-		/// <summary>HeaderKeyComments accesses a string array of all key comments of the primary header.
-		/// <para>Individual String^ comments may be accessed by indexing HeaderKeyComments[i].</para></summary>
-		property array<String^>^ HeaderKeyComments
-		{
-			array<String^>^ get() { return HEADERKEYCOMS; }
-			//void set(array<String^>^ hkeycoms) { HEADERKEYCOMS = hkeycoms; }
-		}
-
 		/// <summary>Header returns a fully formated header card(s).</summary>
-		property array<String^>^ Header
+		property JPFITS::FITSImageHeader^ Header
 		{
-			array<String^>^ get() { return FITSFILEOPS::GETFORMATTEDIMAGEHEADER(HEADERKEYS, HEADERKEYVALS, HEADERKEYCOMS, ISEXTENSION); }
+			JPFITS::FITSImageHeader^ get() { return HEADER; }
 		}
+
 		#pragma endregion
 
 		#pragma region PRIVATEMEMBERS
@@ -514,7 +577,7 @@ namespace JPFITS
 		//Fits Info
 		int NAXIS1 = -1, NAXIS2 = -1, BITPIX = -1, NAXIS = -1;
 		__int64 BZERO = -1, BSCALE = -1;
-		void SETBITPIX(TypeCode Precision);
+		array<int>^ NAXISN;
 
 		//File Info
 		String^ FILENAME;
@@ -524,17 +587,13 @@ namespace JPFITS
 
 		//File IO
 		void READIMAGE(FileStream^ fs, array<int, 1>^ Range, bool do_parallel);
-		void EATRAWIMAGEHEADER(ArrayList^ header, bool populate_nonessential);
+		void EATIMAGEHEADER();
 		void WRITEIMAGE(TypeCode prec, bool do_parallel);
 
 		//Header
-		array<String^>^ HEADERKEYS;//for interaction
-		array<String^>^ HEADERKEYVALS;//for interaction
-		array<String^>^ HEADERKEYCOMS;//for interaction
-		void MAKEDEFHEADER();//make a default header
-		static bool VALIDKEYEDIT(String^ checkkey);
-		#pragma endregion
+		JPFITS::FITSImageHeader^ HEADER;
 
+		#pragma endregion
 	};
 
 	/// <summary>FITSImageSet class is an ArrayList object to hold, manage, and perform operations on a set of FITSImage objects.</summary>
@@ -1127,17 +1186,41 @@ namespace JPFITS
 		static void RADecDegreeToSex(double RA_deg, double DEC_deg, String^ separator, String^ &ra_sex, String^ &dec_sex);
 
 		/// <summary>Returns the angle between -PI to +PI radians following the CAST convention given the run (x) and rise (y) of the direction vector.</summary>
-		/// <param name="x">The run (horizontal amplitude) of the vector.</param>
-		/// <param name="y">The rise (vertical amplitude) of the vector.</param>
-		static double aTanAbsoluteAngle(double x, double y);
+		/// <param name="run">The run (horizontal amplitude) of the vector.</param>
+		/// <param name="rise">The rise (vertical amplitude) of the vector.</param>
+		static double aTanAbsoluteAngle(double run, double rise);
 
 		/// <summary>Returns the sum of all elements in the data array.</summary>
+		/// <param name="vectorOrArray">A vecor or 2-D array.</param>
+		static double Sum(Object^ vectorOrArray, bool do_parallel);
+
+		/// <summary>Returns the sum of all elements in the data array.</summary>
+		/// <param name="vectorOrArray">A vecor or 2-D array.</param>
+		static double Mean(Object^ vectorOrArray, bool do_parallel);
+
+		/*/// <summary>Returns the mean (average) of all elements in the data array.</summary>
+		/// <param name="data">A 2-D double array.</param>
+		static double Mean(array<double, 2>^ data, bool do_parallel);
+
+		/// <summary>Returns the mean (average) of all elements in the data array.</summary>
+		/// <param name="data">A 1-D double array.</param>
+		static double Mean(array<double, 1>^ data, bool do_parallel);*/
+
+		/*/// <summary>Returns the sum of all elements in the data array.</summary>
 		/// <param name="data">A 2-D double array.</param>
 		static double Sum(array<double, 2>^ data, bool do_parallel);
 
 		/// <summary>Returns the sum of all elements in the data array.</summary>
 		/// <param name="data">A 1-D double array.</param>
 		static double Sum(array<double, 1>^ data, bool do_parallel);
+
+		/// <summary>Returns the sum of all elements in the data array.</summary>
+		/// <param name="data">A 2-D int array.</param>
+		static int Sum(array<int, 2>^ data, bool do_parallel);
+
+		/// <summary>Returns the sum of all elements in the data array.</summary>
+		/// <param name="data">A 1-D int array.</param>
+		static int Sum(array<int, 1>^ data, bool do_parallel);*/
 
 		static array<double, 2>^ Pad(array<double, 2>^ data, array<int>^ padding, bool do_parallel);
 		static array<double, 2>^ Crop(array<double, 2>^ data, array<int>^ cropping, bool do_parallel);
@@ -1149,28 +1232,12 @@ namespace JPFITS
 		/// <para>1 (one) sums along the vertical axis, resulting in a horizontal vector.</para></param>
 		static array<double, 1>^ Sum(array<double, 2>^ data, int dim, bool do_parallel);
 
-		/// <summary>Returns the sum of all elements in the data array.</summary>
-		/// <param name="data">A 2-D int array.</param>
-		static int Sum(array<int, 2>^ data, bool do_parallel);
-
-		/// <summary>Returns the sum of all elements in the data array.</summary>
-		/// <param name="data">A 1-D int array.</param>
-		static int Sum(array<int, 1>^ data, bool do_parallel);
-
 		/// <summary>Sum a 2-D array along one dimension, resulting in a 1-D vector array.</summary>
 		/// <param name="data">A 2-D int array.</param>
 		/// <param name="dim">The dimension along which to sum.  
 		/// <para>0 (zero) sums along the horizontal axis, resulting in a vertical vector.</para>
 		/// <para>1 (one) sums along the vertical axis, resulting in a horizontal vector.</para></param>
-		static array<int, 1>^ Sum(array<int, 2>^ data, int dim, bool do_parallel);
-
-		/// <summary>Returns the mean (average) of all elements in the data array.</summary>
-		/// <param name="data">A 2-D double array.</param>
-		static double Mean(array<double, 2>^ data, bool do_parallel);
-
-		/// <summary>Returns the mean (average) of all elements in the data array.</summary>
-		/// <param name="data">A 1-D double array.</param>
-		static double Mean(array<double, 1>^ data, bool do_parallel);
+		static array<int, 1>^ Sum(array<int, 2>^ data, int dim, bool do_parallel);		
 
 		/// <summary>Average a 2-D array along one dimension, resulting in a 1-D vector array.</summary>
 		/// <param name="data">A 2-D double array.</param>
@@ -1286,6 +1353,9 @@ namespace JPFITS
 		/// <summary>Returns the global maximum of the 1-D array data.</summary>
 		static double Max(array<double>^ data, bool do_parallel);
 
+		/// <summary>Returns the global maximum of the data array.</summary>
+		static int Max(array<int>^ data, bool do_parallel);
+
 		/// <summary>Returns the global maximum and its index within a subsection of the 1-D array data.</summary>
 		/// <param name="data">A 1-D double array.</param>
 		/// <param name="startIndex">The start index at which to begin checking for a maximum value.</param>
@@ -1297,9 +1367,6 @@ namespace JPFITS
 		/// <param name="data">A 1-D int array.</param>
 		/// <param name="index">The index at which the maximum occurs in the array.</param>
 		static int Max(array<int>^ data, int &index, bool do_parallel);
-
-		/// <summary>Returns the global maximum of the data array.</summary>
-		static int Max(array<int>^ data, bool do_parallel);
 
 		/// <summary>Returns the global maximum of the data array and its [x, y] indices.</summary>
 		/// <param name="data">A 2-D int array.</param>

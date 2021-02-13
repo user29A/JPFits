@@ -152,8 +152,8 @@ void JPFITS::FitsFinder::FitsFinderWrkr_DoWork(System::Object^  sender, System::
 		FitsFinderWrkr->ReportProgress(ii+1,filelist->Count);
 
 		FITSImage^ f1 = gcnew FITSImage(fullfilesinit[ii], nullptr, true, false, false, false);
-		array<String^>^ HeadKeys = f1->HeaderKeys;			//get just header from file in JPFITSImage
-		array<String^>^ HeadKeyVals = f1->HeaderKeyValues;	//get just header key values from file in JPFITSImage
+		array<String^>^ HeadKeys = f1->Header->HeaderKeys;			//get just header from file in JPFITSImage
+		array<String^>^ HeadKeyVals = f1->Header->HeaderKeyValues;	//get just header key values from file in JPFITSImage
 		match = 0;
 		for (int j = 0; j < HeadKeys->Length; j++)
 		{

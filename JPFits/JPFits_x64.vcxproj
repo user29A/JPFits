@@ -252,6 +252,7 @@
     <ClCompile Include="FitsExtensionTableViewer.cpp" />
     <ClCompile Include="FitsFinder.cpp" />
     <ClCompile Include="FitsFound.cpp" />
+    <ClCompile Include="FitsHeader.cpp" />
     <ClCompile Include="FitsSet.cpp" />
     <ClCompile Include="FitsImage.cpp" />
     <ClCompile Include="JPBitMap.cpp" />

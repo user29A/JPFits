@@ -1116,28 +1116,31 @@ void JPFITS::FITSImageSet::CHECK_CODIMENSIONAL()
 
 void JPFITS::FITSImageSet::GatherHeaders(JPFITS::FITSImageSet^ FITS_Set, FITSImage^ FITS_destination)
 {
-	FITS_destination->RemoveAllKeys();
+	FITS_destination->Header->RemoveAllKeys(FITS_destination->Image);
 
 	bool skip = false;
-	for (int j = 0; j < FITS_Set[0]->HeaderKeys->Length; j++)
+	for (int j = 0; j < FITS_Set[0]->Header->HeaderKeys->Length; j++)
 	{
 		skip = false;
-		String^ key = FITS_Set[0]->GetKeyName(j);
-		String^ val = FITS_Set[0]->GetKeyValue(j);
-		String^ com = FITS_Set[0]->GetKeyComment(j);
+		String^ key = FITS_Set[0]->Header->GetKeyName(j);
+		String^ val = FITS_Set[0]->Header->GetKeyValue(j);
+		String^ com = FITS_Set[0]->Header->GetKeyComment(j);
 
-		if (!JPFITS::FITSImage::ValidKeyEdit(key))
+		if (!JPFITS::FITSImageHeader::VALIDKEYEDIT(key)/*FITS_Set[0]->Header->VALIDKEYEDIT(key)*/)
 			continue;
 
 		for (int i = 1; i < FITS_Set->Count; i++)
-			if (FITS_Set[i]->GetKeyIndex(key, val, com) == -1)
+			if (FITS_Set[i]->Header->GetKeyIndex(key, val, com) == -1)
 			{
 				skip = true;
 				break;
 			}
 		
 		if (!skip)
-			FITS_destination->AddKey(key, val, com, -1);
+			if (FITS_Set[0]->Header->HeaderLineIsComment[j])
+				FITS_destination->Header->AddCommentKeyLine(com, -1);
+			else
+				FITS_destination->Header->AddKey(key, val, com, -1);
 	}
 }
 
@@ -1184,7 +1187,7 @@ int JPFITS::FITSImageSet::Sort(String^ key)
 	bool numeric = true;
 	try
 	{
-		double d = Convert::ToDouble(((FITSImage^)(FITSLIST[0]))->GetKeyValue(key));
+		double d = Convert::ToDouble(((FITSImage^)(FITSLIST[0]))->Header->GetKeyValue(key));
 	}
 	catch (...)
 	{
@@ -1199,7 +1202,7 @@ int JPFITS::FITSImageSet::Sort(String^ key)
 
 		for (int i = 0; i < FITSLIST->Count; i++)
 		{
-			keys[i] = ((FITSImage^)(FITSLIST[i]))->GetKeyValue(key);
+			keys[i] = ((FITSImage^)(FITSLIST[i]))->Header->GetKeyValue(key);
 
 			if (keys[i] == "" && keycheck)
 			{
@@ -1213,11 +1216,11 @@ int JPFITS::FITSImageSet::Sort(String^ key)
 
 		for (int i = 0; i < FITSLIST->Count; i++)
 		{
-			if (keys[i] == ((FITSImage^)(FITSLIST[i]))->GetKeyValue(key))
+			if (keys[i] == ((FITSImage^)(FITSLIST[i]))->Header->GetKeyValue(key))
 				continue;
 
 			for (int j = i + 1; j < FITSLIST->Count; j++)
-				if (keys[i] == ((FITSImage^)(FITSLIST[j]))->GetKeyValue(key))
+				if (keys[i] == ((FITSImage^)(FITSLIST[j]))->Header->GetKeyValue(key))
 				{
 					FITSImage^ tempfits = (FITSImage^)FITSLIST[i];
 					FITSLIST[i] = FITSLIST[j];
@@ -1234,7 +1237,7 @@ int JPFITS::FITSImageSet::Sort(String^ key)
 
 		for (int i = 0; i < FITSLIST->Count; i++)
 		{
-			String^ k = ((FITSImage^)(FITSLIST[i]))->GetKeyValue(key);
+			String^ k = ((FITSImage^)(FITSLIST[i]))->Header->GetKeyValue(key);
 
 			if (k == "" && keycheck)
 			{
@@ -1245,7 +1248,7 @@ int JPFITS::FITSImageSet::Sort(String^ key)
 
 			try
 			{
-				keys[i] = Convert::ToDouble(((FITSImage^)(FITSLIST[i]))->GetKeyValue(key));
+				keys[i] = Convert::ToDouble(((FITSImage^)(FITSLIST[i]))->Header->GetKeyValue(key));
 			}
 			catch (...)
 			{
@@ -1258,11 +1261,11 @@ int JPFITS::FITSImageSet::Sort(String^ key)
 
 		for (int i = 0; i < FITSLIST->Count; i++)
 		{
-			if (keys[i] == Convert::ToDouble(((FITSImage^)(FITSLIST[i]))->GetKeyValue(key)))
+			if (keys[i] == Convert::ToDouble(((FITSImage^)(FITSLIST[i]))->Header->GetKeyValue(key)))
 				continue;
 
 			for (int j = i + 1; j < FITSLIST->Count; j++)
-				if (keys[i] == Convert::ToDouble(((FITSImage^)(FITSLIST[j]))->GetKeyValue(key)))
+				if (keys[i] == Convert::ToDouble(((FITSImage^)(FITSLIST[j]))->Header->GetKeyValue(key)))
 				{
 					FITSImage^ tempfits = (FITSImage^)FITSLIST[i];
 					FITSLIST[i] = FITSLIST[j];

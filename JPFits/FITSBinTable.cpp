@@ -2289,25 +2289,25 @@ void JPFITS::FITSBinTable::Write(String^ FileName, String^ ExtensionName, bool O
 		fs->Close();
 
 		FITSImage^ ff = gcnew FITSImage(FILENAME, nullptr, true, false, false, false);
-		int n = ff->GetKeyIndex("NAXIS");
+		int n = ff->Header->GetKeyIndex("NAXIS", false);
 		if (n == -1)
 		{
 			throw gcnew Exception("File not formatted as FITS file (NAXIS not present). Use a new file.");
 			return;
 		}
-		n = Convert::ToInt32(ff->GetKeyValue("NAXIS"));
+		n = Convert::ToInt32(ff->Header->GetKeyValue("NAXIS"));
 		if (n > 0)
 		{
-			n = ff->GetKeyIndex("NAXIS" + n.ToString());
-			if (ff->GetKeyIndex("BZERO") > n)
-				n = ff->GetKeyIndex("BZERO");
-			if (ff->GetKeyIndex("BSCALE") > n)
-				n = ff->GetKeyIndex("BSCALE");
+			n = ff->Header->GetKeyIndex("NAXIS" + n.ToString(), false);
+			if (ff->Header->GetKeyIndex("BZERO", false) > n)
+				n = ff->Header->GetKeyIndex("BZERO", false);
+			if (ff->Header->GetKeyIndex("BSCALE", false) > n)
+				n = ff->Header->GetKeyIndex("BSCALE", false);
 		}
 		else
-			n = ff->GetKeyIndex("NAXIS");
-		ff->SetKey("EXTEND", "T", "FITS file may contain extensions", true, n + 1);
-		array<String^>^ HEADER = FITSFILEOPS::GETFORMATTEDIMAGEHEADER(ff->HeaderKeys, ff->HeaderKeyValues, ff->HeaderKeyComments, false);
+			n = ff->Header->GetKeyIndex("NAXIS", false);
+		ff->Header->SetKey("EXTEND", "T", "FITS file may contain extensions", true, n + 1);
+		array<String^>^ HEADER = ff->Header->GetFormattedHeaderBlock(true, false);           // FITSHEADER::MAKEFORMATTEDIMAGEHEADER(ff->Header->HeaderKeys, ff->Header->HeaderKeyValues, ff->Header->HeaderKeyComments, false);
 
 		array<unsigned char>^ headarr = gcnew array<unsigned char>(HEADER->Length * 80);
 		for (int i = 0; i < HEADER->Length; i++)

@@ -314,113 +314,6 @@ void JPFITS::FITSImage::StatsUpD(bool do_parallel)
 	
 }
 
-void JPFITS::FITSImage::SETBITPIX(System::TypeCode Precision)
-{
-	if (DIMAGE == nullptr || DIMAGE->Length == 0)
-	{
-		BITPIX = 8;
-		NAXIS = 0;
-		NAXIS1 = 0;
-		NAXIS2 = 0;
-		SetKey("BITPIX", BITPIX.ToString(), false, 1);
-		SetKey("NAXIS", NAXIS.ToString(), false, 2);
-		return;
-	}
-
-	switch (Precision)
-	{
-		case TypeCode::SByte:
-		{
-			BITPIX = 8;
-			BZERO = 0;
-			BSCALE = 1;
-			break;
-		}
-
-		case TypeCode::Byte:
-		{
-			BITPIX = 8;
-			BZERO = 128;
-			BSCALE = 1;
-			break;
-		}
-
-		case TypeCode::Int16:
-		{
-			BITPIX = 16;
-			BZERO = 0;
-			BSCALE = 1;
-			break;
-		}
-
-		case TypeCode::UInt16:
-		{
-			BITPIX = 16;
-			BZERO = 32768;
-			BSCALE = 1;
-			break;
-		}
-
-		case TypeCode::Int32:
-		{
-			BITPIX = 32;
-			BZERO = 0;
-			BSCALE = 1;
-			break;
-		}
-
-		case TypeCode::UInt32:
-		{
-			BITPIX = 32;
-			BZERO = 2147483648;
-			BSCALE = 1;
-			break;
-		}
-
-		case TypeCode::Int64:
-		{
-			BITPIX = 64;
-			BZERO = 0;
-			BSCALE = 1;
-			break;
-		}
-
-		case TypeCode::UInt64:
-		{
-			BITPIX = 64;
-			BZERO = 9223372036854775808;
-			BSCALE = 1;
-			break;
-		}
-
-		case TypeCode::Single:
-		{
-			BITPIX = -32;
-			BZERO = 0;
-			BSCALE = 1;
-			break;
-		}
-
-		case TypeCode::Double:
-		{
-			BITPIX = -64;
-			BZERO = 0;
-			BSCALE = 1;
-			break;
-		}
-
-		default:
-		{
-			throw gcnew Exception("TypeCode '" + Precision.ToString() + "' not recognized at SETBITPIX.");
-			return;
-		}
-	}
-
-	SetKey("BITPIX", BITPIX.ToString(), false, 0);
-	SetKey("BZERO", BZERO.ToString(), "Data Offset; pixel = pixel*BSCALE+BZERO", true, 4);
-	SetKey("BSCALE", BSCALE.ToString(), "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 5);
-}
-
 void JPFITS::FITSImage::RotateCW(bool CW)
 {
 	array<double,2>^ rotimg = gcnew array<double,2>(NAXIS2,NAXIS1);
@@ -443,7 +336,7 @@ void JPFITS::FITSImage::RotateCW(bool CW)
 				rotimg[j,NAXIS1-1-i] = dum3;
 			}
 		}
-		this->AddKey("ROTATN","-90","Image Rotated CW 90",-1);
+		this->Header->AddKey("ROTATN","-90","Image Rotated CW 90",-1);
 	}
 	else
 	{
@@ -464,13 +357,13 @@ void JPFITS::FITSImage::RotateCW(bool CW)
 				rotimg[j,NAXIS1-1-i] = dum1;
 			}
 		}
-		this->AddKey("ROTATN","90","Image Rotated CCW 90",-1);
+		this->Header->AddKey("ROTATN","90","Image Rotated CCW 90",-1);
 	}
 
 	DIMAGE = rotimg;
 	delete rotimg;
-	this->SetKey("NAXIS1",NAXIS2.ToString(),0,1);
-	this->SetKey("NAXIS2",NAXIS1.ToString(),0,2);
+	this->Header->SetKey("NAXIS1",NAXIS2.ToString(),0,1);
+	this->Header->SetKey("NAXIS2",NAXIS1.ToString(),0,2);
 	int dumn = NAXIS1;
 	NAXIS1 = NAXIS2;
 	NAXIS2 = dumn;
@@ -490,7 +383,7 @@ void JPFITS::FITSImage::FlipVertical()
 			DIMAGE[i,NAXIS2-1-j] = dum1;
 		}
 	}
-	this->AddKey("VFLIP","true","Image Vertically Flipped",-1);
+	this->Header->AddKey("VFLIP","true","Image Vertically Flipped",-1);
 }
 
 void JPFITS::FITSImage::FlipHorizontal()
@@ -507,6 +400,6 @@ void JPFITS::FITSImage::FlipHorizontal()
 			DIMAGE[NAXIS1-1-i,j] = dum1;
 		}
 	}
-	this->AddKey("HFLIP","true","Image Horizontally Flipped",-1);
+	this->Header->AddKey("HFLIP","true","Image Horizontally Flipped",-1);
 }
 

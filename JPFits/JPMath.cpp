@@ -667,6 +667,24 @@ double JPFITS::JPMath::Max(array<double, 2>^ data, int& x, int& y, bool do_paral
 	return max;
 }
 
+double JPFITS::JPMath::Max(array<double> ^data, bool do_parallel)
+{
+	double max = System::Double::MinValue;
+
+	#pragma omp parallel for if (do_parallel)
+	for (int i = 0; i < data->Length; i++)
+		if (data[i] > max)
+		{
+			#pragma omp critical
+			{
+				if (data[i] > max)
+					max = data[i];
+			}
+		}
+
+	return max;
+}
+
 double JPFITS::JPMath::Max(array<double, 2>^ data, bool do_parallel)
 {
 	double max = System::Double::MinValue;
@@ -707,25 +725,7 @@ double JPFITS::JPMath::Max(array<double> ^data, int& index, bool do_parallel)
 	return max;
 }
 
-double JPFITS::JPMath::Max(array<double> ^data, bool do_parallel)
-{
-	double max = System::Double::MinValue;
-
-	#pragma omp parallel for if (do_parallel)
-	for (int i = 0; i < data->Length; i++)
-		if (data[i] > max)
-		{
-			#pragma omp critical
-			{
-				if (data[i] > max)
-					max = data[i];
-			}
-		}
-
-	return max;
-}
-
-double JPFITS::JPMath::Max(cli::array<double> ^data, int startIndex, int endIndex, int &maxIndex, bool do_parallel)
+double JPFITS::JPMath::Max(array<double> ^data, int startIndex, int endIndex, int &maxIndex, bool do_parallel)
 {
 	if (startIndex < 0)
 		startIndex = 0;
@@ -735,7 +735,7 @@ double JPFITS::JPMath::Max(cli::array<double> ^data, int startIndex, int endInde
 	double max = System::Double::MinValue;
 
 	#pragma omp parallel for if (do_parallel)
-	for (int i = startIndex; i < endIndex; i++)
+	for (int i = startIndex; i <= endIndex; i++)
 		if (data[i] > max)
 		{
 			#pragma omp critical
@@ -784,7 +784,7 @@ double JPFITS::JPMath::Min(array<double> ^data, int startIndex, int endIndex, in
 	double min = System::Double::MaxValue;
 
 	#pragma omp parallel for if (do_parallel)
-	for (int i = startIndex; i < endIndex; i++)
+	for (int i = startIndex; i <= endIndex; i++)
 		if (data[i] < min)
 		{
 			#pragma omp critical
@@ -1439,7 +1439,7 @@ array<double>^ JPFITS::JPMath::Replace(array<double, 1>^ data, array<int, 1>^ co
 	return result;
 }
 
-double JPFITS::JPMath::Sum(array<double, 1> ^data, bool do_parallel)
+/*double JPFITS::JPMath::Sum(array<double, 1> ^data, bool do_parallel)
 {
 	double S = 0;
 	#pragma omp parallel for if (do_parallel) reduction(+:S)
@@ -1479,6 +1479,174 @@ int JPFITS::JPMath::Sum(array<int, 2>^ data, bool do_parallel)
 			S += data[i, j];
 
 	return S;
+}*/
+
+double JPFITS::JPMath::Sum(Object^ vectorOrArray, bool do_parallel)
+{
+	TypeCode type = Type::GetTypeCode((((Array^)vectorOrArray)->GetType())->GetElementType());
+	int rank = ((Array^)vectorOrArray)->Rank;
+	double res = 0;
+	int naxis0, naxis1;
+	if (rank == 1)
+		naxis0 = ((Array^)vectorOrArray)->Length;
+	else
+	{
+		naxis0 = ((Array^)vectorOrArray)->GetLength(0);
+		naxis1 = ((Array^)vectorOrArray)->GetLength(1);
+	}
+
+	switch (type)
+	{
+		case TypeCode::Double:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					res += ((array<double>^)vectorOrArray)[x];
+			}
+			else //rank == 2
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					for (int y = 0; y < naxis1; y++)
+						res += ((array<double, 2>^)vectorOrArray)[x, y];
+			}
+			return res;
+		}
+
+		case TypeCode::Single:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					res += (double)((array<float>^)vectorOrArray)[x];
+			}
+			else //rank == 2
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					for (int y = 0; y < naxis1; y++)
+						res += (double)((array<float, 2>^)vectorOrArray)[x, y];
+			}
+			return res;
+		}
+
+		case TypeCode::UInt64:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					res += (double)((array<unsigned __int64>^)vectorOrArray)[x];
+			}
+			else //rank == 2
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					for (int y = 0; y < naxis1; y++)
+						res += (double)((array<unsigned __int64, 2>^)vectorOrArray)[x, y];
+			}
+			return res;
+		}
+
+		case TypeCode::Int64:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					res += (double)((array<__int64>^)vectorOrArray)[x];
+			}
+			else //rank == 2
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					for (int y = 0; y < naxis1; y++)
+						res += (double)((array<__int64, 2>^)vectorOrArray)[x, y];
+			}
+			return res;
+		}
+
+		case TypeCode::UInt32:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					res += (double)((array<unsigned __int32>^)vectorOrArray)[x];
+			}
+			else //rank == 2
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					for (int y = 0; y < naxis1; y++)
+						res += (double)((array<unsigned __int32, 2>^)vectorOrArray)[x, y];
+			}
+			return res;
+		}
+
+		case TypeCode::Int32:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					res += (double)((array<__int32>^)vectorOrArray)[x];
+			}
+			else //rank == 2
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					for (int y = 0; y < naxis1; y++)
+						res += (double)((array<__int32, 2>^)vectorOrArray)[x, y];
+			}
+			return res;
+		}
+
+		case TypeCode::UInt16:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					res += (double)((array<unsigned __int16>^)vectorOrArray)[x];
+			}
+			else //rank == 2
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					for (int y = 0; y < naxis1; y++)
+						res += (double)((array<unsigned __int16, 2>^)vectorOrArray)[x, y];
+			}
+			return res;
+		}
+
+		case TypeCode::Int16:
+		{
+			if (rank == 1)
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					res += (double)((array<__int16>^)vectorOrArray)[x];
+			}
+			else //rank == 2
+			{
+				#pragma omp parallel for if (do_parallel) reduction(+:res)
+				for (int x = 0; x < naxis0; x++)
+					for (int y = 0; y < naxis1; y++)
+						res += (double)((array<__int16, 2>^)vectorOrArray)[x, y];
+			}
+			return res;
+		}
+
+		default:
+		{
+			throw gcnew Exception("Typecode '" + type.ToString() + "' not supported for Sum.");
+			return 0;
+		}
+	}
 }
 
 array<double, 1>^ JPFITS::JPMath::Sum(array<double, 2>^ data, int dim, bool do_parallel)//sum allong a dimension
@@ -1557,7 +1725,7 @@ array<int, 1>^ JPFITS::JPMath::Sum(array<int, 2>^ data, int dim, bool do_paralle
 	return result;
 }
 
-double JPFITS::JPMath::Mean(array<double, 1> ^data, bool do_parallel)
+/*double JPFITS::JPMath::Mean(array<double, 1> ^data, bool do_parallel)
 {
 	double M = 0;
 	#pragma omp parallel for if (do_parallel) reduction(+:M)
@@ -1578,8 +1746,12 @@ double JPFITS::JPMath::Mean(array<double, 2>^ data, bool do_parallel)
 
 	M = M / (double)data->Length;
 	return M;
-}
+}*/
 
+double JPFITS::JPMath::Mean(Object^ vectorOrArray, bool do_parallel)
+{
+	return JPMath::Sum(vectorOrArray, do_parallel) / double(((Array^)vectorOrArray)->Length);
+}
 
 array<double, 1>^ JPFITS::JPMath::Mean(array<double, 2>^ data, int dim, bool do_parallel)
 {
@@ -1662,9 +1834,7 @@ inline double JPFITS::JPMath::Median(array<double>^ data)
 	array<double>^ lindata = gcnew array<double>(len);
 
 	::Array::Copy(data, lindata, len);
-
 	pin_ptr<double> p = &lindata[0];
-
 	return MedianSTD(p, len);
 }
 
@@ -1675,9 +1845,7 @@ inline double JPFITS::JPMath::Median(array<double, 2>^ data)
 	array<double, 2>^ lindata = gcnew array<double, 2>(lenx, leny);
 
 	::Array::Copy(data, lindata, lenx*leny);
-
 	pin_ptr<double> p = &lindata[0, 0];
-
 	return MedianSTD(p, lenx*leny);
 }
 
