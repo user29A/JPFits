@@ -38,66 +38,105 @@ JPFITS::FITSImageHeader::FITSImageHeader(ArrayList^ headerlines, bool populate_n
 	}
 	else
 	{
-		HEADERKEYS = gcnew array<String^>(6);
-		HEADERKEYVALS = gcnew array<String^>(6);
-		HEADERKEYCOMS = gcnew array<String^>(6);
-		HEADERLINEISCOMMENT = gcnew array<bool>(6);
+		int N = 10;
+		if (headerlines->Count < 10)
+			N = headerlines->Count;
+		HEADERKEYS = gcnew array<String^>(N);
+		HEADERKEYVALS = gcnew array<String^>(N);
+		HEADERKEYCOMS = gcnew array<String^>(N);
+		HEADERLINEISCOMMENT = gcnew array<bool>(N);
 	}
 
+	//#pragma omp parallel for
 	for (int i = 0; i < HEADERKEYS->Length; i++)
 	{
 		String^ line = (String^)headerlines[i];
 
-		HEADERKEYS[i] = line->Substring(0, 8)->Trim();
-		if (HEADERKEYS[i] == "END")
+		try
 		{
-			HEADERKEYVALS[i] = "";
-			HEADERKEYCOMS[i] = "";
-		}
-		else if (line->Substring(8, 1) != "=")
-		{
-			HEADERLINEISCOMMENT[i] = true;
-			HEADERKEYS[i] = "";
-			HEADERKEYVALS[i] = "";
-			HEADERKEYCOMS[i] = line->Trim();
-		}
-		else
-		{
-			if (JPMath::IsNumeric(line->Substring(10, 20)))//this has to work if it is supposed to be a numeric value here
-				HEADERKEYVALS[i] = line->Substring(10, 20)->Trim();//get rid of leading and trailing white space
-			else if (line->Substring(10, 20)->Trim() == "T" || line->Substring(10, 20)->Trim() == "F")
-				HEADERKEYVALS[i] = line->Substring(10, 20)->Trim();
+			HEADERKEYS[i] = line->Substring(0, 8)->Trim();
+			if (HEADERKEYS[i] == "END")
+			{
+				HEADERKEYVALS[i] = "";
+				HEADERKEYCOMS[i] = "";
+			}
+			else if (line->Substring(8, 1) != "=")
+			{
+				HEADERLINEISCOMMENT[i] = true;
+				HEADERKEYS[i] = "";
+				HEADERKEYVALS[i] = "";
+				HEADERKEYCOMS[i] = line->Trim();
+			}
 			else
 			{
-				HEADERKEYVALS[i] = line->Substring(line->IndexOf("'") + 1, line->LastIndexOf("'") - line->IndexOf("'") - 1);
-				HEADERKEYVALS[i] = HEADERKEYVALS[i]->Trim();
-			}
+				if (JPMath::IsNumeric(line->Substring(10, 20)))//this has to work if it is supposed to be a numeric value here
+					HEADERKEYVALS[i] = line->Substring(10, 20)->Trim();//get rid of leading and trailing white space
+				else if (line->Substring(10, 20)->Trim() == "T" || line->Substring(10, 20)->Trim() == "F")
+					HEADERKEYVALS[i] = line->Substring(10, 20)->Trim();
+				else
+				{
+					if (line->IndexOf("'") == -1)
+					{
+						HEADERLINEISCOMMENT[i] = true;
+						HEADERKEYS[i] = "";
+						HEADERKEYVALS[i] = "";
+						HEADERKEYCOMS[i] = line->Trim();
+					}
+					else
+					{
+						HEADERKEYVALS[i] = line->Substring(line->IndexOf("'") + 1, line->LastIndexOf("'") - line->IndexOf("'") - 1);
+						HEADERKEYVALS[i] = HEADERKEYVALS[i]->Trim();
+					}
+				}
 
-			int indx = line->IndexOf("/");
-			if (indx != -1)
-				HEADERKEYCOMS[i] = line->Substring(indx + 1)->Trim();
-			else
-				HEADERKEYCOMS[i] = "";
+				int indx = line->IndexOf("/");
+				if (indx != -1)
+					HEADERKEYCOMS[i] = line->Substring(indx + 1)->Trim();
+				else
+					HEADERKEYCOMS[i] = "";
+			}
+		}
+		catch (...)
+		{
+			throw gcnew Exception("Header line: \r\r'" + line + "'\r\r is very nastily formatted. Continuing should allow the image to be loaded but the header will not likely contain whatever was intended.");
 		}
 	}
 }
 
 String^ JPFITS::FITSImageHeader::GetKeyValue(String^ key)
 {
-	for (int i = 0; i < HEADERKEYS->Length; i++)
-		if (key->CompareTo(HEADERKEYS[i]) == 0)
-			return HEADERKEYVALS[i];
+	String^ result = "";
+	bool brek = false;
 
-	return "";
+	//#pragma omp parallel for
+	for (int i = 0; i < HEADERKEYS->Length; i++)
+		if (brek)
+			break;
+		else if (key == HEADERKEYS[i])
+		{
+			result = HEADERKEYVALS[i];
+			brek = true;
+		}
+
+	return result;
 }
 
 String^ JPFITS::FITSImageHeader::GetKeyComment(String^ key)
 {
-	for (int i = 0; i < HEADERKEYS->Length; i++)
-		if (key->CompareTo(HEADERKEYS[i]) == 0)
-			return HEADERKEYCOMS[i];
+	String^ result = "";
+	bool brek = false;
 
-	return "";
+	//#pragma omp parallel for
+	for (int i = 0; i < HEADERKEYS->Length; i++)
+		if (brek)
+			break;
+		else if (key == HEADERKEYS[i])
+		{
+			result = HEADERKEYCOMS[i];
+			brek = true;
+		}
+
+	return result;
 }
 
 String^ JPFITS::FITSImageHeader::GetKeyName(int index)
@@ -126,46 +165,73 @@ String^ JPFITS::FITSImageHeader::GetKeyComment(int index)
 
 int JPFITS::FITSImageHeader::GetKeyIndex(String^ key, bool KeyIsFullLineFormatted)
 {
+	int result = -1;
+	bool brek = false;
+
 	if (!KeyIsFullLineFormatted)
 	{
+		//#pragma omp parallel for
 		for (int i = 0; i < HEADERKEYS->Length; i++)
-			if (key == HEADERKEYS[i])
-				return i;
+			if (brek)
+				break;
+			else if (key == HEADERKEYS[i])
+			{
+				result = i;
+				brek = true;
+			}
 	}
 	else
 	{
+		//#pragma omp parallel for
 		for (int i = 0; i < HEADERKEYS->Length; i++)
-			if (key == this->HeaderLine[i])
-				return i;
+			if (brek)
+				break;
+			else if (key == this->HeaderLine[i])
+			{
+				result = i;
+				brek = true;
+			}
 	}
 
-	return -1;
+	return result;
 }
 
 int JPFITS::FITSImageHeader::GetKeyIndex(String^ key, String^ keyvalue)
 {
-	for (int i = 0; i < HEADERKEYS->Length; i++)
-		if (key == HEADERKEYS[i])
-			if (keyvalue == HEADERKEYVALS[i])
-				return i;
+	int result = -1;
+	bool brek = false;
 
-	return -1;
+	//#pragma omp parallel for
+	for (int i = 0; i < HEADERKEYS->Length; i++)
+		if (brek)
+			break;
+		else if (key == HEADERKEYS[i])
+			if (keyvalue == HEADERKEYVALS[i])
+				result = i;
+
+	return result;
 }
 
 int JPFITS::FITSImageHeader::GetKeyIndex(String^ key, String^ keyvalue, String^ keycomment)
 {
 	int result = -1;
+	bool brek = false;
+
+	//#pragma omp parallel for
 	for (int i = 0; i < HEADERKEYS->Length; i++)
-		if (key == HEADERKEYS[i])
+		if (brek)
+			break;
+		else if (key == HEADERKEYS[i])
 			if (keyvalue == HEADERKEYVALS[i])
 				if (keycomment == HEADERKEYCOMS[i])
-					return i;
+					result = i;
 
-	return -1;
+	return result;
 }
 
 void JPFITS::FITSImageHeader::SetKey(String^ Key, String^ Value, bool AddIfNotFound, int AddAtIndex)
 {
+	UPDATEDISPLAYHEADER = true;
 	Key = Key->ToUpper();
 	for (int i = 0; i < HEADERKEYS->Length; i++)
 		if (Key == HEADERKEYS[i])
@@ -179,6 +245,7 @@ void JPFITS::FITSImageHeader::SetKey(String^ Key, String^ Value, bool AddIfNotFo
 
 void JPFITS::FITSImageHeader::SetKey(String^ Key, String^ Value, String^ Comment, bool AddIfNotFound, int AddAtIndex)
 {
+	UPDATEDISPLAYHEADER = true;
 	Key = Key->ToUpper();
 	for (int i = 0; i < HEADERKEYS->Length; i++)
 		if (Key == HEADERKEYS[i])
@@ -201,6 +268,7 @@ void JPFITS::FITSImageHeader::SetKey(int index, String^ Key, String^ Value, Stri
 	HEADERKEYVALS[index] = Value;
 	HEADERKEYCOMS[index] = Comment;
 	HEADERLINEISCOMMENT[index] = false;
+	UPDATEDISPLAYHEADER = true;
 }
 
 void JPFITS::FITSImageHeader::AddKey(String^ NewKey, String^ NewValue, String^ NewComment, int KeyIndex)
@@ -236,16 +304,13 @@ void JPFITS::FITSImageHeader::AddKey(String^ NewKey, String^ NewValue, String^ N
 	HEADERKEYVALS = headerkeyvals;
 	HEADERKEYCOMS = headerkeycoms;
 	HEADERLINEISCOMMENT = headerlineiscomment;
+	UPDATEDISPLAYHEADER = true;
 }
 
 void JPFITS::FITSImageHeader::AddCommentKeyLine(String^ commentKeyLine, int keyIndex)
 {
+	commentKeyLine = commentKeyLine->PadRight(80);//pad since might just be empty intended as blank line
 	int nels = commentKeyLine->Length;
-	if (nels == 0)
-	{
-		nels = 1;
-		commentKeyLine = " ";
-	}
 	int Nnewlines = (int)Math::Ceiling(double(nels) / 80);
 	array<String^>^ strnewlines = gcnew array<String^>(Nnewlines);
 
@@ -295,6 +360,7 @@ void JPFITS::FITSImageHeader::AddCommentKeyLine(String^ commentKeyLine, int keyI
 	HEADERKEYVALS = headerkeyvals;
 	HEADERKEYCOMS = headerkeycoms;
 	HEADERLINEISCOMMENT = headerlineiscomment;
+	UPDATEDISPLAYHEADER = true;
 }
 
 void JPFITS::FITSImageHeader::RemoveKey(int KeyIndex)
@@ -322,6 +388,7 @@ void JPFITS::FITSImageHeader::RemoveKey(int KeyIndex)
 	HEADERKEYVALS = vals;
 	HEADERKEYCOMS = coms;
 	HEADERLINEISCOMMENT = bols;
+	UPDATEDISPLAYHEADER = true;
 }
 
 void JPFITS::FITSImageHeader::RemoveKey(String^ Key)
@@ -337,6 +404,7 @@ void JPFITS::FITSImageHeader::RemoveKey(String^ Key, String^ Value)
 void JPFITS::FITSImageHeader::RemoveAllKeys(array<double, 2>^ image)
 {
 	MAKE_DEFAULT_HEADER(true, image);
+	UPDATEDISPLAYHEADER = true;
 }
 
 void JPFITS::FITSImageHeader::CopyHeaderFrom(JPFITS::FITSImageHeader^ sourceHeader)
@@ -385,27 +453,12 @@ void JPFITS::FITSImageHeader::CopyHeaderFrom(JPFITS::FITSImageHeader^ sourceHead
 	HEADERKEYVALS = newheadervals;
 	HEADERKEYCOMS = newheadercoms;
 	HEADERLINEISCOMMENT = newheaderbols;
+	UPDATEDISPLAYHEADER = true;
 }
-
-//void JPFITS::FITSImageHeader::SetBITPIXNAXISBSCZ(Object^ image)
-//{
-//	TypeCode precision = TypeCode::Double;
-//
-//	if (image == nullptr)
-//	{
-//		precision = TypeCode::Byte;
-//		SetBITPIXNAXISBSCZ(precision, nullptr);
-//	}
-//	else
-//	{
-//		precision = Type::GetTypeCode((((Array^)image)->GetType())->GetElementType());
-//	}
-//
-//
-//}
 
 void JPFITS::FITSImageHeader::SetBITPIXNAXISBSCZ(System::TypeCode precision, array<double, 2>^ image)
 {
+	UPDATEDISPLAYHEADER = true;
 	if (image == nullptr || image->Length == 0)
 	{
 		SetKey("BITPIX", "8", false, 0);
@@ -584,6 +637,7 @@ void JPFITS::FITSImageHeader::MAKE_DEFAULT_HEADER(bool mayContainExtensions, arr
 	HEADERKEYS[nlines] = "END";
 	HEADERKEYVALS[nlines] = "";
 	HEADERKEYCOMS[nlines] = "";
+	UPDATEDISPLAYHEADER = true;
 }
 
 String^ JPFITS::FITSImageHeader::GET_FORMATTED_HEADERLINE(int lineIndex)
@@ -657,8 +711,11 @@ String^ JPFITS::FITSImageHeader::GET_FORMATTED_HEADERLINE(int lineIndex)
 
 array<String^>^ JPFITS::FITSImageHeader::GetFormattedHeaderBlock(bool isExtension, bool keysOnly)
 {
-	if (isExtension)
+	if (isExtension && !ISEXTENSION)
 	{
+		UPDATEDISPLAYHEADER = true;
+		ISEXTENSION = true;
+
 		this->RemoveKey("EXTEND");
 
 		HEADERKEYS[0] = "XTENSION";
@@ -725,33 +782,41 @@ array<String^>^ JPFITS::FITSImageHeader::GetFormattedHeaderBlock(bool isExtensio
 			HEADERLINEISCOMMENT = bols;
 		}
 	}
-	else
+	else if (!isExtension && ISEXTENSION)
 	{
+		UPDATEDISPLAYHEADER = true;
+		ISEXTENSION = false;
 		HEADERKEYS[0] = "SIMPLE";
 		HEADERKEYVALS[0] = "T";
 		HEADERKEYCOMS[0] = "File conforms to FITS standard.";
 	}
 
-	array<String^>^ header;
+	if (!UPDATEDISPLAYHEADER && !keysOnly)
+		return FORMATTEDHEADER;
+
+	UPDATEDISPLAYHEADER = false;
+
 	if (keysOnly)
-		header = gcnew array<String^>(HEADERKEYS->Length);
+		FORMATTEDHEADER = gcnew array<String^>(HEADERKEYS->Length);
 	else
 	{
 		int NKeys = HEADERKEYS->Length;
 		int NCards = (NKeys - 1) / 36;
-		header = gcnew array<String^>((NCards + 1) * 36);
-	}	
+		FORMATTEDHEADER = gcnew array<String^>((NCards + 1) * 36);
+	}
 
+	//#pragma omp parallel for
 	for (int i = 0; i < HEADERKEYS->Length; i++)
-		header[i] = FITSImageHeader::GET_FORMATTED_HEADERLINE(i);
+		FORMATTEDHEADER[i] = FITSImageHeader::GET_FORMATTED_HEADERLINE(i);
 
 	if (keysOnly)
-		return header;
+		return FORMATTEDHEADER;
 
 	String^ empty = "";
-	for (int i = HEADERKEYS->Length; i < header->Length; i++)
-		header[i] = empty->PadLeft(80);
+	//#pragma omp parallel for
+	for (int i = HEADERKEYS->Length; i < FORMATTEDHEADER->Length; i++)
+		FORMATTEDHEADER[i] = empty->PadLeft(80);
 
-	return header;
+	return FORMATTEDHEADER;
 }
 

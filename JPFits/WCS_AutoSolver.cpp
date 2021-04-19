@@ -133,10 +133,6 @@ void JPFITS::WCS_AutoSolver::BGWRKR_DoWork(System::Object^ sender, System::Compo
 		CAT_CVAL2s = bt->GetTTYPEEntry(CAT_CVAL2NAME);
 		CAT_MAGs = bt->GetTTYPEEntry(CAT_MAGNAME);
 
-		/*CAT_CVAL1s = JPFITS::FITSBinTable::GetExtensionEntry(CAT_FILENAME, CAT_EXTNAME, CAT_CVAL1NAME);
-		CAT_CVAL2s = JPFITS::FITSBinTable::GetExtensionEntry(CAT_FILENAME, CAT_EXTNAME, CAT_CVAL2NAME);
-		CAT_MAGs = JPFITS::FITSBinTable::GetExtensionEntry(CAT_FILENAME, CAT_EXTNAME, CAT_MAGNAME);*/
-
 		//need to check mag for NaN's and re-form ra dec mag
 		BGWRKR->ReportProgress(0, "Formatting the Catalogue FITS binary tables...");
 		ArrayList^ ralist = gcnew ArrayList(CAT_CVAL1s->Length);
@@ -379,12 +375,8 @@ void JPFITS::WCS_AutoSolver::BGWRKR_DoWork(System::Object^ sender, System::Compo
 		array<double>^ Xintrmdt_triplet = gcnew array<double>(3);
 		array<double>^ Yintrmdt_triplet = gcnew array<double>(3);
 		array<double>^ P0 = gcnew array<double>(4);
-		//double minlength0 = SCALE_LB * (PSEtriangles[i]->SideLength[0] - kern_diam);//redundant as per below
-		//double maxlength0 = SCALE_UB * (PSEtriangles[i]->SideLength[0] + kern_diam);//redundant as per below
-		//double minlength1 = SCALE_LB * (PSEtriangles[i]->SideLength[1] - kern_diam);//redundant as per below
-		//double maxlength1 = SCALE_UB * (PSEtriangles[i]->SideLength[1] + kern_diam);//redundant as per below
-		double minlength2 = SCALE_LB * (PSEtriangles[i]->SideLength[2] - kern_diam);
-		double maxlength2 = SCALE_UB * (PSEtriangles[i]->SideLength[2] + kern_diam);
+		double minlength2 = SCALE_LB * (PSEtriangles[i]->SideLength[2] - kern_diam);//longest side length min
+		double maxlength2 = SCALE_UB * (PSEtriangles[i]->SideLength[2] + kern_diam);//longest side length max
 
 		for (int j = 0; j < CATtriangles_intrmdt->Length; j++)
 		{
@@ -395,26 +387,17 @@ void JPFITS::WCS_AutoSolver::BGWRKR_DoWork(System::Object^ sender, System::Compo
 
 			ncompares++;
 
+			//compare AAS (vertex0, vertex1, longest side)
 			if (Math::Abs(PSEtriangles[i]->VertexAngle[0] - CATtriangles_intrmdt[j]->VertexAngle[0]) > WCS_VERTEX_TOL)
 				continue;
 			if (Math::Abs(PSEtriangles[i]->VertexAngle[1] - CATtriangles_intrmdt[j]->VertexAngle[1]) > WCS_VERTEX_TOL)
 				continue;
-			/*if (Math::Abs(PSEtriangles[i]->VertexAngle[2] - CATtriangles_intrmdt[j]->VertexAngle[2]) > WCS_VERTEX_TOL)
-				continue;*/
-
-				//these are unneccessary because they're redundant
-
-			/*if (CATtriangles_intrmdt[j]->SideLength[0] <  minlength0 || CATtriangles_intrmdt[j]->SideLength[0] > maxlength0)
-				continue;*/
-			/*if (CATtriangles_intrmdt[j]->SideLength[1] < minlength1 || CATtriangles_intrmdt[j]->SideLength[1] > maxlength1)
-				continue;*/
 			if (CATtriangles_intrmdt[j]->SideLength[2] < minlength2 || CATtriangles_intrmdt[j]->SideLength[2] > maxlength2)
 				continue;
 
 			if (compare_fieldvectors)
 			{
 				double theta = Math::Atan2(PSEtriangles[i]->FieldVector->X * CATtriangles_intrmdt[j]->FieldVector->Y - PSEtriangles[i]->FieldVector->Y * CATtriangles_intrmdt[j]->FieldVector->X, PSEtriangles[i]->FieldVector->X * CATtriangles_intrmdt[j]->FieldVector->X + PSEtriangles[i]->FieldVector->Y * CATtriangles_intrmdt[j]->FieldVector->Y);
-				//double theta = CATtriangles_intrmdt[j]->FieldVectorRadAngle - PSEtriangles[i]->FieldVectorRadAngle;
 				
 				if (theta > ROTATION_UB || theta < ROTATION_LB)
 					continue;
@@ -465,7 +448,7 @@ void JPFITS::WCS_AutoSolver::BGWRKR_DoWork(System::Object^ sender, System::Compo
 							int x = (int)Math::Round((double)IMAGE_WIDTH - 1 - (1 / P0[0] * (Math::Cos(-P0[1]) * X_int - Math::Sin(-P0[1]) * Y_int) + P0[2]));
 							int y = (int)Math::Round((double)IMAGE_HEIGHT - 1 - (1 / P0[0] * (Math::Sin(-P0[1]) * X_int + Math::Cos(-P0[1]) * Y_int) + P0[3]));
 
-							if (x > 0 && y > 0 && x < IMAGE_WIDTH && y < IMAGE_HEIGHT && PSE->SourceBooleanMap[x, y])
+							if (x > 0 && y > 0 && x < IMAGE_WIDTH && y < IMAGE_HEIGHT && PSE->SourceBooleanMap[x, y] && PSE->SourceIndexMap[x, y] < PSE->N_Sources)
 								N_pt_matches++;
 						}
 
@@ -523,7 +506,7 @@ void JPFITS::WCS_AutoSolver::BGWRKR_DoWork(System::Object^ sender, System::Compo
 		int x = (int)Math::Round((double)IMAGE_WIDTH - 1 - (1 / p00 * (Math::Cos(-p01) * X_int - Math::Sin(-p01) * Y_int) + p02));
 		int y = (int)Math::Round((double)IMAGE_HEIGHT - 1 - (1 / p00 * (Math::Sin(-p01) * X_int + Math::Cos(-p01) * Y_int) + p03));
 
-		if (x > 0 && y > 0 && x < IMAGE_WIDTH && y < IMAGE_HEIGHT && PSE->SourceBooleanMap[x, y])
+		if (x > 0 && y > 0 && x < IMAGE_WIDTH && y < IMAGE_HEIGHT && PSE->SourceBooleanMap[x, y] && PSE->SourceIndexMap[x, y] < PSE->N_Sources)
 		{
 			int index = PSE->SourceIndexMap[x, y];
 			cpix1[c] = PSE->Centroids_X[index];
@@ -538,7 +521,7 @@ void JPFITS::WCS_AutoSolver::BGWRKR_DoWork(System::Object^ sender, System::Compo
 		return;
 
 	BGWRKR->ReportProgress(0, "Solving for " + c + " point pair matches out of a possible " + N_POINTS);
-	WCS->Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG);
+	WCS->Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG->Header);
 	BGWRKR->ReportProgress(0, "Solution:" + Environment::NewLine);
 	BGWRKR->ReportProgress(0, "CRPIX1 = " + WCS->CRPIXn[1]);
 	BGWRKR->ReportProgress(0, "CRPIX2 = " + WCS->CRPIXn[2]);
@@ -633,7 +616,7 @@ void JPFITS::WCS_AutoSolver::BGWRKR_DoWork(System::Object^ sender, System::Compo
 		int x = (int)Math::Round(cpix1[i]);
 		int y = (int)Math::Round(cpix2[i]);
 		if (x > 0 && x < IMAGE_WIDTH && y > 0 && y < IMAGE_HEIGHT)
-			if (PSE->SourceBooleanMap[x, y])
+			if (PSE->SourceBooleanMap[x, y] && PSE->SourceIndexMap[x, y] < PSE->N_Sources)
 			{
 				nmatches++;
 				match[i] = true;
@@ -661,8 +644,8 @@ void JPFITS::WCS_AutoSolver::BGWRKR_DoWork(System::Object^ sender, System::Compo
 	if (CANCELLED)
 		return;
 
-	WCS->Clear(FITS_IMG);
-	WCS->Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG);
+	WCS->Clear(FITS_IMG->Header);
+	WCS->Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG->Header);
 	BGWRKR->ReportProgress(0, Environment::NewLine + nmatches + " sources of " + N_POINTS + " were able to be used for WCS refinement.");
 	BGWRKR->ReportProgress(0, Environment::NewLine + "Refined solution:" + Environment::NewLine);
 	BGWRKR->ReportProgress(0, "CRPIX1 = " + WCS->CRPIXn[1]);
@@ -694,9 +677,7 @@ void JPFITS::WCS_AutoSolver::BGWRKR_ProgressChanged(System::Object^ sender, Syst
 	{
 		STATUS_LOG = STATUS_LOG->Remove(STATUS_LOG->LastIndexOf(Environment::NewLine));
 		STATUS_LOG += Environment::NewLine + "Approximate progress: " + (PROGRESS + 1).ToString() + "%";
-	}
-
-	
+	}	
 }
 
 void JPFITS::WCS_AutoSolver::BGWRKR_RunWorkerCompleted(System::Object^ sender, System::ComponentModel::RunWorkerCompletedEventArgs^ e)

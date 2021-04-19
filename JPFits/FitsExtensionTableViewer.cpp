@@ -57,7 +57,7 @@ void JPFITS::FitsExtensionTableViewer::OpenFITSImage(String^ FileName)
 
 void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 {
-	try
+	//try
 	{
 		EXTENSIONNAME = ExtensionName;
 
@@ -125,10 +125,10 @@ void JPFITS::FitsExtensionTableViewer::PopulateTable(String^ ExtensionName)
 			}
 		}		
 	}
-	catch (Exception^ e)
+	/*catch (Exception^ e)
 	{
 		MessageBox::Show(e->Data + "	" + e->InnerException + "	" + e->Message + "	" + e->Source + "	" + e->StackTrace + "	" + e->TargetSite);
-	}
+	}*/
 
 	this->BringToFront();
 	this->Activate();

@@ -45,6 +45,87 @@ array<double, 2>^ JPFITS::JPBitMap::Bin(cli::array<double, 2> ^data, int Nx, int
 	return result;
 }
 
+//Bitmap^ JPFITS::JPBitMap::ArrayTo16bppGSBmp(array<double, 2>^ image, int scaling, int colour, bool invert, array<double, 1>^ DImCLim, int WinWidth, int WinHeight, bool invertYaxis)
+//{
+//	if (image->GetLength(0) > WinWidth * 2 || image->GetLength(1) > WinHeight * 2)
+//	{
+//		int Nx = 1;
+//		int Ny = 1;
+//		if (image->GetLength(0) > WinWidth * 2)
+//			Nx = image->GetLength(0) / WinWidth;
+//		if (image->GetLength(1) > WinHeight * 2)
+//			Ny = image->GetLength(1) / WinHeight;
+//		if (Nx > 1 || Ny > 1)
+//			image = Bin(image, Nx, Ny);
+//	}
+//
+//	Bitmap^ bmp = gcnew Bitmap(image->GetLength(0), image->GetLength(1), PixelFormat::Format16bppGrayScale);
+//	BitmapData^ data = bmp->LockBits(Drawing::Rectangle(0, 0, image->GetLength(0), image->GetLength(1)), ImageLockMode::WriteOnly, PixelFormat::Format16bppGrayScale);
+//	unsigned char *bits = (unsigned char *)data->Scan0.ToPointer();
+//	int bytesPerPixel = 2; // 2 bytes per pixel for 24 bpp rgb
+//
+//	int height = data->Height;
+//	int width = data->Width;
+//	int stride = data->Stride;
+//	int bytesWidth = width * bytesPerPixel;
+//	double invDImCLimRange = 1 / (DImCLim[1] - DImCLim[0]);
+//
+//	//#pragma omp parallel for
+//	for (int i = 0; i < height; i++)
+//	{
+//		int istride = i * stride;
+//		int jcounter = -1;
+//		for (int j = 0; j < bytesWidth; j += bytesPerPixel)
+//		{
+//			jcounter++;
+//			double val = image[jcounter, i];
+//			if (val < DImCLim[0])
+//				val = DImCLim[0];
+//			else if (val > DImCLim[1])
+//				val = DImCLim[1];
+//			val = (val - DImCLim[0]) * invDImCLimRange;
+//
+//			switch (scaling)
+//			{
+//				case (0)://linear
+//				{
+//					val = val * 65535;
+//					break;
+//				}
+//				case (1)://square root
+//				{
+//					val = Math::Sqrt(val) * 65535;
+//					break;
+//				}
+//				case (2)://squared
+//				{
+//					val = val * val * 65535;
+//					break;
+//				}
+//				case (3)://log
+//				{
+//					val = Math::Log(Math::Sqrt(val*val) + 1) * 65535;
+//					break;
+//				}
+//			}
+//
+//			if (invert)
+//				val = 65535 - val;
+//
+//			bits[istride + j] = (int(val) & 0xff);
+//			bits[istride + j + 1] = ((int(val) >> 8) & 0xff);
+//		}
+//	}
+//
+//	bmp->UnlockBits(data);
+//	if (invertYaxis)
+//		bmp->RotateFlip(::Drawing::RotateFlipType::RotateNoneFlipY);
+//
+//	//bmp->Save("C:\\ProgramData\\Astrowerks\\CCDLABx64\\test.bmp");
+//
+//	return bmp;
+//}
+
 Bitmap^ JPFITS::JPBitMap::ArrayToBmp(cli::array<double, 2>^ image, int scaling, int colour, bool invert, array<double, 1>^ DImCLim, int WinWidth, int WinHeight, bool invertYaxis)
 {
 	if (image->GetLength(0) > WinWidth * 2 || image->GetLength(1) > WinHeight * 2)

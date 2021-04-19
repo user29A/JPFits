@@ -16,7 +16,6 @@ GNU General Public License for more details.
 
 See http://www.gnu.org/licenses/. */
 
-
 #pragma once
 using namespace System;
 using namespace System::IO;
@@ -202,8 +201,6 @@ namespace JPFITS
 		/// <summary>This sets the BITPIX, NAXIS, NAXISn, BSCALE and BZERO keywords of the header given the TypeCode and the image. If the image is null then NAXIS = 0 and any NAXISn keywords are removed as well as BSCALE and BZERO.</summary>
 		void SetBITPIXNAXISBSCZ(TypeCode precision, array<double, 2>^ image);
 
-		//void SetBITPIXNAXISBSCZ(Object^ image);
-
 		/// <summary>Returns a formatted header block with the existing keys, and sets the first key to either SIMPLE = T or XTENSION = IMAGE. If a full 2880-multiple block is needed, set keysOnly to false.</summary>
 		/// <param name="asExtension">If true then the first keyword is set to XTENSION = IMAGE, otherwise it is SIMPLE = T.</param>
 		/// <param name="keysOnly">If true then only the existing keywords are returned formatted, otherwise if you need the entire 2880-multiple block pass false. True typically needed for display, false typically needed for writing.</param>
@@ -257,13 +254,244 @@ namespace JPFITS
 		array<String^>^ HEADERKEYS;
 		array<String^>^ HEADERKEYVALS;
 		array<String^>^ HEADERKEYCOMS;
+		array<String^>^ FORMATTEDHEADER;
 		array<bool>^ HEADERLINEISCOMMENT;
+		bool UPDATEDISPLAYHEADER = true;
+		bool ISEXTENSION = false;
 
 		static array<String^>^ INVALIDEDITKEYS = { "SIMPLE", "EXTEND", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "BZERO", "BSCALE", "END", "PCOUNT", "GCOUNT", "THEAP", "GROUPS", "XTENSION", "TFIELDS" };
 		void MAKE_DEFAULT_HEADER(bool mayContainExtensions, array<double, 2>^ image);//make a default header
 		String^ GET_FORMATTED_HEADERLINE(int lineIndex);//returns a formatted header line from the existing key at the lineIndex
 
 		#pragma endregion
+	};
+
+	/// <summary>WorldCoordinateSolution class provides functionality for creation and interaction with World Coordinate Solutions for FITS files.</summary>
+	public ref class WorldCoordinateSolution
+	{
+		public:
+		~WorldCoordinateSolution();
+		WorldCoordinateSolution();
+		WorldCoordinateSolution(JPFITS::FITSImageHeader^ header);
+
+		/// <summary>Gets or Sets the column-major CD matrix for this class instance.</summary>
+		property array<double, 2>^ CD_Matrix
+		{
+			array<double, 2>^ get() { return CDMATRIX; }
+			void set(array<double, 2>^ cdmatrix)
+			{
+				CDMATRIX = cdmatrix;
+				CD1_1 = CDMATRIX[0, 0];
+				CD1_2 = CDMATRIX[1, 0];
+				CD2_1 = CDMATRIX[0, 1];
+				CD2_2 = CDMATRIX[1, 1];
+				SET_CDMATRIXINV();
+			}
+		}
+
+		/// <summary>Gets the one-based row-major element from the CD matrix CDi_j[int i, int j], where i is the row index, and j is the column index.</summary>
+		property double CDi_j[int, int]
+		{
+			double get(int i, int j)
+			{
+				return CDMATRIX[j - 1, i - 1];
+			}
+			void set(int i, int j, double val)
+			{
+				CDMATRIX[j - 1, i - 1] = val;
+				CD1_1 = CDMATRIX[0, 0];
+				CD1_2 = CDMATRIX[1, 0];
+				CD2_1 = CDMATRIX[0, 1];
+				CD2_2 = CDMATRIX[1, 1];
+				SET_CDMATRIXINV();
+			}
+		}
+
+		/// <summary>Gets the inverse of the CD matrix.</summary>
+		property array<double, 2>^ CD_Matrix_Inverse
+		{
+			array<double, 2>^ get() { return CDMATRIXINV; }
+		}
+
+		/// <summary>Gets the array of coordinate values on one-based axis n (Coordinate_Values[n]) used for this World Coordinate Solution.</summary>
+		property array<double>^ Coordinate_Values[int]
+		{
+			array<double>^ get(int Coordinate_Axis)
+			{
+				if (Coordinate_Axis == 1)
+					return CVAL1;
+				if (Coordinate_Axis == 2)
+					return CVAL2;
+				return nullptr;
+			}
+			void set(int Coordinate_Axis, array<double>^ cvals)
+			{
+				if (Coordinate_Axis == 1)
+					CVAL1 = cvals;
+				if (Coordinate_Axis == 2)
+					CVAL2 = cvals;
+			}
+		}
+
+		/// <summary>Gets the array of one-based coordinate pixels on one-based axis n (Coordinate_Pixels[n]) used for this World Coordinate Solution.</summary>
+		property array<double>^ Coordinate_Pixels[int]
+		{
+			array<double>^ get(int Coordinate_Axis)
+			{
+				if (Coordinate_Axis == 1)
+					return CPIX1;
+				if (Coordinate_Axis == 2)
+					return CPIX2;
+				return nullptr;
+			}
+			void set(int Coordinate_Axis, array<double>^ cpixs)
+			{
+				if (Coordinate_Axis == 1)
+					CPIX1 = cpixs;
+				if (Coordinate_Axis == 2)
+					CPIX2 = cpixs;
+			}
+		}
+
+		/// <summary>Gets or Sets the Coordinate Reference Value for the one-based axis n: CRVALn[int n].</summary>
+		property double CRVALn[int]
+		{
+			double get(int Coordinate_Axis)
+			{
+				return CRVALN[Coordinate_Axis - 1];
+			}
+			void set(int Coordinate_Axis, double val)
+			{
+				CRVALN[Coordinate_Axis - 1] = val;
+			}
+		}
+
+		/// <summary>Gets or Sets the one-based Coordinate Reference Pixel for the one-based axis n: CRPIXn[int n].</summary>
+		property double CRPIXn[int]
+		{
+			double get(int Coordinate_Axis)
+			{
+				return CRPIXN[Coordinate_Axis - 1];
+			}
+			void set(int Coordinate_Axis, double val)
+			{
+				CRPIXN[Coordinate_Axis - 1] = val;
+			}
+		}
+
+		/// <summary>Gets the world coordinate solution plate scale (arcseconds per pixel) for one-based axis n: WCSSCALn[int n].</summary>
+		property double CDELTn[int]
+		{
+			double get(int Coordinate_Axis)
+			{
+				return CDELTN[Coordinate_Axis - 1];
+			}
+		}
+
+		/// <summary>Gets the world coordinate solution field rotation (degrees) for one-based axis n: WCSROTn[int n].</summary>
+		property double CROTAn[int]
+		{
+			double get(int Coordinate_Axis)
+			{
+				return CROTAN[Coordinate_Axis - 1];
+			}
+		}
+
+		/// <summary>Gets the world coordinate solution type for one-based axis n: CTYPEn[int n].</summary>
+		property String^ CTYPEn[int]
+		{
+			String^ get(int Coordinate_Axis)
+			{
+				return CTYPEN[Coordinate_Axis - 1];
+			}
+		}
+
+		property double WCSFitResidual_MeanPix
+		{
+			double get() { return CPIXRM; }
+		}
+
+		property double WCSFitResidual_StdvPix
+		{
+			double get() { return CPIXRS; }
+		}
+
+		property double WCSFitResidual_MeanSky
+		{
+			double get() { return CVALRM; }
+		}
+
+		property double WCSFitResidual_StdvSky
+		{
+			double get() { return CVALRS; }
+		}
+
+		/// <summary>Solves the projection parameters for a given list of pixel and coordinate values. Pass nullptr for FITS if writing WCS parameters to a primary header not required.</summary>
+		/// <param name="WCS_Type">The world coordinate solution type. For example: TAN, for tangent-plane or Gnomic projection.</param>
+		/// <param name="X_pix">An array of the image x-axis pixel locations.</param>
+		/// <param name="Y_pix">An array of the image y-axis pixel locations.</param>
+		/// <param name="zero_based_pixels">A boolean to indicate if the X_Pix and Y_Pix are zero-based coordinates. They will be converted to one-based if true.</param>
+		/// <param name="cval1">An array of coordinate values in degrees on coordinats axis 1.</param>
+		/// <param name="cval2">An array of coordinate values in degrees on coordinats axis 2.</param>
+		/// <param name="header">An FITSImageHeader^ instance to write the solution into. Pass nulltr if not required.</param>
+		void Solve_WCS(String^ WCS_Type, array<double>^ X_pix, array<double>^ Y_pix, bool zero_based_pixels, array<double>^ cval1, array<double>^ cval2, JPFITS::FITSImageHeader^ header);
+
+		/// <summary>Gets the image [x, y] pixel position for a given world coordinate in degrees at cval1 and cval2.</summary>
+		void Get_Pixel(double cval1, double cval2, String^ WCS_Type, double &X_pix, double &Y_pix, bool return_zero_based_pixels);
+
+		/// <summary>Gets arrays of image [x, y] pixel positions for a list of given world coordinates in degrees at cval1 and cval2.</summary>
+		void Get_Pixels(array<double>^ cval1, array<double>^ cval2, String^ WCS_Type, array<double>^ &X_pix, array<double>^ &Y_pix, bool return_zero_based_pixels);
+
+		/// <summary>Gets the cval1 and cval2 world coordinate in degrees for a given image [x, y] pixel position.</summary>
+		void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, String^ WCS_Type, double &cval1, double &cval2);
+
+		/// <summary>Gets the cval1 and cval2 world coordinate in sexagesimal for a given image [x, y] pixel position.</summary>
+		void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, String^ WCS_Type, String^ &cval1_sxgsml, String^ &cval2_sxgsml);
+
+		/// <summary>Gets the cval1 and cval2 world coordinate in degrees and sexagesimal for a given image [x, y] pixel position.</summary>
+		void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, String^ WCS_Type, double &cval1, double &cval2, String^ &cval1_sxgsml, String^ &cval2_sxgsml);
+
+		/// <summary>Gets arrays of cval1 and cval2 world coordinates in degrees for a list of given image [x, y] pixel positions.</summary>
+		void Get_Coordinates(array<double>^ X_pix, array<double>^ Y_pix, bool zero_based_pixels, String^ WCS_Type, array<double>^ &cval1, array<double>^ &cval2);
+
+		/// <summary>Gets arrays of cval1 and cval2 world coordinates in sexagesimal for a list of given image [x, y] pixel positions.</summary>
+		void Get_Coordinates(array<double>^ X_pix, array<double>^ Y_pix, bool zero_based_pixels, String^ WCS_Type, array<String^>^ &cval1_sxgsml, array<String^>^ &cval2_sxgsml);
+
+		/// <summary>Gets arrays of cval1 and cval2 world coordinates in degrees and sexagesimal for a list of given image [x, y] pixel positions.</summary>
+		void Get_Coordinates(array<double>^ X_pix, array<double>^ Y_pix, bool zero_based_pixels, String^ WCS_Type, array<double>^ &cval1, array<double>^ &cval2, array<String^>^ &cval1_sxgsml, array<String^>^ &cval2_sxgsml);
+
+		void CopyFrom(JPFITS::WorldCoordinateSolution^ wcs_source);
+
+		void CopyTo(JPFITS::FITSImageHeader^ header);
+
+		void Clear();
+
+		static void Clear(JPFITS::FITSImageHeader^ header);
+
+		bool Exists() { return WCSEXISTS; }
+
+		/// <summary>Checks to see if a complete WCS solution exists in the primary header of the given FITS object.</summary>
+		static bool Exists(FITSImageHeader^ header, array<String^>^ WCS_CTYPEN);
+
+		private:
+		array<double, 2>^ CDMATRIX;
+		array<double, 2>^ CDMATRIXINV;
+		array<double>^ CVAL1;
+		array<double>^ CVAL2;
+		array<double>^ CPIX1;
+		array<double>^ CPIX2;
+		array<double>^ CRVALN;
+		array<double>^ CRPIXN;
+		array<double>^ CDELTN;
+		array<double>^ CROTAN;
+		array<String^>^ CTYPEN;
+		double CD1_1, CD1_2, CD2_1, CD2_2, CPIX1RM, CPIX1RS, CVAL1RM, CVAL1RS, CPIX2RM, CPIX2RS, CVAL2RM, CVAL2RS, CPIXRM, CPIXRS, CVALRM, CVALRS, CCVALD1, CCVALD2;
+		String^  CCVALS1;
+		String^ CCVALS2;
+		void SET_CDMATRIXINV();
+		bool WCSEXISTS = false;
+
+		void EATHEADERFORWCS(JPFITS::FITSImageHeader^ header);
 	};
 
 	/// <summary> FITSImage class to create, read, interact with, modify components of, and write FITS Primary image data and its Header.</summary>
@@ -549,10 +777,17 @@ namespace JPFITS
 			void set(array<double, 2>^ img) { SetImage(img, true, true); }
 		}
 
-		/// <summary>Header returns a fully formated header card(s).</summary>
+		/// <summary>Provides access to the image header.</summary>
 		property JPFITS::FITSImageHeader^ Header
 		{
 			JPFITS::FITSImageHeader^ get() { return HEADER; }
+		}
+
+		/// <summary>Provides access to the image WCS.</summary>
+		property JPFITS::WorldCoordinateSolution^ WCS
+		{
+			JPFITS::WorldCoordinateSolution^ get() { return WORLDCOORDINATESOLUTION; }
+			void set(WorldCoordinateSolution^ WCS) { WORLDCOORDINATESOLUTION = WCS; }
 		}
 
 		#pragma endregion
@@ -576,7 +811,7 @@ namespace JPFITS
 
 		//Fits Info
 		int NAXIS1 = -1, NAXIS2 = -1, BITPIX = -1, NAXIS = -1;
-		__int64 BZERO = -1, BSCALE = -1;
+		double BZERO = -1, BSCALE = -1;
 		array<int>^ NAXISN;
 
 		//File Info
@@ -592,6 +827,9 @@ namespace JPFITS
 
 		//Header
 		JPFITS::FITSImageHeader^ HEADER;
+
+		//WCS
+		JPFITS::WorldCoordinateSolution^ WORLDCOORDINATESOLUTION;
 
 		#pragma endregion
 	};
@@ -619,6 +857,8 @@ namespace JPFITS
 		/// <param name="show_waitbar">Optionally show a cancellable waitbar when saving. If cancelled, return value is false.</param>
 		/// <param name="waitbar_message">Message to display on Waitbar progress if it is shown.</param>
 		bool Write(TypeCode precision, bool do_parallel, bool show_waitbar, String^ waitbar_message);
+
+		//bool Write(TypeCode precision, bool do_parallel, JPWaitBar::WaitBar^ waitbar);
 
 		/// <summary>Appends a FITSImage object to the ArrayList FITSImageSet object.</summary>
 		void Add(FITSImage^ FITS)
@@ -1186,8 +1426,8 @@ namespace JPFITS
 		static void RADecDegreeToSex(double RA_deg, double DEC_deg, String^ separator, String^ &ra_sex, String^ &dec_sex);
 
 		/// <summary>Returns the angle between -PI to +PI radians following the CAST convention given the run (x) and rise (y) of the direction vector.</summary>
-		/// <param name="run">The run (horizontal amplitude) of the vector.</param>
-		/// <param name="rise">The rise (vertical amplitude) of the vector.</param>
+		/// <param name="run">The run (signed horizontal amplitude) of the vector.</param>
+		/// <param name="rise">The rise (signed vertical amplitude) of the vector.</param>
 		static double aTanAbsoluteAngle(double run, double rise);
 
 		/// <summary>Returns the sum of all elements in the data array.</summary>
@@ -1485,6 +1725,12 @@ namespace JPFITS
 		/// <param name="do_parallel">Optionally perform all array operations in parallel. False when parallelizing upstream.</param>
 		static void XCorrImageLagShifts(array<double>^ referenceX, array<double>^ referenceY, array<double, 2>^ COMPARISON, bool autoDeBias_COMX, bool autoDeBias_COMY, bool autoHanning_COM, double& xshift, double& yshift, bool do_parallel);
 
+		/// <summary>Determines the Curve of Growth photometry for a source centered in the ROI image.</summary>
+		/// <param name="ROI">The region of interest image to determine the curve of growth for.</param>
+		/// <param name="N_last_fit_pts">The number of tailing points to fit for linear slope - intercept of this line is source counts, slope is the background count per pixel.</param>
+		/// <param name="N_points_COG">The number of points for each curve of growth point. Used as the abscissa against the return value.</param>
+		/// <param name="background_signal_per_pix">The slope of the linear fit line to the tailing points, i.e., the counts per pixel background.</param>
+		/// <param name="source_signal">The intercept of the linear fit line to the tailing points, i.e., the total central source counts.</param>
 		static array<double>^ COG(array<double, 2>^ ROI, int N_last_fit_pts, array<double>^ &N_points_COG, double &background_signal_per_pix, double &source_signal);
 
 		static double QuadFit3PtsCenterPos(array<double>^ x, array<double>^ y);
@@ -1658,6 +1904,13 @@ namespace JPFITS
 		/// <param name="fit_residuals">The return residuals of the fit: Gdata[x, y] - fit[x, y].  Pass an array of length 0 if not required.</param>
 		static void Fit_Gaussian2d(array<int>^ xdata, array<int>^ ydata, array<double, 2>^ Gdata, array<double>^ &p, array<double>^ p_LB, array<double>^ p_UB, array<double>^ &p_err, array<double, 2>^ &fit_residuals);
 
+		static void Fit_PointSource(String^ model_name, String^ minimization_type, array<int>^ xdata, array<int>^ ydata, array<double, 2>^ source, array<double>^ &params, array<double>^ params_LB, array<double>^ params_UB, array<double>^ &p_err, array<double, 2>^ &fit_residuals, String^ &termination_msg);
+
+		static void Fit_PointSource_Compound(String^ model_name, String^ minimization_type, array<int>^ xdata, array<int>^ ydata, array<double, 2>^ source, array<double>^ xpositions, array<double>^ ypositions, double position_radius, array<double, 2>^ &params, array<double, 2>^ &p_err, array<double, 2>^ &fit_residuals, String^ &termination_msg);
+
+
+
+
 		/// <summary>Determines the non-linear least-squares fit parameters for a field of n positively-oriented 2-d Gaussian surfaces G(x,y|p_n)
 		/// <para>G(x,y|p_n) = Sum[p_n(0) * exp(-((x - p_n(1))^2 + (y - p_n(2))^2) / (2*p_n(3)^2))] + p(4)</para>
 		/// <para>or</para>
@@ -1803,8 +2056,6 @@ namespace JPFITS
 		/// <param name="p_scale">The order of magnitude scale (positive) of the fit parameters.</param>
 		static void Fit_GeneralTransform2d(array<double>^ x_ref, array<double>^ y_ref, array<double>^ x_tran, array<double>^ y_tran, array<double>^ &p, array<double>^ p_lbnd, array<double>^ p_ubnd, array<double>^ p_scale);
 
-		//static void Transform2d(array<double>^ x0, array<double>^ y0, array<double>^ p, array<double>^ &xp, array<double>^ &yp);
-
 		/// <summary>Fits a polynomial to x, y data.</summary>
 		/// <param name="xdata">The x-axis data points.</param>
 		/// <param name="ydata">The y-axis data points.</param>
@@ -1822,36 +2073,101 @@ namespace JPFITS
 		static void alglib_Gauss_1d_grad(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
 		delegate void alglib_Gauss_1d_grad_delegate(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
 
-		/// <summary>Calculates a single point of a 2-d Gaussian surface G(x,y|p)
-		/// <para>G(x,y|p) = p(0)*exp(-((x-p(1))^2 + (y - p(2))^2)/(2*p(3)^2)) + p(4)</para>
-		/// <para>or</para>
-		/// <para>G(x,y|p) = p(0)*exp(-((x-p(1))*cos(p(3)) + (y-p(2))*sin(p(3)))^2 / (2*p(4)^2) - (-(x-p(1))*sin(p(3)) + (y-p(2))*cos(p(3))).^2 / (2*p(5)^2) ) + p(6)</para>
-		/// <para>where x[0] is a position on X-axis x, and x[1] is a position on Y-axis y.</para>
-		/// <para>The form of G(x,y|p) used is determined by the length of the parmater vector p</para></summary>
-		/// <param name="p">The initial parameters of the Gaussian fit.  Options are:
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias</para>
-		/// <para>or</para>
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias</para></param>
-		/// <param name="x">The x,y position to calculate the value val of the Gaussian G(x,y|p): x[0] = x, x[1] = y</param>
-		/// <param name="val">The calculated value of the Gaussian.</param>
-		/// <param name="obj">obj.</param>
+		static void alglib_Moffat_1d(array<double>^ p, array<double>^ x, double %val, Object^ obj);
+		delegate void alglib_Moffat_1d_delegate(array<double>^ p, array<double>^ x, double %val, Object^ obj);
+
+		static void alglib_Moffat_1d_grad(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
+		delegate void alglib_Moffat_1d_grad_delegate(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
+
+		///// <summary>Calculates a single point of a 2-d Gaussian surface G(x,y|p)
+		///// <para>G(x,y|p) = p(0)*exp(-((x-p(1))^2 + (y - p(2))^2)/(2*p(3)^2)) + p(4)</para>
+		///// <para>or</para>
+		///// <para>G(x,y|p) = p(0)*exp(-((x-p(1))*cos(p(3)) + (y-p(2))*sin(p(3)))^2 / (2*p(4)^2) - (-(x-p(1))*sin(p(3)) + (y-p(2))*cos(p(3))).^2 / (2*p(5)^2) ) + p(6)</para>
+		///// <para>where x[0] is a position on X-axis x, and x[1] is a position on Y-axis y.</para>
+		///// <para>The form of G(x,y|p) used is determined by the length of the parmater vector p</para></summary>
+		///// <param name="p">The initial parameters of the Gaussian fit.  Options are:
+		///// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias</para>
+		///// <para>or</para>
+		///// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias</para></param>
+		///// <param name="x">The x,y position to calculate the value val of the Gaussian G(x,y|p): x[0] = x, x[1] = y</param>
+		///// <param name="val">The calculated value of the Gaussian.</param>
+		///// <param name="obj">obj.</param>
 		static void alglib_Gauss_2d(array<double>^ p, array<double>^ x, double %val, Object^ obj);
 		delegate void function_Gauss_2d_delegate(array<double>^ p, array<double>^ x, double %val, Object^ obj);
 
 		static void alglib_Gauss_2d_grad(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
 		delegate void alglib_Gauss_2d_grad_delegate(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
 
+
+
+
+
+
+
+		static void alglib_Gauss_2d_LM_LS_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj);
+		delegate void function_Gauss_2d_LM_LS_grad_delegate(array<double>^ p, double %f, array<double>^ grad, Object^ obj);
+
+		static void alglib_Gauss_2d_LM_LS_grad_compound(array<double>^ p, double %f, array<double>^ grad, Object^ obj);
+		delegate void function_Gauss_2d_LM_LS_grad_compound_delegate(array<double>^ p, double %f, array<double>^ grad, Object^ obj);
+
+		static void alglib_Gauss_2d_LM_LS_CHISQ_grad(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+		delegate void function_Gauss_2d_LM_LS_CHISQ_grad_delegate(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+
+		static void alglib_Gauss_2d_LM_LS_CHISQ_grad_compound(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+		delegate void function_Gauss_2d_LM_LS_CHISQ_grad__compounddelegate(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+
+		static void alglib_Gauss_2d_LM_LS_ROBUST_grad(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+		delegate void function_Gauss_2d_LM_LS_ROBUST_grad_delegate(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+
+		static void alglib_Gauss_2d_LM_LS_ROBUST_grad_compound(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+		delegate void function_Gauss_2d_LM_LS_ROBUST_grad_compound_delegate(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+
+		static void alglib_Gauss_2d_LM_LS_CSTAT_grad(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+		delegate void function_Gauss_2d_LM_LS_CSTATS_grad_delegate(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+
+		static void alglib_Gauss_2d_LM_LS_CSTAT_grad_compound(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+		delegate void function_Gauss_2d_LM_LS_CSTATS_grad_compound_delegate(array<double>^ p, double% f, array<double>^ grad, Object^ obj);
+
+		
+
+
+
+
+		
+
+		
+
+		static void alglib_Moffat_2d_LM_LS_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj);
+		delegate void function_Moffat_2d_LM_LS_grad_delegate(array<double>^ p, double %f, array<double>^ grad, Object^ obj);
+
+		static void alglib_Moffat_2d_LM_LS_CHISQ_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj);
+		delegate void function_Moffat_2d_LM_LS_CHISQ_grad_delegate(array<double>^ p, double %f, array<double>^ grad, Object^ obj);
+
+		static void alglib_Moffat_2d_LM_LS_ROBUST_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj);
+		delegate void function_Moffat_2d_LM_LS_ROBUST_grad_delegate(array<double>^ p, double %f, array<double>^ grad, Object^ obj);
+
+		static void alglib_Moffat_2d_LM_LS_CSTAT_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj);
+		delegate void function_Moffat_2d_LM_LS_CSTATS_grad_delegate(array<double>^ p, double f, array<double>^ grad, Object^ obj);
+
+
+
+
+
+
+
+
+
+
+
+
+		static array<double>^ Gauss_2D_param_err(array<double>^ p, array<double>^ x, array<double>^ y, array<double, 2>^ Z);
+		static array<double>^ Moffat_2D_param_err(array<double>^ p, array<double>^ x, array<double>^ y, array<double, 2>^ Z);
+
 		static void alglib_Gauss_2d_compound(array<double>^ p, array<double>^ x, double %val, Object^ obj);
 		delegate void function_Gauss_2d_compound_delegate(array<double>^ p, array<double>^ x, double %val, Object^ obj);
 
 		static void alglib_Gauss_2d_compound_grad(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
 		delegate void alglib_Gauss_2d_compound_grad_delegate(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
-
-		static void alglib_Moffat_1d(array<double>^ p, array<double>^ x, double %val, Object^ obj);
-		delegate void alglib_Moffat_1d_delegate(array<double>^ p, array<double>^ x, double %val, Object^ obj);
-
-		static void alglib_Moffat_1d_grad(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
-		delegate void alglib_Moffat_1d_grad_delegate(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
 
 		/// <summary>Calculates a single point of a 2-d Moffat surface M(x,y|p)
 		/// <para>M(x,y|p) = p(0) * ( 1 + { (x-p(1))^2 + (y-p(2))^2 } / p(3)^2 ) ^ (-p(4)) + p(5)</para>
@@ -1878,243 +2194,14 @@ namespace JPFITS
 		static void alglib_Moffat_2d_compound_grad(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
 		delegate void alglib_Moffat_2d_grad_compound_delegate(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj);
 
-		static void alglib_WCSTransform2d(array<double>^ p, array<double>^ f, Object^ obj);
-		delegate void alglib_WCSTransform2d_delegate(array<double>^ p, array<double>^ f, Object^ obj);
+		static void alglib_WCSTransform2d_fvec(array<double>^ p, array<double>^ f, Object^ obj);
+		delegate void alglib_WCSTransform2d_fvec_delegate(array<double>^ p, array<double>^ f, Object^ obj);
 
-		static void alglib_GeneralTransform2d(array<double>^ p, array<double>^ f, Object^ obj);
-		delegate void alglib_GeneralTransform2d_delegate(array<double>^ p, array<double>^ f, Object^ obj);
+		static void alglib_WCSTransform2d_jac(array<double>^ p, array<double>^ f, array<double, 2>^ jac, Object^ obj);
+		delegate void alglib_WCSTransform2d_jac_delegate(array<double>^ p, array<double>^ f, array<double, 2>^ jac, Object^ obj);
 
-		/*static void alglib_Transform2d_jac(array<double>^ p, array<double>^ f, array<double, 2>^ jac, Object^ obj);
-		delegate void alglib_Fit_2dTransform_grad_delegate(array<double>^ p, array<double>^ f, array<double, 2>^ jac, Object^ obj);*/
-
-
-	};
-
-	/// <summary>WorldCoordinateSolution class provides functionality for creation and interaction with World Coordinate Solutions for FITS files.</summary>
-	public ref class WorldCoordinateSolution
-	{
-		public:
-
-		WorldCoordinateSolution();
-		~WorldCoordinateSolution();
-
-		/// <summary>Gets or Sets the column-major CD matrix for this class instance.</summary>
-		property array<double, 2>^ CD_Matrix
-		{
-			array<double, 2>^ get() { return CDMATRIX; }
-			void set(array<double, 2>^ cdmatrix)
-			{
-				CDMATRIX = cdmatrix;
-				CD1_1 = CDMATRIX[0, 0];
-				CD1_2 = CDMATRIX[1, 0];
-				CD2_1 = CDMATRIX[0, 1];
-				CD2_2 = CDMATRIX[1, 1];
-				SET_CDMATRIXINV();
-			}
-		}
-		
-		/// <summary>Gets the one-based row-major element from the CD matrix CDi_j[int i, int j], where i is the row index, and j is the column index.</summary>
-		property double CDi_j[int, int]
-		{
-			double get(int i, int j)
-			{
-				return CDMATRIX[j - 1, i - 1];
-			}
-			void set(int i, int j, double val)
-			{
-				CDMATRIX[j - 1, i - 1] = val;
-				CD1_1 = CDMATRIX[0, 0];
-				CD1_2 = CDMATRIX[1, 0];
-				CD2_1 = CDMATRIX[0, 1];
-				CD2_2 = CDMATRIX[1, 1];
-				SET_CDMATRIXINV();
-			}
-		}
-		
-		/// <summary>Gets the inverse of the CD matrix.</summary>
-		property array<double, 2>^ CD_Matrix_Inverse
-		{
-			array<double, 2>^ get() { return CDMATRIXINV; }
-		}
-		
-		/// <summary>Gets the array of coordinate values on one-based axis n (Coordinate_Values[n]) used for this World Coordinate Solution.</summary>
-		property array<double>^ Coordinate_Values[int]
-		{
-			array<double>^ get(int Coordinate_Axis)
-			{
-				if (Coordinate_Axis == 1)
-					return CVAL1;
-				if (Coordinate_Axis == 2)
-					return CVAL2;
-				return nullptr;
-			}
-			void set(int Coordinate_Axis, array<double>^ cvals)
-			{
-				if (Coordinate_Axis == 1)
-					CVAL1 = cvals;
-				if (Coordinate_Axis == 2)
-					CVAL2 = cvals;
-			}
-		}
-		
-		/// <summary>Gets the array of one-based coordinate pixels on one-based axis n (Coordinate_Pixels[n]) used for this World Coordinate Solution.</summary>
-		property array<double>^ Coordinate_Pixels[int]
-		{
-			array<double>^ get(int Coordinate_Axis)
-			{
-				if (Coordinate_Axis == 1)
-					return CPIX1;
-				if (Coordinate_Axis == 2)
-					return CPIX2;
-				return nullptr;
-			}
-			void set(int Coordinate_Axis, array<double>^ cpixs)
-			{
-				if (Coordinate_Axis == 1)
-					CPIX1 = cpixs;
-				if (Coordinate_Axis == 2)
-					CPIX2 = cpixs;
-			}
-		}
-
-		/// <summary>Gets or Sets the Coordinate Reference Value for the one-based axis n: CRVALn[int n].</summary>
-		property double CRVALn[int]
-		{
-			double get(int Coordinate_Axis)
-			{
-				return CRVALN[Coordinate_Axis - 1];
-			}
-			void set(int Coordinate_Axis, double val)
-			{
-				CRVALN[Coordinate_Axis - 1] = val;
-			}
-		}
-
-		/// <summary>Gets or Sets the one-based Coordinate Reference Pixel for the one-based axis n: CRPIXn[int n].</summary>
-		property double CRPIXn[int]
-		{
-			double get(int Coordinate_Axis)
-			{
-				return CRPIXN[Coordinate_Axis - 1];
-			}
-			void set(int Coordinate_Axis, double val)
-			{
-				CRPIXN[Coordinate_Axis - 1] = val;
-			}
-		}
-
-		/// <summary>Gets the world coordinate solution plate scale (arcseconds per pixel) for one-based axis n: WCSSCALn[int n].</summary>
-		property double CDELTn[int]
-		{
-			double get(int Coordinate_Axis)
-			{
-				return CDELTN[Coordinate_Axis - 1];
-			}
-		}
-
-		/// <summary>Gets the world coordinate solution field rotation (degrees) for one-based axis n: WCSROTn[int n].</summary>
-		property double CROTAn[int]
-		{
-			double get(int Coordinate_Axis)
-			{
-				return CROTAN[Coordinate_Axis - 1];
-			}
-		}
-
-		/// <summary>Gets the world coordinate solution type for one-based axis n: CTYPEn[int n].</summary>
-		property String^ CTYPEn[int]
-		{
-			String^ get(int Coordinate_Axis)
-			{
-				return CTYPEN[Coordinate_Axis - 1];
-			}
-		}
-
-		property double WCSFitResidual_MeanPix
-		{
-			double get() { return CPIXRM; }
-		}
-
-		property double WCSFitResidual_StdvPix
-		{
-			double get() { return CPIXRS; }
-		}
-
-		property double WCSFitResidual_MeanSky
-		{
-			double get() { return CVALRM; }
-		}
-
-		property double WCSFitResidual_StdvSky
-		{
-			double get() { return CVALRS; }
-		}
-
-		/// <summary>Solves the projection parameters for a given list of pixel and coordinate values. Pass nullptr for FITS if writing WCS parameters to a primary header not required.</summary>
-		/// <param name="WCS_Type">The world coordinate solution type. For example: TAN, for tangent-plane or Gnomic projection.</param>
-		/// <param name="X_pix">An array of the image x-axis pixel locations.</param>
-		/// <param name="Y_pix">An array of the image y-axis pixel locations.</param>
-		/// <param name="zero_based_pixels">A boolean to indicate if the X_Pix and Y_Pix are zero-based coordinates. They will be converted to one-based if true.</param>
-		/// <param name="cval1">An array of coordinate values in degrees on coordinats axis 1.</param>
-		/// <param name="cval2">An array of coordinate values in degrees on coordinats axis 2.</param>
-		/// <param name="FITS">An FITSImage^ instance to write the solution into. Pass nulltr if not required.</param>
-		void Solve_WCS(String^ WCS_Type, array<double>^ X_pix, array<double>^ Y_pix, bool zero_based_pixels, array<double>^ cval1, array<double>^ cval2, FITSImage^ FITS);
-
-		//void Refine_WCS
-
-		/// <summary>Gets the image [x, y] pixel position for a given world coordinate in degrees at cval1 and cval2.</summary>
-		void Get_Pixel(double cval1, double cval2, String^ WCS_Type, double &X_pix, double &Y_pix, bool return_zero_based_pixels);
-
-		/// <summary>Gets arrays of image [x, y] pixel positions for a list of given world coordinates in degrees at cval1 and cval2.</summary>
-		void Get_Pixels(array<double>^ cval1, array<double>^ cval2, String^ WCS_Type, array<double>^ &X_pix, array<double>^ &Y_pix, bool return_zero_based_pixels);
-
-		/// <summary>Gets the cval1 and cval2 world coordinate in degrees for a given image [x, y] pixel position.</summary>
-		void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, String^ WCS_Type, double &cval1, double &cval2);
-
-		/// <summary>Gets the cval1 and cval2 world coordinate in degrees for a given image [x, y] pixel position.</summary>
-		void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, String^ WCS_Type, String^ &cval1_sxgsml, String^ &cval2_sxgsml);
-
-		/// <summary>Gets the cval1 and cval2 world coordinate in degrees for a given image [x, y] pixel position.</summary>
-		void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, String^ WCS_Type, double &cval1, double &cval2, String^ &cval1_sxgsml, String^ &cval2_sxgsml);
-
-		/// <summary>Gets arrays of cval1 and cval2 world coordinates in degrees for a list of given image [x, y] pixel positions.</summary>
-		void Get_Coordinates(array<double>^ X_pix, array<double>^ Y_pix, bool zero_based_pixels, String^ WCS_Type, array<double>^ &cval1, array<double>^ &cval2);
-
-		/// <summary>Gets arrays of cval1 and cval2 world coordinates in degrees for a list of given image [x, y] pixel positions.</summary>
-		void Get_Coordinates(array<double>^ X_pix, array<double>^ Y_pix, bool zero_based_pixels, String^ WCS_Type, array<String^>^ &cval1_sxgsml, array<String^>^ &cval2_sxgsml);
-
-		/// <summary>Gets arrays of cval1 and cval2 world coordinates in degrees for a list of given image [x, y] pixel positions.</summary>
-		void Get_Coordinates(array<double>^ X_pix, array<double>^ Y_pix, bool zero_based_pixels, String^ WCS_Type, array<double>^ &cval1, array<double>^ &cval2, array<String^>^ &cval1_sxgsml, array<String^>^ &cval2_sxgsml);
-
-		/// <summary>Gets the WCS parameters from the given FITS file primary header, and sets them for this WCS class instance.</summary>
-		void Get_WCS(FITSImage^ FITS);
-
-		/// <summary>Gets the WCS parameters from the FITS file primary header of the given filename, and sets them for this WCS class instance.</summary>
-		void Get_WCS(String^ FITS_filename);
-
-		/// <summary>Copies the existing WCS parameters in the current WCS class instance to the given FITS file primary header overwriting any existing values.</summary>
-		void CopyTo(FITSImage^ FITS);
-
-		/// <summary>Clears any existing WCS parameters from the given FITS file primary header.</summary>
-		static void Clear(FITSImage^ FITS);
-
-		/// <summary>Checks to see if a complete WCS solution exists in the primary header of the given FITS object.</summary>
-		static bool Exists(FITSImage^ FITS, array<String^>^ WCS_CTYPEN);
-
-		private:
-		array<double, 2>^ CDMATRIX;
-		array<double, 2>^ CDMATRIXINV;
-		array<double>^ CVAL1;
-		array<double>^ CVAL2;
-		array<double>^ CPIX1;
-		array<double>^ CPIX2;
-		array<double>^ CRVALN;
-		array<double>^ CRPIXN;
-		array<double>^ CDELTN;
-		array<double>^ CROTAN;
-		array<String^>^ CTYPEN;
-		double CD1_1, CD1_2, CD2_1, CD2_2, CPIX1RM, CPIX1RS, CVAL1RM, CVAL1RS, CPIX2RM, CPIX2RS, CVAL2RM, CVAL2RS, CPIXRM, CPIXRS, CVALRM, CVALRS;
-		void SET_CDMATRIXINV();
+		static void alglib_GeneralTransform2d_fvec(array<double>^ p, array<double>^ f, Object^ obj);
+		delegate void alglib_GeneralTransform2d_fvec_delegate(array<double>^ p, array<double>^ f, Object^ obj);
 	};
 
 	/// <summary>SourceExtractor class provides functionality for extracting sources from image arrays.</summary>
@@ -2677,6 +2764,8 @@ namespace JPFITS
 		public:
 
 		static Bitmap^ ArrayToBmp(array<double, 2>^ image, int scaling, int colour, bool invert, array<double, 1>^ DImCLim, int WinWidth, int WinHeight, bool invertYaxis);
+
+		//static Bitmap^ ArrayTo16bppGSBmp(array<double, 2>^ image, int scaling, int colour, bool invert, array<double, 1>^ DImCLim, int WinWidth, int WinHeight, bool invertYaxis);
 		
 		static Bitmap^ RGBBitMap(array<double, 2>^ R, array<double, 2>^ G, array<double, 2>^ B);
 

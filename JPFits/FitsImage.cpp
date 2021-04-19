@@ -44,6 +44,8 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, String^ DiskUCharBufferName, 
 	HEADER = gcnew FITSImageHeader(true, DIMAGE);
 	this->Header->SetBITPIXNAXISBSCZ(Precision, DIMAGE);
 	EATIMAGEHEADER();
+
+	WORLDCOORDINATESOLUTION = gcnew JPFITS::WorldCoordinateSolution();
 }
 
 JPFITS::FITSImage::FITSImage(System::String ^FullFileName, array<int,1>^ Range, bool Populate_Header, bool Populate_Data, bool Do_Stats, bool do_parallel)
@@ -86,6 +88,8 @@ JPFITS::FITSImage::FITSImage(System::String ^FullFileName, array<int,1>^ Range, 
 
 	if (STATS_POP)
 		StatsUpD(do_parallel);
+
+	WORLDCOORDINATESOLUTION = gcnew JPFITS::WorldCoordinateSolution();
 }
 
 JPFITS::FITSImage::FITSImage(String^ FullFileName, String^ extensionName, array<int, 1>^ Range, bool Populate_Header, bool Populate_Data, bool Do_Stats, bool do_parallel)
@@ -133,6 +137,8 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, String^ extensionName, array<
 
 	if (STATS_POP)
 		StatsUpD(do_parallel);
+
+	WORLDCOORDINATESOLUTION = gcnew JPFITS::WorldCoordinateSolution();
 }
 
 JPFITS::FITSImage::FITSImage(String^ FullFileName, Object^ ImageData, bool Do_Stats, bool do_parallel)
@@ -354,6 +360,8 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, Object^ ImageData, bool Do_St
 
 	if (STATS_POP)
 		StatsUpD(do_parallel);
+
+	WORLDCOORDINATESOLUTION = gcnew JPFITS::WorldCoordinateSolution();
 }
 
 void JPFITS::FITSImage::SetImage(array<double,2>^ ImageData, bool Do_Stats, bool do_parallel)//sometimes want to not bother with stats, so cant use property setter for images
@@ -411,9 +419,7 @@ void JPFITS::FITSImage::WriteFileFromDiskBuffer(bool DeleteOrigDiskBuffer)
 		return;
 	}
 
-	FITSImageHeader^ hed = gcnew FITSImageHeader(false, nullptr);
-
-	array<String^>^ HEADER = hed->GetFormattedHeaderBlock(false, false);//         MAKEPRIMARYDEFFORMATTEDHEADER(false);// FITSHEADER::MAKEFORMATTEDIMAGEHEADER(this->Header->HeaderKeys, this->Header->HeaderKeyValues, this->Header->HeaderKeyComments, false);
+	array<String^>^ HEADER = this->Header->GetFormattedHeaderBlock(false, false);
 	FileStream^ fits_fs = gcnew FileStream(FULLFILENAME, IO::FileMode::Create);
 	
 	array<unsigned char>^ head = gcnew array<unsigned char>(HEADER->Length * 80);
@@ -651,9 +657,9 @@ void JPFITS::FITSImage::EATIMAGEHEADER()
 	if (HEADER->GetKeyValue("NAXIS2") != "")
 		NAXIS2 = Convert::ToInt32(HEADER->GetKeyValue("NAXIS2"));
 	if (HEADER->GetKeyValue("BZERO") != "")
-		BZERO = Convert::ToInt64(HEADER->GetKeyValue("BZERO"));
+		BZERO = Convert::ToDouble(HEADER->GetKeyValue("BZERO"));
 	if (HEADER->GetKeyValue("BSCALE") != "")
-		BSCALE = Convert::ToInt64(HEADER->GetKeyValue("BSCALE"));
+		BSCALE = Convert::ToDouble(HEADER->GetKeyValue("BSCALE"));
 
 	if (NAXIS == 0)
 	{
@@ -671,220 +677,9 @@ void JPFITS::FITSImage::EATIMAGEHEADER()
 		BSCALE = 1;
 }
 
-void JPFITS::FITSImage::READIMAGE(FileStream^ fs, array<int, 1>^ Range, bool do_parallel)//assumed READHEADER has been completed, and bs is at beginning of data block
-{
-	if (NAXIS <= 0)
-	{
-		NAXIS1 = 0;
-		NAXIS2 = 0;
-		if (HEADER_POP)
-		{
-			this->Header->SetKey("NAXIS1", "0", false, 0);
-			this->Header->SetKey("NAXIS2", "0", false, 0);
-		}
-		DIMAGE = gcnew array<double, 2>(0, 0);
-		return;
-	}
-
-	double bscale = (double)BSCALE;
-	double bzero = (double)BZERO;
-	int bpix = ::Math::Abs(BITPIX);
-	int NBytes = NAXIS1 * NAXIS2*(bpix / 8);
-	array<int>^ R = gcnew array<int>(4);
-
-	if (Range != nullptr)
-	{
-		if (Range[1] > NAXIS1 - 1 || Range[1] == -1)
-			Range[1] = NAXIS1 - 1;
-		if (Range[3] > NAXIS2 - 1 || Range[3] == -1)
-			Range[3] = NAXIS2 - 1;
-	}
-
-	if (Range == nullptr || Range[0] == -1)//then it is a full frame read
-	{
-		R[0] = 0;
-		R[1] = NAXIS1 - 1;
-		R[2] = 0;
-		R[3] = NAXIS2 - 1;
-	}
-	else//else it is a sub-frame read
-	{
-		R[0] = Range[0];
-		R[1] = Range[1];
-		R[2] = Range[2];
-		R[3] = Range[3];
-	}
-
-	int W = R[1] - R[0] + 1;
-	int H = R[3] - R[2] + 1;
-	DIMAGE = gcnew array<double, 2>(W, H);
-
-	array<unsigned char>^ arr = gcnew array<unsigned char>(NBytes);
-	fs->Read(arr, 0, NBytes);//seems to be fastest to just read the entire data even if only subimage will be used
-
-	if (BITPIX == 8)
-	{
-		int cc;
-
-		#pragma omp parallel for if (do_parallel) private(cc)
-		for (int j = R[2]; j <= R[3]; j++)
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*NAXIS1 + i);
-				DIMAGE[i - R[0], j - R[2]] = double(arr[cc])*bscale + bzero;
-			}
-	}
-
-	if (BITPIX == 16)
-	{
-		int cc;
-		__int16 val;
-
-		#pragma omp parallel for if (do_parallel) private(cc, val)
-		for (int j = R[2]; j <= R[3]; j++)
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*NAXIS1 + i) * 2;
-				val = (arr[cc] << 8) | arr[cc + 1];
-				DIMAGE[i - R[0], j - R[2]] = double(val)*bscale + bzero;
-			}
-	}
-
-	if (BITPIX == 32)
-	{
-		int cc;
-		__int32 val;
-
-		#pragma omp parallel for if (do_parallel) private(cc, val)
-		for (int j = R[2]; j <= R[3]; j++)
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*NAXIS1 + i) * 4;
-				val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-				DIMAGE[i - R[0], j - R[2]] = double(val)*bscale + bzero;
-			}
-	}
-
-	if (BITPIX == -32)
-	{
-		float val = 0;
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(val, cc)
-		for (int j = R[2]; j <= R[3]; j++)
-		{
-			array<unsigned char>^ flt = gcnew array<unsigned char>(4);
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*NAXIS1 + i) * 4;
-				flt[3] = arr[cc];
-				flt[2] = arr[cc + 1];
-				flt[1] = arr[cc + 2];
-				flt[0] = arr[cc + 3];
-				val = BitConverter::ToSingle(flt, 0);
-				DIMAGE[i - R[0], j - R[2]] = double(val)*bscale + bzero;
-			}
-		}
-	}
-
-	if (BITPIX == 64)
-	{
-		__int64 val = 0;
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(val, cc)
-		for (int j = R[2]; j <= R[3]; j++)
-		{
-			array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*NAXIS1 + i) * 8;
-				dbl[7] = arr[cc];
-				dbl[6] = arr[cc + 1];
-				dbl[5] = arr[cc + 2];
-				dbl[4] = arr[cc + 3];
-				dbl[3] = arr[cc + 4];
-				dbl[2] = arr[cc + 5];
-				dbl[1] = arr[cc + 6];
-				dbl[0] = arr[cc + 7];
-				val = BitConverter::ToInt64(dbl, 0);
-				DIMAGE[i - R[0], j - R[2]] = double(val)*bscale + bzero;
-			}
-		}
-	}
-
-	if (BITPIX == -64)
-	{
-		double val = 0;
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(val, cc)
-		for (int j = R[2]; j <= R[3]; j++)
-		{
-			array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*NAXIS1 + i) * 8;
-				dbl[7] = arr[cc];
-				dbl[6] = arr[cc + 1];
-				dbl[5] = arr[cc + 2];
-				dbl[4] = arr[cc + 3];
-				dbl[3] = arr[cc + 4];
-				dbl[2] = arr[cc + 5];
-				dbl[1] = arr[cc + 6];
-				dbl[0] = arr[cc + 7];
-				val = BitConverter::ToDouble(dbl, 0);
-				DIMAGE[i - R[0], j - R[2]] = (val)*bscale + bzero;
-			}
-		}
-	}
-
-	/*
-	//subimage reading only...seems much slower than just reading entire image
-	if (BITPIX == -64)
-	{
-		array<unsigned char>^ arr = gcnew array<unsigned char>(W*8);
-		double val;
-		int cc;
-		array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-
-		bs->Seek((R[2]*NAXIS1 + R[0])*8,::IO::SeekOrigin::Current);
-
-		for (int j = R[2]; j <= R[3]; j++)
-		{
-			bs->Read(arr,0,W*8);
-
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (i - R[0])*8;
-				dbl[7] = arr[cc];
-				dbl[6] = arr[cc + 1];
-				dbl[5] = arr[cc + 2];
-				dbl[4] = arr[cc + 3];
-				dbl[3] = arr[cc + 4];
-				dbl[2] = arr[cc + 5];
-				dbl[1] = arr[cc + 6];
-				dbl[0] = arr[cc + 7];
-				val = BitConverter::ToDouble(dbl, 0);
-				DIMAGE[i-R[0],j-R[2]] = (val)*bscale + bzero;
-			}
-
-			bs->Seek((NAXIS1 - R[1] - 1 + R[0])*8,::IO::SeekOrigin::Current);
-		}
-	}*/
-
-	NAXIS1 = W;
-	NAXIS2 = H;
-	//if (HEADER_POP)
-	{
-		this->Header->SetKey("NAXIS1", W.ToString(), false, 0);
-		this->Header->SetKey("NAXIS2", H.ToString(), false, 0);
-	}
-}
-
 void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 {	
-	try
+	//try
 	{
 		FileStream^ fs;
 		bool filexists = File::Exists(FULLFILENAME);
@@ -1037,6 +832,48 @@ void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 				break;
 			}
 
+			case TypeCode::UInt64:
+			case TypeCode::Int64:
+			{
+				__int64 val = 0;
+
+				#pragma omp parallel for if (do_parallel) private(cc, val)
+				for (int j = 0; j < NAXIS2; j++)
+					for (int i = 0; i < NAXIS1; i++)
+					{
+						cc = NHead + (j*NAXIS1 + i) * 8;
+						val = __int64((DIMAGE[i, j] - bzero) / bscale);
+						data[cc] = ((val >> 56) & 0xff);
+						data[cc + 1] = ((val >> 48) & 0xff);
+						data[cc + 2] = ((val >> 40) & 0xff);
+						data[cc + 3] = ((val >> 32) & 0xff);
+						data[cc + 4] = ((val >> 24) & 0xff);
+						data[cc + 5] = ((val >> 16) & 0xff);
+						data[cc + 6] = ((val >> 8) & 0xff);
+						data[cc + 7] = (val & 0xff);
+					}
+				break;
+			}
+
+			case TypeCode::Single:
+			{
+				#pragma omp parallel for if (do_parallel) private(cc)
+				for (int j = 0; j < NAXIS2; j++)
+				{
+					array<unsigned char>^ sng = gcnew array<unsigned char>(4);
+					for (int i = 0; i < NAXIS1; i++)
+					{
+						cc = NHead + (j*NAXIS1 + i) * 4;
+						sng = BitConverter::GetBytes(float((DIMAGE[i, j] - bzero) / bscale));	
+						data[cc] = sng[3];
+						data[cc + 1] = sng[2];
+						data[cc + 2] = sng[1];
+						data[cc + 3] = sng[0];
+					}
+				}
+				break;
+			}
+
 			case TypeCode::Double:
 			{
 				#pragma omp parallel for if (do_parallel) private(cc)
@@ -1066,9 +903,227 @@ void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 			fs->Write(appenddata, 0, appenddata->Length);
 		fs->Close();
 	}
-	catch (Exception^ e)
+	/*catch (Exception^ e)
 	{
 		MessageBox::Show(e->Data + "	" + e->InnerException + "	" + e->Message + "	" + e->Source + "	" + e->StackTrace + "	" + e->TargetSite);
+	}*/
+}
+
+/*array<double, 2>^ JPFITS::FITSImage::READIMAGE(FileStream^ fs, array<int, 1>^ Range, int bitpix, int naxis1, int naxis2, double bzero, double bscale, bool do_parallel)
+{
+
+}*/
+
+void JPFITS::FITSImage::READIMAGE(FileStream^ fs, array<int, 1>^ Range, bool do_parallel)//assumed READHEADER has been completed, and bs is at beginning of data block
+{
+	if (NAXIS <= 0)
+	{
+		NAXIS1 = 0;
+		NAXIS2 = 0;
+		if (HEADER_POP)
+		{
+			this->Header->SetKey("NAXIS1", "0", false, 0);
+			this->Header->SetKey("NAXIS2", "0", false, 0);
+		}
+		DIMAGE = gcnew array<double, 2>(0, 0);
+		return;
+	}
+
+	int bpix = ::Math::Abs(BITPIX);
+	int NBytes = NAXIS1 * NAXIS2*(bpix / 8);
+	array<int>^ R = gcnew array<int>(4);
+
+	if (Range != nullptr)
+	{
+		if (Range[1] > NAXIS1 - 1 || Range[1] == -1)
+			Range[1] = NAXIS1 - 1;
+		if (Range[3] > NAXIS2 - 1 || Range[3] == -1)
+			Range[3] = NAXIS2 - 1;
+	}
+
+	if (Range == nullptr || Range[0] == -1)//then it is a full frame read
+	{
+		R[0] = 0;
+		R[1] = NAXIS1 - 1;
+		R[2] = 0;
+		R[3] = NAXIS2 - 1;
+	}
+	else//else it is a sub-frame read
+	{
+		R[0] = Range[0];
+		R[1] = Range[1];
+		R[2] = Range[2];
+		R[3] = Range[3];
+	}
+
+	DIMAGE = gcnew array<double, 2>(R[1] - R[0] + 1, R[3] - R[2] + 1);
+	array<unsigned char>^ arr = gcnew array<unsigned char>(NBytes);
+	fs->Read(arr, 0, NBytes);//seems to be fastest to just read the entire data even if only subimage will be used
+	int cc;
+
+	switch (BITPIX)
+	{
+		case 8:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = j * NAXIS1 + R[0];
+				for (int i = R[0]; i <= R[1]; i++)
+					DIMAGE[i - R[0], j - R[2]] = double(arr[cc + i])*BSCALE + BZERO;
+			}
+			break;
+		}
+
+		case 16:
+		{
+			__int16 val;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * NAXIS1 + R[0]) * 2;
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					val = (arr[cc] << 8) | arr[cc + 1];
+					DIMAGE[i - R[0], j - R[2]] = double(val)*BSCALE + BZERO;
+					cc += 2;
+				}
+			}
+			break;
+		}
+
+		case 32:
+		{
+			__int32 val;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * NAXIS1 + R[0]) * 4;
+				for (int i = R[0]; i <= R[1]; i++)
+				{					
+					val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
+					DIMAGE[i - R[0], j - R[2]] = double(val)*BSCALE + BZERO;
+					cc += 4;
+				}
+			}
+			break;
+		}
+
+		case 64:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * NAXIS1 + R[0]) * 8;
+				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+				for (int i = R[0]; i <= R[1]; i++)
+				{					
+					dbl[7] = arr[cc];
+					dbl[6] = arr[cc + 1];
+					dbl[5] = arr[cc + 2];
+					dbl[4] = arr[cc + 3];
+					dbl[3] = arr[cc + 4];
+					dbl[2] = arr[cc + 5];
+					dbl[1] = arr[cc + 6];
+					dbl[0] = arr[cc + 7];
+					DIMAGE[i - R[0], j - R[2]] = double(BitConverter::ToInt64(dbl, 0))*BSCALE + BZERO;
+					cc += 8;
+				}
+			}
+			break;
+		}
+
+		case -32:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * NAXIS1 + R[0]) * 4;
+				array<unsigned char>^ flt = gcnew array<unsigned char>(4);
+				for (int i = R[0]; i <= R[1]; i++)
+				{					
+					flt[3] = arr[cc];
+					flt[2] = arr[cc + 1];
+					flt[1] = arr[cc + 2];
+					flt[0] = arr[cc + 3];
+					DIMAGE[i - R[0], j - R[2]] = double(BitConverter::ToSingle(flt, 0))*BSCALE + BZERO;
+					cc += 4;
+				}
+			}
+			break;
+		}
+
+		case -64:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * NAXIS1 + R[0]) * 8;
+				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+				for (int i = R[0]; i <= R[1]; i++)
+				{					
+					dbl[7] = arr[cc];
+					dbl[6] = arr[cc + 1];
+					dbl[5] = arr[cc + 2];
+					dbl[4] = arr[cc + 3];
+					dbl[3] = arr[cc + 4];
+					dbl[2] = arr[cc + 5];
+					dbl[1] = arr[cc + 6];
+					dbl[0] = arr[cc + 7];
+					DIMAGE[i - R[0], j - R[2]] = (BitConverter::ToDouble(dbl, 0))*BSCALE + BZERO;
+					cc += 8;
+				}
+			}
+			break;
+		}
+
+		/*//subimage reading only...seems much slower than just reading entire image
+		if (BITPIX == -64)
+		{
+			array<unsigned char>^ arr = gcnew array<unsigned char>(W*8);
+			double val;
+			int cc;
+			array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+
+			bs->Seek((R[2]*NAXIS1 + R[0])*8,::IO::SeekOrigin::Current);
+
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				bs->Read(arr,0,W*8);
+
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					cc = (i - R[0])*8;
+					dbl[7] = arr[cc];
+					dbl[6] = arr[cc + 1];
+					dbl[5] = arr[cc + 2];
+					dbl[4] = arr[cc + 3];
+					dbl[3] = arr[cc + 4];
+					dbl[2] = arr[cc + 5];
+					dbl[1] = arr[cc + 6];
+					dbl[0] = arr[cc + 7];
+					val = BitConverter::ToDouble(dbl, 0);
+					DIMAGE[i-R[0],j-R[2]] = (val)*bscale + bzero;
+				}
+
+				bs->Seek((NAXIS1 - R[1] - 1 + R[0])*8,::IO::SeekOrigin::Current);
+			}
+		}*/
+	}
+
+	if (Range != nullptr && Range[0] != -1)//then it is a full frame read
+	{
+		NAXIS1 = DIMAGE->GetLength(0);
+		NAXIS2 = DIMAGE->GetLength(1);
+		if (NAXIS2 == 1)
+		{
+			NAXIS2 = NAXIS1;
+			NAXIS1 = 1;
+		}
+		this->Header->SetKey("NAXIS1", NAXIS1.ToString(), false, 0);
+		this->Header->SetKey("NAXIS2", NAXIS2.ToString(), false, 0);
 	}
 }
 
@@ -1126,101 +1181,128 @@ array<double, 2>^ JPFITS::FITSImage::ReadImageArrayOnly(System::String ^file, cl
 		R[3] = Range[3];
 	}
 
-	int W = R[1] - R[0] + 1;
-	int H = R[3] - R[2] + 1;
-	array<double, 2>^ result = gcnew array<double, 2>(W, H);
+	array<double, 2>^ result = gcnew array<double, 2>(R[1] - R[0] + 1, R[3] - R[2] + 1);
 	array<unsigned char>^ arr = gcnew array<unsigned char>(NBytes);
-	fs->Read(arr, 0, NBytes);
+	fs->Read(arr, 0, NBytes);//seems to be fastest to just read the entire data even if only subimage will be used
 	fs->Close();
+	int cc;
 
-	if (bitpix == 8)
+	switch (bitpix)
 	{
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc)
-		for (int j = R[2]; j <= R[3]; j++)
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*naxis1 + i);
-				result[i - R[0], j - R[2]] = double(arr[cc])*bscale + bzero;
-			}
-	}
-
-	if (bitpix == 16)
-	{
-		int cc = 0;
-		__int16 val = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc, val)
-		for (int j = R[2]; j <= R[3]; j++)
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*naxis1 + i) * 2;
-				val = (((arr[cc]) << 8) | arr[cc + 1]);
-				result[i - R[0], j - R[2]] = double(val)*bscale + bzero;
-			}
-	}
-
-	if (bitpix == 32)
-	{
-		int cc = 0;
-		__int32 val = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc, val)
-		for (int j = R[2]; j <= R[3]; j++)
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*naxis1 + i) * 4;
-				val = ((arr[cc]) << 24) | ((arr[cc + 1]) << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-				result[i - R[0], j - R[2]] = double(val)*bscale + bzero;
-			}
-	}
-
-	if (bitpix == -32)
-	{
-		float val = 0;
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(val, cc)
-		for (int j = R[2]; j <= R[3]; j++)
+		case 8:
 		{
-			array<unsigned char>^ flt = gcnew array<unsigned char>(4);
-			for (int i = R[0]; i <= R[1]; i++)
+			#pragma omp parallel for if (do_parallel) private(cc)
+			for (int j = R[2]; j <= R[3]; j++)
 			{
-				cc = (j*naxis1 + i) * 4;
-				flt[3] = arr[cc];
-				flt[2] = arr[cc + 1];
-				flt[1] = arr[cc + 2];
-				flt[0] = arr[cc + 3];
-				val = BitConverter::ToSingle(flt, 0);
-				result[i - R[0], j - R[2]] = double(val)*bscale + bzero;
+				cc = j * naxis1 + R[0];
+				for (int i = R[0]; i <= R[1]; i++)
+					result[i - R[0], j - R[2]] = double(arr[cc + i])*bscale + bzero;
 			}
+			break;
 		}
-	}
 
-	if (bitpix == -64)
-	{
-		double val = 0;
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(val, cc)
-		for (int j = R[2]; j <= R[3]; j++)
+		case 16:
 		{
-			array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-			for (int i = R[0]; i <= R[1]; i++)
+			__int16 val;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val)
+			for (int j = R[2]; j <= R[3]; j++)
 			{
-				cc = (j*naxis1 + i) * 8;
-				dbl[7] = arr[cc];
-				dbl[6] = arr[cc + 1];
-				dbl[5] = arr[cc + 2];
-				dbl[4] = arr[cc + 3];
-				dbl[3] = arr[cc + 4];
-				dbl[2] = arr[cc + 5];
-				dbl[1] = arr[cc + 6];
-				dbl[0] = arr[cc + 7];
-				val = BitConverter::ToDouble(dbl, 0);
-				result[i - R[0], j - R[2]] = (val)*bscale + bzero;
+				cc = (j * naxis1 + R[0]) * 2;
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					val = (arr[cc] << 8) | arr[cc + 1];
+					result[i - R[0], j - R[2]] = double(val)*bscale + bzero;
+					cc += 2;
+				}
 			}
+			break;
+		}
+
+		case 32:
+		{
+			__int32 val;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * naxis1 + R[0]) * 4;
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
+					result[i - R[0], j - R[2]] = double(val)*bscale + bzero;
+					cc += 4;
+				}
+			}
+			break;
+		}
+
+		case 64:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * naxis1 + R[0]) * 8;
+				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					dbl[7] = arr[cc];
+					dbl[6] = arr[cc + 1];
+					dbl[5] = arr[cc + 2];
+					dbl[4] = arr[cc + 3];
+					dbl[3] = arr[cc + 4];
+					dbl[2] = arr[cc + 5];
+					dbl[1] = arr[cc + 6];
+					dbl[0] = arr[cc + 7];
+					result[i - R[0], j - R[2]] = double(BitConverter::ToInt64(dbl, 0))*bscale + bzero;
+					cc += 8;
+				}
+			}
+			break;
+		}
+
+		case -32:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * naxis1 + R[0]) * 4;
+				array<unsigned char>^ flt = gcnew array<unsigned char>(4);
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					flt[3] = arr[cc];
+					flt[2] = arr[cc + 1];
+					flt[1] = arr[cc + 2];
+					flt[0] = arr[cc + 3];
+					result[i - R[0], j - R[2]] = double(BitConverter::ToSingle(flt, 0))*bscale + bzero;
+					cc += 4;
+				}
+			}
+			break;
+		}
+
+		case -64:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * naxis1 + R[0]) * 8;
+				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					dbl[7] = arr[cc];
+					dbl[6] = arr[cc + 1];
+					dbl[5] = arr[cc + 2];
+					dbl[4] = arr[cc + 3];
+					dbl[3] = arr[cc + 4];
+					dbl[2] = arr[cc + 5];
+					dbl[1] = arr[cc + 6];
+					dbl[0] = arr[cc + 7];
+					result[i - R[0], j - R[2]] = (BitConverter::ToDouble(dbl, 0))*bscale + bzero;
+					cc += 8;
+				}
+			}
+			break;
 		}
 	}
 
@@ -1294,101 +1376,134 @@ array<double>^ JPFITS::FITSImage::ReadImageVectorOnly(System::String ^file, cli:
 		return nullptr;
 	}
 
-	int W = R[1] - R[0] + 1;
-	int H = R[3] - R[2] + 1;
-	array<double>^ result = gcnew array<double>(W*H);
+	array<double>^ result = gcnew array<double>((R[1] - R[0] + 1) * (R[3] - R[2] + 1));
 	array<unsigned char>^ arr = gcnew array<unsigned char>(NBytes);
-	fs->Read(arr, 0, NBytes);
+	fs->Read(arr, 0, NBytes);//seems to be fastest to just read the entire data even if only subimage will be used
 	fs->Close();
+	int cc, jmr2;
 
-	if (bitpix == 8)
+	switch (bitpix)
 	{
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc)
-		for (int j = R[2]; j <= R[3]; j++)
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*naxis1 + i);
-				result[(i - R[0])*(j - R[2]) + j - R[2]] = double(arr[cc])*bscale + bzero;
-			}
-	}
-
-	if (bitpix == 16)
-	{
-		int cc = 0;
-		__int16 val = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc, val)
-		for (int j = R[2]; j <= R[3]; j++)
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*naxis1 + i) * 2;
-				val = (((arr[cc]) << 8) | arr[cc + 1]);
-				result[(i - R[0])*(j - R[2]) + j - R[2]] = double(val)*bscale + bzero;
-			}
-	}
-
-	if (bitpix == 32)
-	{
-		int cc = 0;
-		__int32 val = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc, val)
-		for (int j = R[2]; j <= R[3]; j++)
-			for (int i = R[0]; i <= R[1]; i++)
-			{
-				cc = (j*naxis1 + i) * 4;
-				val = ((arr[cc]) << 24) | ((arr[cc + 1]) << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-				result[(i - R[0])*(j - R[2]) + j - R[2]] = double(val)*bscale + bzero;
-			}
-	}
-
-	if (bitpix == -32)
-	{
-		float val = 0;
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc, val)
-		for (int j = R[2]; j <= R[3]; j++)
+		case 8:
 		{
-			array<unsigned char>^ flt = gcnew array<unsigned char>(4);
-			for (int i = R[0]; i <= R[1]; i++)
+			#pragma omp parallel for if (do_parallel) private(cc, jmr2)
+			for (int j = R[2]; j <= R[3]; j++)
 			{
-				cc = (j*naxis1 + i) * 4;
-				flt[3] = arr[cc];
-				flt[2] = arr[cc + 1];
-				flt[1] = arr[cc + 2];
-				flt[0] = arr[cc + 3];
-				val = BitConverter::ToSingle(flt, 0);
-				result[(i - R[0])*(j - R[2]) + j - R[2]] = double(val)*bscale + bzero;
+				cc = j * naxis1 + R[0];
+				jmr2 = j - R[2];
+				for (int i = R[0]; i <= R[1]; i++)
+					result[(i - R[0]) * jmr2 + jmr2] = double(arr[cc + i])*bscale + bzero;
 			}
+			break;
 		}
-	}
 
-	if (bitpix == -64)
-	{
-		double val = 0;
-		int cc = 0;
-
-		#pragma omp parallel for if (do_parallel) private(cc, val)
-		for (int j = R[2]; j <= R[3]; j++)
+		case 16:
 		{
-			array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
-			for (int i = R[0]; i <= R[1]; i++)
+			__int16 val;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val, jmr2)
+			for (int j = R[2]; j <= R[3]; j++)
 			{
-				cc = (j*naxis1 + i) * 8;
-				dbl[7] = arr[cc];
-				dbl[6] = arr[cc + 1];
-				dbl[5] = arr[cc + 2];
-				dbl[4] = arr[cc + 3];
-				dbl[3] = arr[cc + 4];
-				dbl[2] = arr[cc + 5];
-				dbl[1] = arr[cc + 6];
-				dbl[0] = arr[cc + 7];
-				val = BitConverter::ToDouble(dbl, 0);
-				result[(i - R[0])*(j - R[2]) + j - R[2]] = (val)*bscale + bzero;
+				cc = (j * naxis1 + R[0]) * 2;
+				jmr2 = j - R[2];
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					val = (arr[cc] << 8) | arr[cc + 1];
+					result[(i - R[0]) * jmr2 + jmr2] = double(val)*bscale + bzero;
+					cc += 2;
+				}
 			}
+			break;
+		}
+
+		case 32:
+		{
+			__int32 val;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val, jmr2)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * naxis1 + R[0]) * 4;
+				jmr2 = j - R[2];
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
+					result[(i - R[0]) * jmr2 + jmr2] = double(val)*bscale + bzero;
+					cc += 4;
+				}
+			}
+			break;
+		}
+
+		case 64:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc, jmr2)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * naxis1 + R[0]) * 8;
+				jmr2 = j - R[2];
+				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					dbl[7] = arr[cc];
+					dbl[6] = arr[cc + 1];
+					dbl[5] = arr[cc + 2];
+					dbl[4] = arr[cc + 3];
+					dbl[3] = arr[cc + 4];
+					dbl[2] = arr[cc + 5];
+					dbl[1] = arr[cc + 6];
+					dbl[0] = arr[cc + 7];
+					result[(i - R[0]) * jmr2 + jmr2] = double(BitConverter::ToInt64(dbl, 0))*bscale + bzero;
+					cc += 8;
+				}
+			}
+			break;
+		}
+
+		case -32:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc, jmr2)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * naxis1 + R[0]) * 4;
+				jmr2 = j - R[2];
+				array<unsigned char>^ flt = gcnew array<unsigned char>(4);
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					flt[3] = arr[cc];
+					flt[2] = arr[cc + 1];
+					flt[1] = arr[cc + 2];
+					flt[0] = arr[cc + 3];
+					result[(i - R[0]) * jmr2 + jmr2] = double(BitConverter::ToSingle(flt, 0))*bscale + bzero;
+					cc += 4;
+				}
+			}
+			break;
+		}
+
+		case -64:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc, jmr2)
+			for (int j = R[2]; j <= R[3]; j++)
+			{
+				cc = (j * naxis1 + R[0]) * 8;
+				jmr2 = j - R[2];
+				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+				for (int i = R[0]; i <= R[1]; i++)
+				{
+					dbl[7] = arr[cc];
+					dbl[6] = arr[cc + 1];
+					dbl[5] = arr[cc + 2];
+					dbl[4] = arr[cc + 3];
+					dbl[3] = arr[cc + 4];
+					dbl[2] = arr[cc + 5];
+					dbl[1] = arr[cc + 6];
+					dbl[0] = arr[cc + 7];
+					result[(i - R[0]) * jmr2 + jmr2] = (BitConverter::ToDouble(dbl, 0))*bscale + bzero;
+					cc += 8;
+				}
+			}
+			break;
 		}
 	}
 

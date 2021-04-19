@@ -975,7 +975,10 @@ array<int, 2>^ JPFITS::JPMath::Find(array<double, 2>^ data, double val, String^ 
 	if (Double::IsNaN(val))
 		method = 6;
 
-	#pragma omp parallel for if (do_parallel)
+	array<bool, 2>^ finds = gcnew array<bool, 2>(data->GetLength(0), data->GetLength(1));
+	int Nfinds = 0;
+
+	#pragma omp parallel for if (do_parallel) reduction (+: Nfinds)
 	for (int i = 0; i < data->GetLength(0); i++)
 		for (int j = 0; j < data->GetLength(1); j++)
 		{
@@ -985,11 +988,13 @@ array<int, 2>^ JPFITS::JPMath::Find(array<double, 2>^ data, double val, String^ 
 				{
 					if (data[i, j] < val)
 					{
-						#pragma omp critical
+						finds[i, j] = true;
+						Nfinds++;
+						/*#pragma omp critical
 						{
 							ptslist->Add(i);
 							ptslist->Add(j);
-						}
+						}*/
 					}
 					break;
 				}
@@ -997,11 +1002,13 @@ array<int, 2>^ JPFITS::JPMath::Find(array<double, 2>^ data, double val, String^ 
 				{
 					if (data[i, j] <= val)
 					{
-						#pragma omp critical
+						finds[i, j] = true;
+						Nfinds++;
+						/*#pragma omp critical
 						{
 							ptslist->Add(i);
 							ptslist->Add(j);
-						}
+						}*/
 					}
 					break;
 				}
@@ -1009,11 +1016,13 @@ array<int, 2>^ JPFITS::JPMath::Find(array<double, 2>^ data, double val, String^ 
 				{
 					if (data[i, j] == val)
 					{
-						#pragma omp critical
+						finds[i, j] = true;
+						Nfinds++;
+						/*#pragma omp critical
 						{
 							ptslist->Add(i);
 							ptslist->Add(j);
-						}
+						}*/
 					}
 					break;
 				}
@@ -1021,11 +1030,13 @@ array<int, 2>^ JPFITS::JPMath::Find(array<double, 2>^ data, double val, String^ 
 				{
 					if (data[i, j] >= val)
 					{
-						#pragma omp critical
+						finds[i, j] = true;
+						Nfinds++;
+						/*#pragma omp critical
 						{
 							ptslist->Add(i);
 							ptslist->Add(j);
-						}
+						}*/
 					}
 					break;
 				}
@@ -1033,11 +1044,13 @@ array<int, 2>^ JPFITS::JPMath::Find(array<double, 2>^ data, double val, String^ 
 				{
 					if (data[i, j] > val)
 					{
-						#pragma omp critical
+						finds[i, j] = true;
+						Nfinds++;
+						/*#pragma omp critical
 						{
 							ptslist->Add(i);
 							ptslist->Add(j);
-						}
+						}*/
 					}
 					break;
 				}
@@ -1045,11 +1058,13 @@ array<int, 2>^ JPFITS::JPMath::Find(array<double, 2>^ data, double val, String^ 
 				{
 					if (data[i, j] != val)
 					{
-						#pragma omp critical
+						finds[i, j] = true;
+						Nfinds++;
+						/*#pragma omp critical
 						{
 							ptslist->Add(i);
 							ptslist->Add(j);
-						}
+						}*/
 					}
 					break;
 				}
@@ -1057,26 +1072,43 @@ array<int, 2>^ JPFITS::JPMath::Find(array<double, 2>^ data, double val, String^ 
 				{
 					if (Double::IsNaN(data[i, j]))
 					{
-						#pragma omp critical
+						finds[i, j] = true;
+						Nfinds++;
+						/*#pragma omp critical
 						{
 							ptslist->Add(i);
 							ptslist->Add(j);
-						}
+						}*/
 					}
 					break;
 				}
 			}
 		}
 
-	int N = int(double(ptslist->Count) / 2);
-	array<int, 2>^ result = gcnew array<int, 2>(N, 2);
+	/*int N = int(double(ptslist->Count) / 2);
+	array<int, 2>^ result = gcnew array<int, 2>(N, 2);	
 
 	#pragma omp parallel for if (do_parallel)
 	for (int i = 0; i < N; i++)
 	{
 		result[i, 0] = System::Convert::ToInt32(ptslist[i * 2]);//x
 		result[i, 1] = System::Convert::ToInt32(ptslist[i * 2 + 1]);//y
-	}
+	}*/
+
+	array<int, 2>^ result = gcnew array<int, 2>(Nfinds, 2);
+	Nfinds = 0;
+	//#pragma omp parallel for if (do_parallel)
+	for (int i = 0; i < data->GetLength(0); i++)
+		for (int j = 0; j < data->GetLength(1); j++)
+			if (finds[i, j])
+			{
+				//#pragma omp critical
+				{
+					result[Nfinds, 0] = i;//x
+					result[Nfinds, 1] = j;//y
+					Nfinds++;
+				}
+			}
 
 	return result;
 }
@@ -2990,7 +3022,8 @@ array<double>^ JPFITS::JPMath::Interpolate1d(array<double>^ xdata, array<double>
 	if (style != "linear" && style != "cubic" && style != "mono" && style != "akima" && style != "catmullrom")
 		throw gcnew Exception("Interpolation style '" + style + "' not recognized.");
 
-	alglib::spline1dinterpolant^ sp = gcnew alglib::spline1dinterpolant();
+	void *x = 0;
+	alglib::spline1dinterpolant^ sp = gcnew alglib::spline1dinterpolant(x);
 
 	if (style == "linear")
 		alglib::spline1dbuildlinear(xdata, ydata, sp);
@@ -3213,7 +3246,7 @@ void JPFITS::JPMath::Fit_Gaussian2d(array<int>^ xdata, array<int>^ ydata, array<
 	Object^ obj;
 	alglib::lsfitstate^ state;
 	alglib::lsfitreport^ report;
-	double epsx = 0.00001;
+	double epsx = 0.000000001;
 	int maxits = 5000;//automatic stopping conditions w epsx & maxits = 0
 	int info;
 	array<double>^ scale;
@@ -3324,6 +3357,2639 @@ void JPFITS::JPMath::alglib_Gauss_2d_grad(array<double>^ p, array<double>^ x, do
 		grad[4] = (p[0] * Math::Exp(-Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (2 * p[4] * p[4]) - Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (2 * p[5] * p[5]))*Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2)) / (p[4] * p[4] * p[4]);
 		grad[5] = (p[0] * Math::Exp(-Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (2 * p[4] * p[4]) - Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (2 * p[5] * p[5]))*Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2)) / (p[5] * p[5] * p[5]);
 		grad[6] = 1;
+	}
+}
+
+void JPFITS::JPMath::Fit_PointSource_Compound(String^ model_name, String^ minimization_type, array<int>^ xdata, array<int>^ ydata, array<double, 2>^ source, array<double>^ xpositions, array<double>^ ypositions, double position_radius, array<double, 2>^ &params, array<double, 2>^ &p_err, array<double, 2>^ &fit_residuals, String^ &termination_msg)
+{
+	if (params->GetLength(1) != xpositions->Length)
+	{
+		throw gcnew Exception("Parameter array params not consistent with the number of source xpositions indicated.");
+		return;
+	}
+
+	try
+	{
+		alglib::ndimensional_grad^ grad;
+
+		array<double>^ XDATA = gcnew array<double>(xdata->Length);
+		array<double>^ YDATA = gcnew array<double>(ydata->Length);
+		int func = params->GetLength(0);
+		int count = params->GetLength(1);
+		array<int>^ fcobj = gcnew array<int>(2) { func, count };
+		array<double>^ P0I = gcnew array<double>(params->Length - count + 1);//remove repeated background, but keep one
+		array<double>^ PLB = gcnew array<double>(params->Length - count + 1);//remove repeated background, but keep one
+		array<double>^ PUB = gcnew array<double>(params->Length - count + 1);//remove repeated background, but keep one
+		array<double>^ scale = gcnew array<double>(params->Length - count + 1);//remove repeated background, but keep one
+
+		for (int i = 0; i < XDATA->Length; i++)
+			XDATA[i] = double(xdata[i]);
+		for (int i = 0; i < YDATA->Length; i++)
+			YDATA[i] = double(ydata[i]);
+
+		double min, max;
+		JPMath::MinMax(source, min, max, false);
+		double bias = min;
+		if (bias < 1)
+			bias = 1;
+		P0I[P0I->Length - 1] = bias;//background
+		PLB[P0I->Length - 1] = 0;//background
+		PUB[P0I->Length - 1] = max / 4;//background
+		scale[P0I->Length - 1] = bias;//background
+
+		int funcindex;
+		if (model_name == "Gaussian")
+		{
+			if (func == 5)
+			{
+				for (int i = 0; i < count; i++)
+				{
+					funcindex = i * (func - 1);
+
+					//amplitude
+					P0I[funcindex] = source[(int)(xpositions[i] - XDATA[0] + 0.5), (int)(ypositions[i] - YDATA[0] + 0.5)] - bias;
+					PLB[funcindex] = P0I[funcindex] / 3;
+					PUB[funcindex] = 2 * P0I[funcindex];
+					scale[funcindex] = P0I[funcindex];
+
+					//x0
+					PLB[funcindex + 1] = xpositions[i] - position_radius;
+					P0I[funcindex + 1] = xpositions[i];
+					PUB[funcindex + 1] = xpositions[i] + position_radius;
+					scale[funcindex + 1] = P0I[funcindex + 1];
+
+					//y0
+					PLB[funcindex + 2] = ypositions[i] - position_radius;
+					P0I[funcindex + 2] = ypositions[i];
+					PUB[funcindex + 2] = ypositions[i] + position_radius;
+					scale[funcindex + 2] = P0I[funcindex + 2];
+
+					//sigma
+					PLB[funcindex + 3] = 1e-1;
+					P0I[funcindex + 3] = 2;
+					PUB[funcindex + 3] = 10;
+					scale[funcindex + 3] = P0I[funcindex + 3];
+				}
+			}
+			else if (func == 7)
+			{
+				for (int i = 0; i < count; i++)
+				{
+					funcindex = i * (func - 1);
+
+					//amplitude
+					P0I[funcindex] = source[(int)(xpositions[i] - XDATA[0]), (int)(ypositions[i] - YDATA[0])] - bias;
+					PLB[funcindex] = P0I[funcindex] / 3;
+					PUB[funcindex] = 2 * P0I[funcindex];
+					scale[funcindex] = P0I[funcindex];
+
+					//x0
+					PLB[funcindex + 1] = xpositions[i] - position_radius;
+					P0I[funcindex + 1] = xpositions[i];
+					PUB[funcindex + 1] = xpositions[i] + position_radius;
+					scale[funcindex + 1] = P0I[funcindex + 1];
+
+					//y0
+					PLB[funcindex + 2] = ypositions[i] - position_radius;
+					P0I[funcindex + 2] = ypositions[i];
+					PUB[funcindex + 2] = ypositions[i] + position_radius;
+					scale[funcindex + 2] = P0I[funcindex + 2];
+
+					//phi
+					PLB[funcindex + 3] = -Math::PI;
+					P0I[funcindex + 3] = 0;
+					PUB[funcindex + 3] = Math::PI;
+					scale[funcindex + 3] = 1;
+
+					//sigmaX
+					PLB[funcindex + 4] = 1e-1;
+					P0I[funcindex + 4] = 2;
+					PUB[funcindex + 4] = 10;
+					scale[funcindex + 4] = P0I[funcindex + 4];
+
+					//sigmaY
+					PLB[funcindex + 5] = 1e-1;
+					P0I[funcindex + 5] = 2;
+					PUB[funcindex + 5] = 10;
+					scale[funcindex + 5] = P0I[funcindex + 5];
+				}
+			}
+			else
+			{
+				throw gcnew Exception("Parameter length does not correspond to either circular (5 params) or elliptical (7 params) Gaussian; params length = " + func);
+				return;
+			}
+
+			if (minimization_type->ToLower() == "ls")
+				grad = gcnew alglib::ndimensional_grad(alglib_Gauss_2d_LM_LS_grad_compound);
+			else if (minimization_type->ToLower() == "chisq")
+				grad = gcnew alglib::ndimensional_grad(alglib_Gauss_2d_LM_LS_CHISQ_grad_compound);
+			else if (minimization_type->ToLower() == "robust")
+				grad = gcnew alglib::ndimensional_grad(alglib_Gauss_2d_LM_LS_ROBUST_grad_compound);
+			else if (minimization_type->ToLower() == "cstat")
+				grad = gcnew alglib::ndimensional_grad(alglib_Gauss_2d_LM_LS_CSTAT_grad_compound);
+			else
+			{
+				throw gcnew Exception("Fit Type not recognized: '" + minimization_type);
+				return;
+			}
+		}
+		else if (model_name == "Moffat")
+		{
+			if (func == 6)
+			{
+				for (int i = 0; i < count; i++)
+				{
+					funcindex = i * (func - 1);
+
+					//amplitude
+					P0I[funcindex] = source[(int)(xpositions[i] - XDATA[0]), (int)(ypositions[i] - YDATA[0])] - bias;
+					PLB[funcindex] = P0I[funcindex] / 3;
+					PUB[funcindex] = 2 * P0I[funcindex];
+					scale[funcindex] = P0I[funcindex];
+
+					//x0
+					PLB[funcindex + 1] = xpositions[i] - position_radius;
+					P0I[funcindex + 1] = xpositions[i];
+					PUB[funcindex + 1] = xpositions[i] + position_radius;
+					scale[funcindex + 1] = P0I[funcindex + 1];
+
+					//y0
+					PLB[funcindex + 2] = ypositions[i] - position_radius;
+					P0I[funcindex + 2] = ypositions[i];
+					PUB[funcindex + 2] = ypositions[i] + position_radius;
+					scale[funcindex + 2] = P0I[funcindex + 2];
+
+					//alpha
+					PLB[funcindex + 3] = 1e-1;
+					P0I[funcindex + 3] = 2;
+					PUB[funcindex + 3] = 10;
+					scale[funcindex + 3] = P0I[funcindex + 3];
+
+					//beta
+					PLB[funcindex + 4] = 1 + 1e-6;
+					P0I[funcindex + 4] = 2;
+					PUB[funcindex + 4] = 10;
+					scale[funcindex + 4] = P0I[funcindex + 4];
+				}
+			}
+			else if (func == 8)
+			{
+				for (int i = 0; i < count; i++)
+				{
+					funcindex = i * (func - 1);
+
+					//amplitude
+					P0I[funcindex] = source[(int)(xpositions[i] - XDATA[0]), (int)(ypositions[i] - YDATA[0])] - bias;
+					PLB[funcindex] = P0I[funcindex] / 3;					
+					PUB[funcindex] = 2 * P0I[funcindex];
+					scale[funcindex] = P0I[funcindex];
+
+					//x0
+					PLB[funcindex + 1] = xpositions[i] - position_radius;
+					P0I[funcindex + 1] = xpositions[i];
+					PUB[funcindex + 1] = xpositions[i] + position_radius;
+					scale[funcindex + 1] = P0I[funcindex + 1];
+
+					//y0
+					PLB[funcindex + 2] = ypositions[i] - position_radius;
+					P0I[funcindex + 2] = ypositions[i];
+					PUB[funcindex + 2] = ypositions[i] + position_radius;
+					scale[funcindex + 2] = P0I[funcindex + 2];
+
+					//phi
+					PLB[funcindex + 3] = -Math::PI;
+					P0I[funcindex + 3] = 0;
+					PUB[funcindex + 3] = Math::PI;
+					scale[funcindex + 3] = 1;
+
+					//alphaX
+					PLB[funcindex + 4] = 1e-1;
+					P0I[funcindex + 4] = 2;
+					PUB[funcindex + 4] = 10;
+					scale[funcindex + 4] = P0I[funcindex + 4];
+
+					//alphaY
+					PLB[funcindex + 5] = 1e-1;
+					P0I[funcindex + 5] = 2;
+					PUB[funcindex + 5] = 10;
+					scale[funcindex + 5] = P0I[funcindex + 5];
+
+					//beta
+					PLB[funcindex + 6] = 1 + 1e-6;
+					P0I[funcindex + 6] = 2;
+					PUB[funcindex + 6] = 10;
+					scale[funcindex + 6] = P0I[funcindex + 6];
+				}
+			}
+			else
+			{
+				throw gcnew Exception("Parameter length does not correspond to either circular (6 params) or elliptical (8 params) Moffat; params length = " + func);
+				return;
+			}
+
+			if (minimization_type->ToLower() == "ls")
+				/*grad = gcnew alglib::ndimensional_grad(alglib_Moffat_2d_LM_LS_compound_grad)*/;
+			else if (minimization_type->ToLower() == "chisq")
+				/*grad = gcnew alglib::ndimensional_grad(alglib_Moffat_2d_LM_LS_compound_CHISQ_grad)*/;
+			else if (minimization_type->ToLower() == "robust")
+				/*grad = gcnew alglib::ndimensional_grad(alglib_Moffat_2d_LM_LS_compound_ROBUST_grad)*/;
+			else if (minimization_type->ToLower() == "cstat")
+				/*grad = gcnew alglib::ndimensional_grad(alglib_Moffat_2d_LM_LS_compound_CSTAT_grad)*/;
+			else
+			{
+				throw gcnew Exception("Fit Type not recognized: '" + minimization_type);
+				return;
+			}
+		}
+		else
+		{
+			throw gcnew Exception("Fit Model not recognized: '" + model_name);
+			return;
+		}
+
+		double epsx = 1e-6;
+		double epsg = 0;
+		double epsf = 0;
+		int maxits = 2000;
+		array<Object^>^ arrays = gcnew array<Object^>(4);
+		arrays[0] = source;
+		arrays[1] = XDATA;
+		arrays[2] = YDATA;
+		arrays[3] = fcobj;
+
+		alglib::minbcstate^ bcstate;
+		alglib::minbccreate(P0I, bcstate);
+		alglib::minbcsetcond(bcstate, epsg, epsf, epsx, maxits);
+		alglib::minbcsetbc(bcstate, PLB, PUB);
+		alglib::minbcsetscale(bcstate, scale);
+		alglib::minbcoptimize(bcstate, grad, nullptr, arrays, alglib::parallel);
+		alglib::minbcreport^ report;
+		alglib::minbcresults(bcstate, P0I, report);
+
+		switch (report->terminationtype)
+		{
+			case -8:
+			{
+				termination_msg = "Internal integrity control detected infinite or NAN values in function or gradient. Abnormal termination signalled.";
+				break;
+			}
+			case -3:
+			{
+				termination_msg = "Inconsistent constraints.";
+				break;
+			}
+			case 1:
+			{
+				termination_msg = "Relative function improvement is no more than EpsF.";
+				break;
+			}
+			case 2:
+			{
+				termination_msg = "Scaled step is no more than EpsX.";
+				break;
+			}
+			case 4:
+			{
+				termination_msg = "Scaled gradient norm is no more than EpsG.";
+				break;
+			}
+			case 5:
+			{
+				termination_msg = "MaxIts steps was taken.";
+				break;
+			}
+			case 7:
+			{
+				termination_msg = "Stopping conditions are too stringent, further improvement is impossible, X contains best point found so far.";
+				break;
+			}
+			case 8:
+			{
+				termination_msg = "Terminated by user.";
+				break;
+			}
+		}
+
+		for (int i = 0; i < count; i++)
+			for (int j = 0; j < func - 1; j++)
+				params[j, i] = P0I[j + i * (func - 1)];
+		for (int i = 0; i < count; i++)
+			params[func - 1, i] = P0I[P0I->Length - 1];//background
+
+		/*if (p_err->Length != 0)
+		{
+			if (model_name == "Gaussian")
+				p_err = Gauss_2D_param_err(params, XDATA, YDATA, source);
+			else
+				p_err = Moffat_2D_param_err(params, XDATA, YDATA, source);
+		}*/
+
+		if (fit_residuals->Length != 0)
+		{
+			double val;
+			array<double>^ X = gcnew array<double>(2);
+			for (int i = 0; i < XDATA->Length; i++)
+				for (int j = 0; j < YDATA->Length; j++)
+				{
+					X[0] = XDATA[i];
+					X[1] = YDATA[j];
+					alglib_Gauss_2d_compound(P0I, X, val, fcobj);
+					fit_residuals[i, j] = source[i, j] - val;
+				}
+		}
+	}
+	catch (Exception^ e)
+	{
+		MessageBox::Show(e->Data + "	" + e->InnerException + "	" + e->Message + "	" + e->Source + "	" + e->StackTrace + "	" + e->TargetSite);
+	}
+}
+
+void JPFITS::JPMath::Fit_PointSource(String^ model_name, String^ minimization_type, array<int>^ xdata, array<int>^ ydata, array<double, 2>^ source, array<double>^ &params, array<double>^ params_LB, array<double>^ params_UB, array<double>^ &p_err, array<double, 2>^ &fit_residuals, String^ &termination_msg)
+{
+	alglib::ndimensional_grad^ grad;
+	array<double>^ scale;
+
+	array<double>^ XDATA = gcnew array<double>(xdata->Length);
+	array<double>^ YDATA = gcnew array<double>(ydata->Length);
+
+	for (int i = 0; i < XDATA->Length; i++)
+		XDATA[i] = double(xdata[i]);
+	for (int i = 0; i < YDATA->Length; i++)
+		YDATA[i] = double(ydata[i]);
+		
+	int maxx, maxy;
+	double max = JPMath::Max(source, maxx, maxy, false);
+	double min = JPMath::Min(source, false);
+	double amp = max - min;
+	if (amp == 0)
+		amp = 1;
+	double x0 = XDATA[maxx];
+	if (x0 == 0)
+		x0 = 1;
+	double y0 = YDATA[maxy];
+	if (y0 == 0)
+		y0 = 1;
+	double bias = min;
+	if (bias < 1)
+		bias = 1;	
+
+	if (model_name == "Gaussian")
+	{
+		if (params->Length == 5)
+		{
+			scale = gcnew array<double>(5) { amp, x0, y0, 2, bias };
+			if (params_LB == nullptr || params_LB->Length == 0)
+				params_LB = gcnew array<double>(5) { amp / 3, XDATA[0], YDATA[0], 0.1, 0 };
+			if (params_UB == nullptr || params_UB->Length == 0)
+				params_UB = gcnew array<double>(5) { 2 * amp, XDATA[XDATA->Length - 1], YDATA[YDATA->Length - 1], 10, max / 4 };
+			if (params[0] == 0 && params[1] == 0 && params[2] == 0 && params[3] == 0 && params[4] == 0)
+			{
+				params[0] = amp;
+				params[1] = x0;
+				params[2] = y0;
+				params[3] = 2;
+				params[4] = bias;
+			}
+		}
+		else if (params->Length == 7)
+		{
+			scale = gcnew array<double>(7) { amp, x0, y0, 1, 2, 2, bias };
+			if (params_LB == nullptr || params_LB->Length == 0)
+				params_LB = gcnew array<double>(7) { amp / 3, XDATA[0], YDATA[0], -Math::PI, 0.1, 0.1, 0 };
+			if (params_UB == nullptr || params_UB->Length == 0)
+				params_UB = gcnew array<double>(7) { 2 * amp, XDATA[XDATA->Length - 1], YDATA[YDATA->Length - 1], Math::PI, 10, 10, max / 4 };
+			if (params[0] == 0 && params[1] == 0 && params[2] == 0 && params[3] == 0 && params[4] == 0 && params[5] == 0 && params[6] == 0)
+			{
+				params[0] = amp;
+				params[1] = x0;
+				params[2] = y0;
+				params[3] = 0;
+				params[4] = 2;
+				params[5] = 2;
+				params[6] = bias;
+			}
+		}
+		else
+		{
+			throw gcnew Exception("Parameter length does not correspond to either circular (5 params) or elliptical (7 params) Gaussian; params length = " + params->Length);
+			return;
+		}
+
+		if (minimization_type->ToLower() == "ls")
+			grad = gcnew alglib::ndimensional_grad(alglib_Gauss_2d_LM_LS_grad);
+		else if (minimization_type->ToLower() == "chisq")
+			grad = gcnew alglib::ndimensional_grad(alglib_Gauss_2d_LM_LS_CHISQ_grad);
+		else if (minimization_type->ToLower() == "robust")
+			grad = gcnew alglib::ndimensional_grad(alglib_Gauss_2d_LM_LS_ROBUST_grad);
+		else if (minimization_type->ToLower() == "cstat")
+			grad = gcnew alglib::ndimensional_grad(alglib_Gauss_2d_LM_LS_CSTAT_grad);
+		else
+		{
+			throw gcnew Exception("Fit Type not recognized: '" + minimization_type);
+			return;
+		}
+	}
+	else if (model_name == "Moffat")
+	{
+		if (params->Length == 6)
+		{
+			scale = gcnew array<double>(6) { amp, x0, y0, 2, 2, bias };
+			if (params_LB == nullptr || params_LB->Length == 0)
+				params_LB = gcnew array<double>(6) { amp / 3, XDATA[0], YDATA[0], 0.1, 1.000001, 0 };
+			if (params_UB == nullptr || params_UB->Length == 0)
+				params_UB = gcnew array<double>(6) { 2 * amp, XDATA[XDATA->Length - 1], YDATA[YDATA->Length - 1], 10, 10, max / 4 };
+			if (params[0] == 0 && params[1] == 0 && params[2] == 0 && params[3] == 0 && params[4] == 0 && params[5] == 0)
+			{
+				params[0] = amp;
+				params[1] = x0;
+				params[2] = y0;
+				params[3] = 2;
+				params[4] = 2;
+				params[5] = bias;
+			}
+		}
+		else if (params->Length == 8)
+		{
+			scale = gcnew array<double>(8) { amp, x0, y0, 1, 2, 2, 2, bias };
+			if (params_LB == nullptr || params_LB->Length == 0)
+				params_LB = gcnew array<double>(8) { amp / 3, XDATA[0], YDATA[0], -Math::PI, 0.1, 0.1, 1.000001, 0 };
+			if (params_UB == nullptr || params_UB->Length == 0)
+				params_UB = gcnew array<double>(8) { 2 * amp, XDATA[XDATA->Length - 1], YDATA[YDATA->Length - 1], Math::PI, 10, 10, 10, max / 4 };
+			if (params[0] == 0 && params[1] == 0 && params[2] == 0 && params[3] == 0 && params[4] == 0 && params[5] == 0 && params[6] == 0 && params[7] == 0)
+			{
+				params[0] = amp;
+				params[1] = x0;
+				params[2] = y0;
+				params[3] = 0;
+				params[4] = 2;
+				params[5] = 2;
+				params[6] = 2;
+				params[7] = bias;
+			}
+		}
+		else
+		{
+			throw gcnew Exception("Parameter length does not correspond to either circular (6 params) or elliptical (8 params) Moffat; params length = " + params->Length);
+			return;
+		}
+
+		if (minimization_type->ToLower() == "ls")
+			grad = gcnew alglib::ndimensional_grad(alglib_Moffat_2d_LM_LS_grad);
+		else if (minimization_type->ToLower() == "chisq")
+			grad = gcnew alglib::ndimensional_grad(alglib_Moffat_2d_LM_LS_CHISQ_grad);
+		else if (minimization_type->ToLower() == "robust")
+			grad = gcnew alglib::ndimensional_grad(alglib_Moffat_2d_LM_LS_ROBUST_grad);
+		else if (minimization_type->ToLower() == "cstat")
+			grad = gcnew alglib::ndimensional_grad(alglib_Moffat_2d_LM_LS_CSTAT_grad);
+		else
+		{
+			throw gcnew Exception("Fit Type not recognized: '" + minimization_type);
+			return;
+		}
+	}
+	else
+	{
+		throw gcnew Exception("Fit Model not recognized: '" + model_name);
+		return;
+	}
+
+	double epsx = 1e-6;
+	double epsg = 0;
+	double epsf = 0;
+	int maxits = 1000;
+	array<Object^>^ arrays = gcnew array<Object^>(3);
+	arrays[0] = source;
+	arrays[1] = XDATA;
+	arrays[2] = YDATA;
+
+	alglib::minbcstate^ bcstate;
+	alglib::minbccreate(params, bcstate);	
+	alglib::minbcsetcond(bcstate, epsg, epsf, epsx, maxits);
+	alglib::minbcsetbc(bcstate, params_LB, params_UB);
+	alglib::minbcsetscale(bcstate, scale);	
+	alglib::minbcoptimize(bcstate, grad, nullptr, arrays, alglib::parallel);
+	alglib::minbcreport^ report;
+	alglib::minbcresults(bcstate, params, report);
+
+	switch (report->terminationtype)
+	{
+		case -8:
+		{
+			termination_msg = "Internal integrity control detected infinite or NAN values in function or gradient. Abnormal termination signalled.";
+			break;
+		}
+		case -3:
+		{
+			termination_msg = "Inconsistent constraints.";
+			break;
+		}
+		case 1:
+		{
+			termination_msg = "Relative function improvement is no more than EpsF.";
+			break;
+		}
+		case 2:
+		{
+			termination_msg = "Scaled step is no more than EpsX.";
+			break;
+		}
+		case 4:
+		{
+			termination_msg = "Scaled gradient norm is no more than EpsG.";
+			break;
+		}
+		case 5:
+		{
+			termination_msg = "MaxIts steps was taken.";
+			break;
+		}
+		case 7:
+		{
+			termination_msg = "Stopping conditions are too stringent, further improvement is impossible, X contains best point found so far.";
+			break;
+		}
+		case 8:
+		{
+			termination_msg = "Terminated by user.";
+			break;
+		}
+	}
+
+	if (p_err->Length != 0)
+	{
+		if (model_name == "Gaussian")
+			p_err = Gauss_2D_param_err(params, XDATA, YDATA, source);
+		else
+			p_err = Moffat_2D_param_err(params, XDATA, YDATA, source);
+	}
+
+	if (fit_residuals->Length != 0)
+	{
+		array<double, 2>^ model = gcnew array<double, 2>(XDATA->Length, YDATA->Length);
+		if (model_name->ToLower()->Contains("gaus"))
+			Gaussian2d(xdata, ydata, model, params, false);
+		else
+			Moffat2d(xdata, ydata, model, params, false);
+
+		for (int i = 0; i < XDATA->Length; i++)
+			for (int j = 0; j < YDATA->Length; j++)
+				fit_residuals[i, j] = source[i, j] - model[i, j];
+	}
+}
+
+void JPFITS::JPMath::alglib_Gauss_2d_LM_LS_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+
+	if (p->Length == 5)
+	{
+		double p3sq = p[3] * p[3];
+		double twop3sq = 2 * p3sq;
+		double p3cu = p3sq * p[3];
+		double twop1 = 2 * p[1];
+		double twop2 = 2 * p[2];
+		double dx, dxsq, dy, dxsqpdysq, expres, exparg, p0expres, a;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			dxsq = dx * dx;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				dy = p[2] - y[j];
+				dxsqpdysq = dxsq + dy * dy;
+				exparg = -dxsqpdysq / twop3sq;
+				expres = Math::Exp(exparg);
+				p0expres = p[0] * expres;
+				a = p[4] - Z[i, j] + p0expres;
+
+				f += a * a;
+
+				grad[0] += 2 * expres*a;
+				grad[1] += -(p0expres*(twop1 - 2 * x[i])*a) / p3sq;
+				grad[2] += -(p0expres*(twop2 - 2 * y[j])*a) / p3sq;
+				grad[3] += (2 * p0expres*dxsqpdysq*a) / p3cu;
+				grad[4] += 2 * a;
+			}
+		}
+		return;
+	}
+
+	if (p->Length == 7)
+	{
+		double cosp3 = Math::Cos(p[3]);
+		double sinp3 = Math::Sin(p[3]);
+		double p4sq = p[4] * p[4];
+		double twop4sq = 2 * p4sq;
+		double p5sq = p[5] * p[5];
+		double twop5sq = 2 * p5sq;
+		double p4cu = p4sq * p[4];
+		double p5cu = p5sq * p[5];
+		double dx, cosp3dx, sinp3dx, dy, sinp3dy, a, cosp3dy, b, c, exparg, asq, bsq, expexparg, p0expexparg, twop0expexparg;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			cosp3dx = cosp3 * dx;
+			sinp3dx = sinp3 * dx;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				dy = p[2] - y[j];
+				sinp3dy = sinp3 * dy;
+				a = cosp3dx + sinp3dy;
+				cosp3dy = cosp3 * dy;
+				b = cosp3dy - sinp3dx;
+				exparg = -a * a / twop4sq - b * b / twop5sq;
+				asq = a * a;
+				bsq = b * b;
+				expexparg = Math::Exp(exparg);
+				p0expexparg = p[0] * expexparg;
+				c = p[6] - Z[i, j] + p0expexparg;
+				twop0expexparg = 2 * p0expexparg;
+
+				f += c * c;
+
+				grad[0] += 2 * expexparg*c;
+				grad[1] += -twop0expexparg * ((cosp3*a) / p4sq - (sinp3*b) / p5sq)*c;
+				grad[2] += -twop0expexparg * ((cosp3*b) / p5sq + (sinp3*a) / p4sq)*c;
+				grad[3] += -twop0expexparg * ((a*b) / p4sq - (a*b) / p5sq)*c;
+				grad[4] += (twop0expexparg*asq * c) / p4cu;
+				grad[5] += (twop0expexparg*bsq * c) / p5cu;
+				grad[6] += 2 * p[6] - 2 * Z[i, j] + twop0expexparg;
+			}
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_Gauss_2d_LM_LS_grad_compound(array<double>^ p, double %f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double>^ g = gcnew array<double>(grad->Length);
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+	int func = ((array<int>^)(((array<Object^>^)obj)[3]))[0];
+	int count = ((array<int>^)(((array<Object^>^)obj)[3]))[1];
+	int pindex;
+
+	if (func == 5)
+	{
+		array<double>^ p3sq = gcnew array<double>(count);// = p[3] * p[3];
+		array<double>^ twop3sq = gcnew array<double>(count);// = 2 * p3sq;
+		array<double>^ p3cu = gcnew array<double>(count);// = p3sq * p[3];
+		array<double>^ twop1 = gcnew array<double>(count); // = 2 * p[1];
+		array<double>^ twop2 = gcnew array<double>(count);// = 2 * p[2];
+		for (int k = 0; k < count; k++)
+		{
+			pindex = k * (func - 1);
+			p3sq[k] = p[pindex + 3] * p[pindex + 3];
+			twop3sq[k] = 2 * p3sq[k];
+			p3cu[k] = p3sq[k] * p[pindex + 3];
+			twop1[k] = 2 * p[pindex + 1];
+			twop2[k] = 2 * p[pindex + 2];
+		}
+
+		double dy, dxsqpdysq, expres, exparg, p0expres, a;
+		array<double>^ dxsq = gcnew array<double>(count);
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			for (int k = 0; k < count; k++)
+			{
+				pindex = k * (func - 1);
+
+				dxsq[k] = p[pindex + 1] - x[i];
+				dxsq[k] *= dxsq[k];
+			}
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				p0expres = 0;
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					dy = p[pindex + 2] - y[j];
+					dxsqpdysq = dxsq[k] + dy * dy;
+					exparg = -dxsqpdysq / twop3sq[k];
+					expres = Math::Exp(exparg);
+
+					p0expres += p[pindex + 0] * expres;
+					g[pindex + 0] = expres;
+					g[pindex + 1] = -((twop1[k] - 2 * x[i])) / p3sq[k] * p[pindex + 0] * expres;
+					g[pindex + 2] = -((twop2[k] - 2 * y[j])) / p3sq[k] * p[pindex + 0] * expres;
+					g[pindex + 3] = (dxsqpdysq) / p3cu[k] * p[pindex + 0] * expres;
+				}
+
+				a = p[p->Length - 1] - Z[i, j] + p0expres;
+
+				f += a * a;
+				grad[grad->Length - 1] += 2 * a;
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					grad[pindex + 0] += 2 * g[pindex + 0] * a;
+					grad[pindex + 1] += g[pindex + 1] * a;
+					grad[pindex + 2] += g[pindex + 2] * a;
+					grad[pindex + 3] += 2 * g[pindex + 3] * a;
+				}
+			}
+		}
+		return;
+	}
+
+	if (func == 7)
+	{
+		array<double>^ cosp3 = gcnew array<double>(count);// = Math::Cos(p[3]);
+		array<double>^ sinp3 = gcnew array<double>(count);// = Math::Sin(p[3]);
+		array<double>^ p4sq = gcnew array<double>(count);// = p[4] * p[4];
+		array<double>^ twop4sq = gcnew array<double>(count);// = 2 * p4sq;
+		array<double>^ p5sq = gcnew array<double>(count);// = p[5] * p[5];
+		array<double>^ twop5sq = gcnew array<double>(count);// = 2 * p5sq;
+		array<double>^ p4cu = gcnew array<double>(count);// = p4sq * p[4];
+		array<double>^ p5cu = gcnew array<double>(count);// = p5sq * p[5];
+		for (int k = 0; k < count; k++)
+		{
+			pindex = k * (func - 1);
+			cosp3[k] = Math::Cos(p[pindex + 3]);
+			sinp3[k] = Math::Sin(p[pindex + 3]);
+			p4sq[k] = p[pindex + 4] * p[pindex + 4];
+			twop4sq[k] = 2 * p4sq[k];
+			p5sq[k] = p[pindex + 5] * p[pindex + 5];
+			twop5sq[k] = 2 * p5sq[k];
+			p4cu[k] = p4sq[k] * p[pindex + 4];
+			p5cu[k] = p5sq[k] * p[pindex + 5];
+		}
+
+		double dx, cosp3dx, sinp3dx, dy, sinp3dy, a, cosp3dy, b, c, exparg, asq, bsq, expexparg, p0expexparg, twop0expexparg;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			for (int j = 0; j < y->Length; j++)
+			{
+				p0expexparg = 0;
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					dx = p[pindex + 1] - x[i];
+					cosp3dx = cosp3[k] * dx;
+					sinp3dx = sinp3[k] * dx;
+					dy = p[pindex + 2] - y[j];
+					sinp3dy = sinp3[k] * dy;
+					a = cosp3dx + sinp3dy;
+					cosp3dy = cosp3[k] * dy;
+					b = cosp3dy - sinp3dx;
+					exparg = -a * a / twop4sq[k] - b * b / twop5sq[k];
+					asq = a * a;
+					bsq = b * b;
+					expexparg = Math::Exp(exparg);
+					p0expexparg += p[pindex + 0] * expexparg;
+
+					g[pindex + 0] = 2 * expexparg;
+					g[pindex + 1] = ((cosp3[k] *a) / p4sq[k] - (sinp3[k] *b) / p5sq[k]) * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 2] = ((cosp3[k] *b) / p5sq[k] + (sinp3[k] *a) / p4sq[k]) * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 3] = ((a*b) / p4sq[k] - (a*b) / p5sq[k]) * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 4] = (asq) / p4cu[k] * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 5] = (bsq) / p5cu[k] * 2 * p[pindex + 0] * expexparg;
+				}
+
+				twop0expexparg = 2 * p0expexparg;
+				c = p[p->Length - 1] - Z[i, j] + p0expexparg;
+
+				f += c * c;
+				grad[grad->Length - 1] += 2 * c;
+
+				for (int k = 0; k < count; k++)				
+				{
+					pindex = k * (func - 1);
+
+					grad[pindex + 0] += g[pindex + 0] * c;
+					grad[pindex + 1] += - g[pindex + 1] * c;
+					grad[pindex + 2] += - g[pindex + 2] * c;
+					grad[pindex + 3] += - g[pindex + 3] * c;
+					grad[pindex + 4] += (c) * g[pindex + 4];
+					grad[pindex + 5] += (c) * g[pindex + 5];
+				}				
+			}
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_Gauss_2d_LM_LS_CHISQ_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+	double den;
+
+	if (p->Length == 5)
+	{
+		double p3sq = p[3] * p[3];
+		double p3cu = p[3] * p3sq;
+		double twop3sq = 2 * p3sq;
+		double twop1 = 2 * p[1];
+		double twop2 = 2 * p[2];
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			double dx = p[1] - x[i];
+			double dxsq = dx * dx;
+			double twoxi = 2 * x[i];
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Z[i, j];
+
+				double dy = p[2] - y[j];
+				double dysq = dy * dy;
+				double exparg = (dxsq + dysq) / twop3sq;
+				double expmexparg = Math::Exp(-exparg);
+				double p0expmexparg = p[0] * expmexparg;
+				double a = p[4] - Z[i, j] + p0expmexparg;
+
+				f += a * a / den;
+
+				grad[0] += (2 * expmexparg*a) / den;
+				grad[1] += -(p0expmexparg*(twop1 - twoxi)*a) / (den*p3sq);
+				grad[2] += -(p0expmexparg*(twop2 - 2 * y[j])*a) / (den*p3sq);
+				grad[3] += (2 * p0expmexparg*(dxsq + dysq)*a) / (den*p3cu);
+				grad[4] += (2 * p[4] - 2 * Z[i, j] + 2 * p0expmexparg) / den;
+			}
+		}
+		return;
+	}
+
+	if (p->Length == 7)
+	{
+		double cosp3 = Math::Cos(p[3]);
+		double sinp3 = Math::Sin(p[3]);
+		double p4sq = p[4] * p[4];
+		double p5sq = p[5] * p[5];
+		double twop4sq = 2 * p4sq;
+		double twop5sq = 2 * p5sq;
+		double p4cu = p4sq * p[4];
+		double p5cu = p5sq * p[5];
+		double twop6 = 2 * p[6];
+		double dx, cosp3dx, dy, sinp3dy, cosp3dxsinp3dy, cosp3dxsinp3dysq, cosp3dysinp3dx, cosp3dysinp3dxsq, exparg, expres, a, p0expres, twop0expres;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			cosp3dx = cosp3 * dx;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Z[i, j];
+
+				dy = p[2] - y[j];
+				sinp3dy = sinp3 * dy;
+				cosp3dxsinp3dy = cosp3dx + sinp3dy;
+				cosp3dxsinp3dysq = cosp3dxsinp3dy * cosp3dxsinp3dy;
+				cosp3dysinp3dx = cosp3 * dy - sinp3 * dx;
+				cosp3dysinp3dxsq = cosp3dysinp3dx * cosp3dysinp3dx;
+				exparg = -cosp3dxsinp3dysq / twop4sq - cosp3dysinp3dxsq / twop5sq;
+				expres = Math::Exp(exparg);
+				a = p[6] - Z[i, j] + p[0] * expres;
+				p0expres = p[0] * expres;
+				twop0expres = 2 * p0expres;
+
+				f += a * a / den;
+
+				grad[0] += (2 * expres*a) / den;
+				grad[1] += -(twop0expres*((cosp3*cosp3dxsinp3dy) / p4sq - (sinp3*cosp3dysinp3dx) / p5sq)*a) / den;
+				grad[2] += -(twop0expres*((cosp3*cosp3dysinp3dx) / p5sq + (sinp3*cosp3dxsinp3dy) / p4sq)*a) / den;
+				grad[3] += -(twop0expres*((cosp3dxsinp3dy*cosp3dysinp3dx) / p4sq - (cosp3dxsinp3dy*cosp3dysinp3dx) / p5sq)*a) / den;
+				grad[4] += (twop0expres*cosp3dxsinp3dysq * a) / (den*p4cu);
+				grad[5] += (twop0expres*cosp3dysinp3dxsq * a) / (den*p5cu);
+				grad[6] += (twop6 - 2 * Z[i, j] + twop0expres) / den;
+			}
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_Gauss_2d_LM_LS_CHISQ_grad_compound(array<double>^ p, double% f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double>^ g = gcnew array<double>(grad->Length);
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+	int func = ((array<int>^)(((array<Object^>^)obj)[3]))[0];
+	int count = ((array<int>^)(((array<Object^>^)obj)[3]))[1];
+	int pindex;
+
+	if (func == 5)
+	{
+		array<double>^ p3sq = gcnew array<double>(count);// = p[3] * p[3];
+		array<double>^ twop3sq = gcnew array<double>(count);// = 2 * p3sq;
+		array<double>^ p3cu = gcnew array<double>(count);// = p3sq * p[3];
+		array<double>^ twop1 = gcnew array<double>(count); // = 2 * p[1];
+		array<double>^ twop2 = gcnew array<double>(count);// = 2 * p[2];
+		for (int k = 0; k < count; k++)
+		{
+			pindex = k * (func - 1);
+			p3sq[k] = p[pindex + 3] * p[pindex + 3];
+			twop3sq[k] = 2 * p3sq[k];
+			p3cu[k] = p3sq[k] * p[pindex + 3];
+			twop1[k] = 2 * p[pindex + 1];
+			twop2[k] = 2 * p[pindex + 2];
+		}
+
+		double dy, dxsqpdysq, expres, exparg, p0expres, a, den;
+		array<double>^ dxsq = gcnew array<double>(count);
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			for (int k = 0; k < count; k++)
+			{
+				pindex = k * (func - 1);
+
+				dxsq[k] = p[pindex + 1] - x[i];
+				dxsq[k] *= dxsq[k];
+			}
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				p0expres = 0;
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Z[i, j];
+
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					dy = p[pindex + 2] - y[j];
+					dxsqpdysq = dxsq[k] + dy * dy;
+					exparg = -dxsqpdysq / twop3sq[k];
+					expres = Math::Exp(exparg);
+
+					p0expres += p[pindex + 0] * expres;
+					g[pindex + 0] = expres;
+					g[pindex + 1] = -((twop1[k] - 2 * x[i])) / p3sq[k] * p[pindex + 0] * expres;
+					g[pindex + 2] = -((twop2[k] - 2 * y[j])) / p3sq[k] * p[pindex + 0] * expres;
+					g[pindex + 3] = (dxsqpdysq) / p3cu[k] * p[pindex + 0] * expres;
+				}
+
+				a = p[p->Length - 1] - Z[i, j] + p0expres;
+
+				f += a * a / den;
+				grad[grad->Length - 1] += 2 * a / den;
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					grad[pindex + 0] += 2 * g[pindex + 0] * a / den;
+					grad[pindex + 1] += g[pindex + 1] * a / den;
+					grad[pindex + 2] += g[pindex + 2] * a / den;
+					grad[pindex + 3] += 2 * g[pindex + 3] * a / den;
+				}
+			}
+		}
+		return;
+	}
+
+	if (func == 7)
+	{
+		array<double>^ cosp3 = gcnew array<double>(count);// = Math::Cos(p[3]);
+		array<double>^ sinp3 = gcnew array<double>(count);// = Math::Sin(p[3]);
+		array<double>^ p4sq = gcnew array<double>(count);// = p[4] * p[4];
+		array<double>^ twop4sq = gcnew array<double>(count);// = 2 * p4sq;
+		array<double>^ p5sq = gcnew array<double>(count);// = p[5] * p[5];
+		array<double>^ twop5sq = gcnew array<double>(count);// = 2 * p5sq;
+		array<double>^ p4cu = gcnew array<double>(count);// = p4sq * p[4];
+		array<double>^ p5cu = gcnew array<double>(count);// = p5sq * p[5];
+		for (int k = 0; k < count; k++)
+		{
+			pindex = k * (func - 1);
+			cosp3[k] = Math::Cos(p[pindex + 3]);
+			sinp3[k] = Math::Sin(p[pindex + 3]);
+			p4sq[k] = p[pindex + 4] * p[pindex + 4];
+			twop4sq[k] = 2 * p4sq[k];
+			p5sq[k] = p[pindex + 5] * p[pindex + 5];
+			twop5sq[k] = 2 * p5sq[k];
+			p4cu[k] = p4sq[k] * p[pindex + 4];
+			p5cu[k] = p5sq[k] * p[pindex + 5];
+		}
+
+		double dx, cosp3dx, sinp3dx, dy, sinp3dy, a, cosp3dy, b, c, exparg, asq, bsq, expexparg, p0expexparg, twop0expexparg, den;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			for (int j = 0; j < y->Length; j++)
+			{
+				p0expexparg = 0;
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Z[i, j];
+
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					dx = p[pindex + 1] - x[i];
+					cosp3dx = cosp3[k] * dx;
+					sinp3dx = sinp3[k] * dx;
+					dy = p[pindex + 2] - y[j];
+					sinp3dy = sinp3[k] * dy;
+					a = cosp3dx + sinp3dy;
+					cosp3dy = cosp3[k] * dy;
+					b = cosp3dy - sinp3dx;
+					exparg = -a * a / twop4sq[k] - b * b / twop5sq[k];
+					asq = a * a;
+					bsq = b * b;
+					expexparg = Math::Exp(exparg);
+					p0expexparg += p[pindex + 0] * expexparg;
+
+					g[pindex + 0] = 2 * expexparg;
+					g[pindex + 1] = ((cosp3[k] * a) / p4sq[k] - (sinp3[k] * b) / p5sq[k]) * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 2] = ((cosp3[k] * b) / p5sq[k] + (sinp3[k] * a) / p4sq[k]) * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 3] = ((a * b) / p4sq[k] - (a * b) / p5sq[k]) * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 4] = (asq) / p4cu[k] * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 5] = (bsq) / p5cu[k] * 2 * p[pindex + 0] * expexparg;
+				}
+
+				twop0expexparg = 2 * p0expexparg;
+				c = p[p->Length - 1] - Z[i, j] + p0expexparg;
+
+				f += c * c / den;
+				grad[grad->Length - 1] += 2 * c / den;
+
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					grad[pindex + 0] += g[pindex + 0] * c / den;
+					grad[pindex + 1] += -g[pindex + 1] * c / den;
+					grad[pindex + 2] += -g[pindex + 2] * c / den;
+					grad[pindex + 3] += -g[pindex + 3] * c / den;
+					grad[pindex + 4] += (c)*g[pindex + 4] / den;
+					grad[pindex + 5] += (c)*g[pindex + 5] / den;
+				}
+			}
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_Gauss_2d_LM_LS_ROBUST_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+	double den;
+
+	if (p->Length == 5)
+	{
+		double p3sq = p[3] * p[3];
+		double twop3sq = 2 * p3sq;
+		double p3cu = p3sq * p[3];
+		double twop1 = 2 * p[1];
+		double twop2 = 2 * p[2];
+		double dx, dxsq, dy, dysq, dxsqdysq, exparg, expres, p0expres, a;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			dxsq = dx * dx;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Math::Sqrt(Z[i, j]);
+
+				dy = p[2] - y[j];
+				dysq = dy * dy;
+				dxsqdysq = dxsq + dysq;
+				exparg = -dxsqdysq / twop3sq;
+				expres = Math::Exp(exparg);
+				p0expres = p[0] * expres;
+				a = p[4] - Z[i, j] + p0expres;
+
+				f += a * a / den;
+
+				grad[0] += (2 * expres*a) / den;
+				grad[1] += -(p0expres*(twop1 - 2 * x[i])*a) / (den*p3sq);
+				grad[2] += -(p0expres*(twop2 - 2 * y[j])*a) / (den*p3sq);
+				grad[3] += (2 * p0expres*dxsqdysq*a) / (den*p3cu);
+				grad[4] += (2 * p[4] - 2 * Z[i, j] + 2 * p0expres) / den;
+			}
+		}
+		return;
+	}
+
+	if (p->Length == 7)
+	{
+		double cosp3 = Math::Cos(p[3]);
+		double sinp3 = Math::Sin(p[3]);
+		double p4sq = p[4] * p[4];
+		double twop4sq = 2 * p4sq;
+		double p5sq = p[5] * p[5];
+		double twop5sq = 2 * p5sq;
+		double p4cu = p[4] * p4sq;
+		double p5cu = p[5] * p5sq;
+		double dx, cosp3dx, dy, sinp3dy, a, b, asq, bsq, exparg, expres, c, p0expres, twop0expres;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			cosp3dx = cosp3 * dx;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Math::Sqrt(Z[i, j]);
+
+				dy = p[2] - y[j];
+				sinp3dy = sinp3 * dy;
+				a = cosp3dx + sinp3dy;
+				b = cosp3 * dy - sinp3 * dx;
+				asq = a * a;
+				bsq = b * b;
+				exparg = -asq / twop4sq - bsq / twop5sq;
+				expres = Math::Exp(exparg);
+				c = p[6] - Z[i, j] + p[0] * expres;
+				p0expres = p[0] * expres;
+				twop0expres = 2 * p0expres;
+
+				f += c * c / den;
+
+				grad[0] += (2 * expres*c) / den;
+				grad[1] += -(twop0expres*((cosp3*a) / p4sq - (sinp3*b) / p5sq)*c) / den;
+				grad[2] += -(twop0expres*((cosp3*b) / p5sq + (sinp3*a) / p4sq)*c) / den;
+				grad[3] += -(twop0expres*((a*b) / p4sq - (a*b) / p5sq)*c) / den;
+				grad[4] += (twop0expres*asq * c) / (den*p4cu);
+				grad[5] += (twop0expres*bsq * c) / (den*p5cu);
+				grad[6] += (2 * p[6] - 2 * Z[i, j] + twop0expres) / den;
+			}
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_Gauss_2d_LM_LS_ROBUST_grad_compound(array<double>^ p, double% f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double>^ g = gcnew array<double>(grad->Length);
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+	int func = ((array<int>^)(((array<Object^>^)obj)[3]))[0];
+	int count = ((array<int>^)(((array<Object^>^)obj)[3]))[1];
+	int pindex;
+
+	if (func == 5)
+	{
+		array<double>^ p3sq = gcnew array<double>(count);// = p[3] * p[3];
+		array<double>^ twop3sq = gcnew array<double>(count);// = 2 * p3sq;
+		array<double>^ p3cu = gcnew array<double>(count);// = p3sq * p[3];
+		array<double>^ twop1 = gcnew array<double>(count); // = 2 * p[1];
+		array<double>^ twop2 = gcnew array<double>(count);// = 2 * p[2];
+		for (int k = 0; k < count; k++)
+		{
+			pindex = k * (func - 1);
+			p3sq[k] = p[pindex + 3] * p[pindex + 3];
+			twop3sq[k] = 2 * p3sq[k];
+			p3cu[k] = p3sq[k] * p[pindex + 3];
+			twop1[k] = 2 * p[pindex + 1];
+			twop2[k] = 2 * p[pindex + 2];
+		}
+
+		double dy, dxsqpdysq, expres, exparg, p0expres, a, den;
+		array<double>^ dxsq = gcnew array<double>(count);
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			for (int k = 0; k < count; k++)
+			{
+				pindex = k * (func - 1);
+
+				dxsq[k] = p[pindex + 1] - x[i];
+				dxsq[k] *= dxsq[k];
+			}
+
+			for (int j = 0; j < y->Length; j++)
+			{				
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Math::Sqrt(Z[i, j]);
+
+				p0expres = 0;
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					dy = p[pindex + 2] - y[j];
+					dxsqpdysq = dxsq[k] + dy * dy;
+					exparg = -dxsqpdysq / twop3sq[k];
+					expres = Math::Exp(exparg);
+
+					p0expres += p[pindex + 0] * expres;
+					g[pindex + 0] = expres;
+					g[pindex + 1] = -((twop1[k] - 2 * x[i])) / p3sq[k] * p[pindex + 0] * expres;
+					g[pindex + 2] = -((twop2[k] - 2 * y[j])) / p3sq[k] * p[pindex + 0] * expres;
+					g[pindex + 3] = (dxsqpdysq) / p3cu[k] * p[pindex + 0] * expres;
+				}
+
+				a = p[p->Length - 1] - Z[i, j] + p0expres;
+
+				f += a * a / den;
+				grad[grad->Length - 1] += 2 * a / den;
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					grad[pindex + 0] += 2 * g[pindex + 0] * a / den;
+					grad[pindex + 1] += g[pindex + 1] * a / den;
+					grad[pindex + 2] += g[pindex + 2] * a / den;
+					grad[pindex + 3] += 2 * g[pindex + 3] * a / den;
+				}
+			}
+		}
+		return;
+	}
+
+	if (func == 7)
+	{
+		array<double>^ cosp3 = gcnew array<double>(count);// = Math::Cos(p[3]);
+		array<double>^ sinp3 = gcnew array<double>(count);// = Math::Sin(p[3]);
+		array<double>^ p4sq = gcnew array<double>(count);// = p[4] * p[4];
+		array<double>^ twop4sq = gcnew array<double>(count);// = 2 * p4sq;
+		array<double>^ p5sq = gcnew array<double>(count);// = p[5] * p[5];
+		array<double>^ twop5sq = gcnew array<double>(count);// = 2 * p5sq;
+		array<double>^ p4cu = gcnew array<double>(count);// = p4sq * p[4];
+		array<double>^ p5cu = gcnew array<double>(count);// = p5sq * p[5];
+		for (int k = 0; k < count; k++)
+		{
+			pindex = k * (func - 1);
+			cosp3[k] = Math::Cos(p[pindex + 3]);
+			sinp3[k] = Math::Sin(p[pindex + 3]);
+			p4sq[k] = p[pindex + 4] * p[pindex + 4];
+			twop4sq[k] = 2 * p4sq[k];
+			p5sq[k] = p[pindex + 5] * p[pindex + 5];
+			twop5sq[k] = 2 * p5sq[k];
+			p4cu[k] = p4sq[k] * p[pindex + 4];
+			p5cu[k] = p5sq[k] * p[pindex + 5];
+		}
+
+		double dx, cosp3dx, sinp3dx, dy, sinp3dy, a, cosp3dy, b, c, exparg, asq, bsq, expexparg, p0expexparg, twop0expexparg, den;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			for (int j = 0; j < y->Length; j++)
+			{
+				p0expexparg = 0;
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Math::Sqrt(Z[i, j]);
+
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					dx = p[pindex + 1] - x[i];
+					cosp3dx = cosp3[k] * dx;
+					sinp3dx = sinp3[k] * dx;
+					dy = p[pindex + 2] - y[j];
+					sinp3dy = sinp3[k] * dy;
+					a = cosp3dx + sinp3dy;
+					cosp3dy = cosp3[k] * dy;
+					b = cosp3dy - sinp3dx;
+					exparg = -a * a / twop4sq[k] - b * b / twop5sq[k];
+					asq = a * a;
+					bsq = b * b;
+					expexparg = Math::Exp(exparg);
+					p0expexparg += p[pindex + 0] * expexparg;
+
+					g[pindex + 0] = 2 * expexparg;
+					g[pindex + 1] = ((cosp3[k] * a) / p4sq[k] - (sinp3[k] * b) / p5sq[k]) * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 2] = ((cosp3[k] * b) / p5sq[k] + (sinp3[k] * a) / p4sq[k]) * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 3] = ((a * b) / p4sq[k] - (a * b) / p5sq[k]) * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 4] = (asq) / p4cu[k] * 2 * p[pindex + 0] * expexparg;
+					g[pindex + 5] = (bsq) / p5cu[k] * 2 * p[pindex + 0] * expexparg;
+				}
+
+				twop0expexparg = 2 * p0expexparg;
+				c = p[p->Length - 1] - Z[i, j] + p0expexparg;
+
+				f += c * c / den;
+				grad[grad->Length - 1] += 2 * c / den;
+
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					grad[pindex + 0] += g[pindex + 0] * c / den;
+					grad[pindex + 1] += -g[pindex + 1] * c / den;
+					grad[pindex + 2] += -g[pindex + 2] * c / den;
+					grad[pindex + 3] += -g[pindex + 3] * c / den;
+					grad[pindex + 4] += (c)*g[pindex + 4] / den;
+					grad[pindex + 5] += (c)*g[pindex + 5] / den;
+				}
+			}
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_Gauss_2d_LM_LS_CSTAT_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+
+	if (p->Length == 5)
+	{
+		double p3sq = p[3] * p[3];
+		double twop3sq = 2 * p3sq;
+		double p3cu = p3sq * p[3];
+		double twop1 = 2 * p[1];
+		double twop2 = 2 * p[2];
+		double dx, dxsq, twoxi, dy, dysq, dxsqdysq, exparg, expres, p0expres, a;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			dxsq = dx * dx;
+			twoxi = 2 * x[i];
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				dy = p[2] - y[j];
+				dysq = dy * dy;
+				dxsqdysq = dxsq + dysq;
+				exparg = -dxsqdysq / twop3sq;
+				expres = Math::Exp(exparg);
+				p0expres = p[0] * expres;
+				a = p[4] + p0expres;
+
+				f += 2 * p[4] - 2 * Z[i, j] * Math::Log(a) + 2 * p0expres;
+
+				grad[0] += 2 * expres - (2 * Z[i, j] * expres) / (a);
+				grad[1] += (Z[i, j] * p0expres*(twop1 - twoxi)) / (p3sq * (a)) - (p0expres*(twop1 - twoxi)) / p3sq;
+				grad[2] += (Z[i, j] * p0expres*(twop2 - 2 * y[j])) / (p3sq * (a)) - (p0expres*(twop2 - 2 * y[j])) / p3sq;
+				grad[3] += (2 * p0expres*dxsqdysq) / p3cu - (2 * Z[i, j] * p0expres*dxsqdysq) / (p3cu * (a));
+				grad[4] += 2 - (2 * Z[i, j]) / (a);
+			}
+		}
+		return;
+	}
+
+	if (p->Length == 7)
+	{
+		double p4sq = p[4] * p[4];
+		double p5sq = p[5] * p[5];
+		double cosp3 = Math::Cos(p[3]);
+		double sinp3 = Math::Sin(p[3]);
+		double twop4sq = 2 * p4sq;
+		double twop5sq = 2 * p5sq;
+		double p4cu = p4sq * p[4];
+		double p5cu = p5sq * p[5]; 
+		double dy, dx, cosp3dx, sinp3dx, sinp3dy, a, b, c, d, g, ab, h, cosp3dy, asq, bsq, exparg, expres, p0expres, twop0expres, twoZijp0expres, twoZij, cosp3a, cosp3b, sinp3b, sinp3a;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			cosp3dx = cosp3 * dx;
+			sinp3dx = sinp3 * dx;			
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				dy = p[2] - y[j];
+				sinp3dy = sinp3 * dy;
+				a = cosp3dx + sinp3dy;
+				cosp3dy = cosp3 * dy;
+				b = cosp3dy - sinp3dx;
+				asq = a * a;
+				bsq = b * b;
+				exparg = -asq / twop4sq - bsq / twop5sq;
+				expres = Math::Exp(exparg);
+				c = p[6] + p[0] * expres;
+				p0expres = p[0] * expres;
+				twoZijp0expres = 2 * Z[i, j] * p0expres;
+				twop0expres = 2 * p0expres;
+				twoZij = 2 * Z[i, j];
+				cosp3a = cosp3 * a;
+				cosp3b = cosp3 * b;
+				sinp3b = sinp3 * b;
+				sinp3a = sinp3 * a;
+				d = cosp3a / p4sq - sinp3b / p5sq;
+				g = cosp3b / p5sq + sinp3a / p4sq;
+				ab = a * b;
+				h = ab / p4sq - ab / p5sq;
+
+				f += 2 * p[6] - twoZij * Math::Log(c) + twop0expres;
+
+				grad[0] += 2 * expres - (twoZij*expres) / (c);
+				grad[1] += (twoZijp0expres*d) / (c)-twop0expres * d;
+				grad[2] += (twoZijp0expres*g) / (c)-twop0expres * g;
+				grad[3] += (twoZijp0expres*h) / (c)-twop0expres * h;
+				grad[4] += (twop0expres*asq) / p4cu - (twoZijp0expres*asq) / (p4cu * (c));
+				grad[5] += (twop0expres*bsq) / p5cu - (twoZijp0expres*bsq) / (p5cu * (c));
+				grad[6] += 2 - (twoZij) / (c);
+			}
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_Gauss_2d_LM_LS_CSTAT_grad_compound(array<double>^ p, double% f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+	int func = ((array<int>^)(((array<Object^>^)obj)[3]))[0];
+	int count = ((array<int>^)(((array<Object^>^)obj)[3]))[1];
+	int pindex;
+
+	if (func == 5)
+	{
+		array<double>^ p3sq = gcnew array<double>(count);// = p[3] * p[3];
+		array<double>^ twop3sq = gcnew array<double>(count);// = 2 * p3sq;
+		array<double>^ p3cu = gcnew array<double>(count);// = p3sq * p[3];
+		array<double>^ twop1 = gcnew array<double>(count); // = 2 * p[1];
+		array<double>^ twop2 = gcnew array<double>(count);// = 2 * p[2];
+		for (int k = 0; k < count; k++)
+		{
+			pindex = k * (func - 1);
+			p3sq[k] = p[pindex + 3] * p[pindex + 3];
+			twop3sq[k] = 2 * p3sq[k];
+			p3cu[k] = p3sq[k] * p[pindex + 3];
+			twop1[k] = 2 * p[pindex + 1];
+			twop2[k] = 2 * p[pindex + 2];
+		}
+
+		double twoxi, exparg, p0expres, a, sumexpress;
+		array<double>^ dxsq = gcnew array<double>(count);
+		array<double>^ dysq = gcnew array<double>(count);
+		array<double>^ dxsqdysq = gcnew array<double>(count);
+		array<double>^ expres = gcnew array<double>(count);
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			for (int k = 0; k < count; k++)
+			{
+				pindex = k * (func - 1);
+
+				dxsq[k] = p[pindex + 1] - x[i];
+				dxsq[k] *= dxsq[k];
+			}
+			twoxi = 2 * x[i];
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				p0expres = 0;
+				sumexpress = 0;
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					dysq[k] = p[pindex + 2] - y[j];
+					dysq[k] *= dysq[k];
+					dxsqdysq[k] = dxsq[k] + dysq[k];
+					exparg = -dxsqdysq[k] / twop3sq[k];
+					expres[k] = Math::Exp(exparg);
+					
+					sumexpress += expres[k];
+					p0expres += p[pindex + 0] * expres[k];
+				}
+				a = p[p->Length - 1] + p0expres;
+				f += 2 * a - 2 * Z[i, j] * Math::Log(a);
+				grad[grad->Length - 1] += 2 - (2 * Z[i, j]) / (a);
+
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					grad[pindex + 0] += 2 * expres[k] - (2 * Z[i, j] * expres[k]) / (a);
+					grad[pindex + 1] += (Z[i, j] * p[pindex + 0] * expres[k] * (twop1[k] - twoxi)) / (p3sq[k] * (a)) - (p[pindex + 0] * expres[k] * (twop1[k] - twoxi)) / p3sq[k];
+					grad[pindex + 2] += (Z[i, j] * p[pindex + 0] * expres[k] * (twop2[k] - 2 * y[j])) / (p3sq[k] * (a)) - (p[pindex + 0] * expres[k] * (twop2[k] - 2 * y[j])) / p3sq[k];
+					grad[pindex + 3] += (2 * p[pindex + 0] * expres[k] * dxsqdysq[k]) / p3cu[k] - (2 * Z[i, j] * p[pindex + 0] * expres[k] * dxsqdysq[k]) / (p3cu[k] * (a));
+				}
+			}
+		}
+		return;
+	}
+
+	if (func == 7)
+	{
+		array<double>^ p4sq = gcnew array<double>(count);// p[4] * p[4];
+		array<double>^ p5sq = gcnew array<double>(count);// p[5] * p[5];
+		array<double>^ cosp3 = gcnew array<double>(count);//  Math::Cos(p[3]);
+		array<double>^ sinp3 = gcnew array<double>(count);// Math::Sin(p[3]);
+		array<double>^ twop4sq = gcnew array<double>(count);// 2 * p4sq;
+		array<double>^ twop5sq = gcnew array<double>(count);// 2 * p5sq;
+		array<double>^ p4cu = gcnew array<double>(count);//  p4sq * p[4];
+		array<double>^ p5cu = gcnew array<double>(count);// p5sq * p[5];
+		for (int k = 0; k < count; k++)
+		{
+			pindex = k * (func - 1);
+
+			p4sq[k] = p[pindex + 4] * p[pindex + 4];
+			p5sq[k] = p[pindex + 5] * p[pindex + 5];
+			cosp3[k] = Math::Cos(p[pindex + 3]);
+			sinp3[k] = Math::Sin(p[pindex + 3]);
+			twop4sq[k] = 2 * p4sq[k];
+			twop5sq[k] = 2 * p5sq[k];
+			p4cu[k] = p4sq[k] * p[pindex + 4];
+			p5cu[k] = p5sq[k] * p[pindex + 5];
+		}
+
+		double dy, sinp3dy, a, b, c, ab, cosp3dy, exparg, p0expres, twop0expres, twoZijp0expres, twoZij, cosp3a, cosp3b, sinp3b, sinp3a;
+		array<double>^ dx = gcnew array<double>(count);
+		array<double>^ cosp3dx = gcnew array<double>(count);
+		array<double>^ sinp3dx = gcnew array<double>(count);
+		array<double>^ expres = gcnew array<double>(count);
+		array<double>^ d = gcnew array<double>(count);
+		array<double>^ g = gcnew array<double>(count);
+		array<double>^ h = gcnew array<double>(count);
+		array<double>^ asq = gcnew array<double>(count);
+		array<double>^ bsq = gcnew array<double>(count);
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			for (int k = 0; k < count; k++)
+			{
+				pindex = k * (func - 1);
+
+				dx[k] = p[pindex + 1] - x[i];
+				cosp3dx[k] = cosp3[k] * dx[k];
+				sinp3dx[k] = sinp3[k] * dx[k];
+			}
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				twoZij = 2 * Z[i, j];
+				p0expres = 0;
+
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					dy = p[pindex + 2] - y[j];
+					sinp3dy = sinp3[k] * dy;
+					a = cosp3dx[k] + sinp3dy;
+					cosp3dy = cosp3[k] * dy;
+					b = cosp3dy - sinp3dx[k];
+					asq[k] = a * a;
+					bsq[k] = b * b;
+					exparg = -asq[k] / twop4sq[k] - bsq[k] / twop5sq[k];
+					expres[k] = Math::Exp(exparg);
+					p0expres += p[pindex + 0] * expres[k];
+					cosp3a = cosp3[k] * a;
+					cosp3b = cosp3[k] * b;
+					sinp3b = sinp3[k] * b;
+					sinp3a = sinp3[k] * a;
+					d[k] = cosp3a / p4sq[k] - sinp3b / p5sq[k];
+					g[k] = cosp3b / p5sq[k] + sinp3a / p4sq[k];
+					ab = a * b;
+					h[k] = ab / p4sq[k] - ab / p5sq[k];
+				}
+				twop0expres = 2 * p0expres;
+				twoZijp0expres = twoZij * p0expres;
+				c = p[p->Length - 1] + p0expres;
+
+				f += 2 * c - twoZij * Math::Log(c);
+				grad[grad->Length - 1] += 2 - (twoZij) / (c);
+
+				for (int k = 0; k < count; k++)
+				{
+					pindex = k * (func - 1);
+
+					grad[pindex + 0] += 2 * expres[k] - (twoZij * expres[k]) / (c);
+					grad[pindex + 1] += (twoZij * p[pindex + 0] * expres[k] * d[k]) / (c)-2 * p[pindex + 0] * expres[k] * d[k];
+					grad[pindex + 2] += (twoZij * p[pindex + 0] * expres[k] * g[k]) / (c)-2 * p[pindex + 0] * expres[k] * g[k];
+					grad[pindex + 3] += (twoZij * p[pindex + 0] * expres[k] * h[k]) / (c)-2 * p[pindex + 0] * expres[k] * h[k];
+					grad[pindex + 4] += (2 * p[pindex + 0] * expres[k] * asq[k]) / p4cu[k] - (twoZij * p[pindex + 0] * expres[k] * asq[k]) / (p4cu[k] * (c));
+					grad[pindex + 5] += (2 * p[pindex + 0] * expres[k] * bsq[k]) / p5cu[k] - (twoZij * p[pindex + 0] * expres[k] * bsq[k]) / (p5cu[k] * (c));
+				}
+			}
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_Moffat_2d_LM_LS_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+
+	if (p->Length == 6)
+	{
+		double p3sq = p[3] * p[3];
+		double p41 = p[4] + 1;
+		double twop1 = 2 * p[1];
+		double twop2 = 2 * p[2];
+		double p0p4 = p[0] * p[4];
+		double p3cu = p3sq * p[3];
+		double dx, dxsq, twoxi, twop1mtwoxi, dy, dysq, dxsqdysq, a, loga, apowp4, apowp41, b;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			dxsq = dx * dx;
+			twoxi = 2 * x[i];
+			twop1mtwoxi = twop1 - twoxi;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				dy = p[2] - y[j];
+				dysq = dy * dy;
+				dxsqdysq = dxsq + dysq;
+				a = dxsqdysq / p3sq + 1;
+				loga = Math::Log(a);
+				apowp4 = Math::Pow(a, p[4]);
+				apowp41 = Math::Pow(a, p41);
+				b = p[5] - Z[i, j] + p[0] / apowp4;
+
+				f += b * b;
+
+				grad[0] += (2 * b) / apowp4;
+				grad[1] += -(2 * p0p4*twop1mtwoxi*b) / (p3sq * apowp41);
+				grad[2] += -(2 * p0p4*(twop2 - 2 * y[j])*b) / (p3sq * apowp41);
+				grad[3] += (4 * p0p4*dxsqdysq*b) / (p3cu * apowp41);
+				grad[4] += -(2 * p[0]*loga*b) / apowp4;
+				grad[5] += 2 * p[5] - 2 * Z[i, j] + (2 * p[0]) / apowp4;
+			}
+		}
+		return;
+	}
+
+	if (p->Length == 8)
+	{
+		double cosp3 = Math::Cos(p[3]);
+		double sinp3 = Math::Sin(p[3]);
+		double p4sq = p[4] * p[4];
+		double p5sq = p[5] * p[5];
+		double p6p1 = p[6] + 1;
+		double p0p6 = p[0] * p[6];
+		double p4cu = p[4] * p4sq;
+		double p5cu = p[5] * p5sq;
+		double twop0p6 = 2 * p0p6;
+		double fourp0p6 = 4 * p0p6;
+		double twocosp3 = 2 * cosp3;
+		double twosinp3 = 2 * sinp3;
+		double twop7 = 2 * p[7];
+		double twop0 = 2 * p[0];
+		double dx, cosp3dx, sinp3dx, dy, sinp3dy, a, b, c, d, g, h, asq, cosp3dy, bsq, logc, p0logc;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			cosp3dx = cosp3 * dx;
+			sinp3dx = sinp3 * dx;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				dy = p[2] - y[j];
+				sinp3dy = sinp3 * dy;
+				a = cosp3dx + sinp3dy;
+				asq = a * a;
+				cosp3dy = cosp3 * dy;
+				b = cosp3dy - sinp3dx;
+				bsq = b * b;
+				c = asq / p4sq + bsq / p5sq + 1;
+				logc = Math::Log(c);
+				d = Math::Pow(c, p6p1);
+				g = Math::Pow(c, p[6]);
+				h = p[7] - Z[i, j] + p[0] / g;
+				p0logc = p[0] * logc;
+
+				f += h * h;
+
+				grad[0] += (2 * (h)) / g;
+				grad[1] += -(twop0p6*((twocosp3*a) / p4sq - (twosinp3*b) / p5sq)*(h)) / d;
+				grad[2] += -(twop0p6*((twocosp3*b) / p5sq + (twosinp3*a) / p4sq)*(h)) / d;
+				grad[3] += -(twop0p6*((2 * a*b) / p4sq - (2 * a*b) / p5sq)*(h)) / d;
+				grad[4] += (fourp0p6*asq * (h)) / (p4cu * d);
+				grad[5] += (fourp0p6*bsq * (h)) / (p5cu * d);
+				grad[6] += -(2 * p0logc*(h)) / g;
+				grad[7] += twop7 - 2 * Z[i, j] + twop0 / g;
+			}
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_Moffat_2d_LM_LS_CHISQ_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+	double den;
+
+	if (p->Length == 6)
+	{
+		double p3sq = p[3] * p[3];
+		double p41 = p[4] + 1;
+		double twop1 = 2 * p[1];
+		double twop2 = 2 * p[2];
+		double p0p4 = p[0] * p[4];
+		double p3cu = p3sq * p[3];
+		double dx, dxsq, twoxi, twop1mtwoxi, dy, dysq, dxsqdysq, a, loga, apowp4, apowp41, b;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			dxsq = dx * dx;
+			twoxi = 2 * x[i];
+			twop1mtwoxi = twop1 - twoxi;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Z[i, j];
+
+				dy = p[2] - y[j];
+				dysq = dy * dy;
+				dxsqdysq = dxsq + dysq;
+				a = dxsqdysq / p3sq + 1;
+				loga = Math::Log(a);
+				apowp4 = Math::Pow(a, p[4]);
+				apowp41 = Math::Pow(a, p41);
+				b = p[5] - Z[i, j] + p[0] / apowp4;
+
+				f += b * b / den;
+
+				grad[0] += (2 * b) / (den*apowp4);
+				grad[1] += -(2 * p0p4*twop1mtwoxi*b) / (den*p3sq * apowp41);
+				grad[2] += -(2 * p0p4*(twop2 - 2 * y[j])*b) / (den*p3sq * apowp41);
+				grad[3] += (4 * p0p4*dxsqdysq*b) / (den*p3cu * apowp41);
+				grad[4] += -(2 * p[0]*loga*b) / (den*apowp4);
+				grad[5] += (2 * p[5] - 2 * Z[i, j] + (2 * p[0]) / apowp4) / den;
+			}
+		}
+		return;
+	}
+
+	if (p->Length == 8)
+	{
+		double cosp3 = Math::Cos(p[3]);
+		double sinp3 = Math::Sin(p[3]);
+		double p4sq = p[4] * p[4];
+		double p5sq = p[5] * p[5];
+		double p6p1 = p[6] + 1;
+		double p0p6 = p[0] * p[6];
+		double p4cu = p[4] * p4sq;
+		double p5cu = p[5] * p5sq;
+		double twop0p6 = 2 * p0p6;
+		double fourp0p6 = 4 * p0p6;
+		double twocosp3 = 2 * cosp3;
+		double twosinp3 = 2 * sinp3;
+		double twop7 = 2 * p[7];
+		double twop0 = 2 * p[0];
+		double dx, cosp3dx, sinp3dx, dy, sinp3dy, a, b, c, d, g, h, asq, cosp3dy, bsq, logc, p0logc;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			cosp3dx = cosp3 * dx;
+			sinp3dx = sinp3 * dx;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Z[i, j];
+
+				dy = p[2] - y[j];
+				sinp3dy = sinp3 * dy;
+				a = cosp3dx + sinp3dy;
+				asq = a * a;
+				cosp3dy = cosp3 * dy;
+				b = cosp3dy - sinp3dx;
+				bsq = b * b;
+				c = asq / p4sq + bsq / p5sq + 1;
+				logc = Math::Log(c);
+				d = Math::Pow(c, p6p1);
+				g = Math::Pow(c, p[6]);
+				h = p[7] - Z[i, j] + p[0] / g;
+				p0logc = p[0] * logc;
+
+				f += h * h / den;
+
+				grad[0] += (2 * (h)) / (den*g);
+				grad[1] += -(twop0p6*((twocosp3*a) / p4sq - (twosinp3*b) / p5sq)*(h)) / (den*d);
+				grad[2] += -(twop0p6*((twocosp3*b) / p5sq + (twosinp3*a) / p4sq)*(h)) / (den*d);
+				grad[3] += -(twop0p6*((2 * a*b) / p4sq - (2 * a*b) / p5sq)*(h)) / (den*d);
+				grad[4] += (fourp0p6*asq * (h)) / (den*p4cu * d);
+				grad[5] += (fourp0p6*bsq * (h)) / (den*p5cu * d);
+				grad[6] += -(2 * p0logc*(h)) / (den*g);
+				grad[7] += (twop7 - 2 * Z[i, j] + twop0 / g) / den;
+			}
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_Moffat_2d_LM_LS_ROBUST_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+	double den;
+
+	if (p->Length == 6)
+	{
+		double p3sq = p[3] * p[3];
+		double p41 = p[4] + 1;
+		double twop1 = 2 * p[1];
+		double twop2 = 2 * p[2];
+		double p0p4 = p[0] * p[4];
+		double p3cu = p3sq * p[3];
+		double dx, dxsq, twoxi, twop1mtwoxi, dy, dysq, dxsqdysq, a, loga, apowp4, apowp41, b;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			dxsq = dx * dx;
+			twoxi = 2 * x[i];
+			twop1mtwoxi = twop1 - twoxi;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Math::Sqrt(Z[i, j]);
+
+				dy = p[2] - y[j];
+				dysq = dy * dy;
+				dxsqdysq = dxsq + dysq;
+				a = dxsqdysq / p3sq + 1;
+				loga = Math::Log(a);
+				apowp4 = Math::Pow(a, p[4]);
+				apowp41 = Math::Pow(a, p41);
+				b = p[5] - Z[i, j] + p[0] / apowp4;
+
+				f += b * b / den;
+
+				grad[0] += (2 * b) / (den*apowp4);
+				grad[1] += -(2 * p0p4*twop1mtwoxi*b) / (den*p3sq * apowp41);
+				grad[2] += -(2 * p0p4*(twop2 - 2 * y[j])*b) / (den*p3sq * apowp41);
+				grad[3] += (4 * p0p4*dxsqdysq*b) / (den*p3cu * apowp41);
+				grad[4] += -(2 * p[0]*loga*b) / (den*apowp4);
+				grad[5] += (2 * p[5] - 2 * Z[i, j] + (2 * p[0]) / apowp4) / den;
+			}
+		}
+		return;
+	}
+
+	if (p->Length == 8)
+	{
+		double cosp3 = Math::Cos(p[3]);
+		double sinp3 = Math::Sin(p[3]);
+		double p4sq = p[4] * p[4];
+		double p5sq = p[5] * p[5];
+		double p6p1 = p[6] + 1;
+		double p0p6 = p[0] * p[6];
+		double p4cu = p[4] * p4sq;
+		double p5cu = p[5] * p5sq;
+		double twop0p6 = 2 * p0p6;
+		double fourp0p6 = 4 * p0p6;
+		double twocosp3 = 2 * cosp3;
+		double twosinp3 = 2 * sinp3;
+		double twop7 = 2 * p[7];
+		double twop0 = 2 * p[0];
+		double dx, cosp3dx, sinp3dx, dy, sinp3dy, a, b, c, d, g, h, asq, cosp3dy, bsq, logc, p0logc;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			cosp3dx = cosp3 * dx;
+			sinp3dx = sinp3 * dx;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Math::Sqrt(Z[i, j]);
+
+				dy = p[2] - y[j];
+				sinp3dy = sinp3 * dy;
+				a = cosp3dx + sinp3dy;
+				asq = a * a;
+				cosp3dy = cosp3 * dy;
+				b = cosp3dy - sinp3dx;
+				bsq = b * b;
+				c = asq / p4sq + bsq / p5sq + 1;
+				logc = Math::Log(c);
+				d = Math::Pow(c, p6p1);
+				g = Math::Pow(c, p[6]);
+				h = p[7] - Z[i, j] + p[0] / g;
+				p0logc = p[0] * logc;
+
+				f += h * h / den;
+
+				grad[0] += (2 * (h)) / (den*g);
+				grad[1] += -(twop0p6*((twocosp3*a) / p4sq - (twosinp3*b) / p5sq)*(h)) / (den*d);
+				grad[2] += -(twop0p6*((twocosp3*b) / p5sq + (twosinp3*a) / p4sq)*(h)) / (den*d);
+				grad[3] += -(twop0p6*((2 * a*b) / p4sq - (2 * a*b) / p5sq)*(h)) / (den*d);
+				grad[4] += (fourp0p6*asq * (h)) / (den*p4cu * d);
+				grad[5] += (fourp0p6*bsq * (h)) / (den*p5cu * d);
+				grad[6] += -(2 * p0logc*(h)) / (den*g);
+				grad[7] += (twop7 - 2 * Z[i, j] + twop0 / g) / den;
+			}
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_Moffat_2d_LM_LS_CSTAT_grad(array<double>^ p, double %f, array<double>^ grad, Object^ obj)
+{
+	f = 0;
+	for (int i = 0; i < grad->Length; i++)
+		grad[i] = 0;
+	array<double, 2>^ Z = (array<double, 2>^)(((array<Object^>^)obj)[0]);
+	array<double>^ x = (array<double>^)(((array<Object^>^)obj)[1]);
+	array<double>^ y = (array<double>^)(((array<Object^>^)obj)[2]);
+
+	if (p->Length == 6)
+	{
+		double p3sq = p[3] * p[3];
+		double p41 = p[4] + 1;
+		double twop1 = 2 * p[1];
+		double twop2 = 2 * p[2];
+		double p0p4 = p[0] * p[4];
+		double p3cu = p3sq * p[3];
+		double dx, dxsq, twoxi, twop1mtwoxi, dy, dysq, dxsqdysq, a, loga, apowp4, apowp41, b, d;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			dxsq = dx * dx;
+			twoxi = 2 * x[i];
+			twop1mtwoxi = twop1 - twoxi;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				dy = p[2] - y[j];
+				dysq = dy * dy;
+				dxsqdysq = dxsq + dysq;
+				a = dxsqdysq / p3sq + 1;
+				loga = Math::Log(a);
+				apowp4 = Math::Pow(a, p[4]);
+				apowp41 = Math::Pow(a, p41);
+				b = p[5] - Z[i, j] + p[0] / apowp4;
+				d = p[5] + p[0] / apowp4;
+
+				f += 2 * p[5] - 2 * Z[i, j]*Math::Log(d) + (2 * p[0]) / apowp4;
+
+				grad[0] += 2 / apowp4 - (2 * Z[i, j]) / (d*apowp4);
+				grad[1] += (2 * Z[i, j] *p0p4*twop1mtwoxi) / (p3sq * d*apowp41) - (2 * p0p4*twop1mtwoxi) / (p3sq * apowp41);
+				grad[2] += (2 * Z[i, j] *p0p4*(twop2 - 2 * y[j])) / (p3sq * d*apowp41) - (2 * p0p4*(twop2 - 2 * y[j])) / (p3sq * apowp41);
+				grad[3] += (4 * p0p4*dxsqdysq) / (p3cu * apowp41) - (4 * Z[i, j] *p0p4*dxsqdysq) / (p3cu * d*apowp41);
+				grad[4] += (2 * Z[i, j] *p[0]*loga) / (d*apowp4) - (2 * p[0]*loga) / apowp4;
+				grad[5] += 2 - (2 * Z[i, j]) / d;
+			}
+		}
+		return;
+	}
+
+	if (p->Length == 8)
+	{
+		double cosp3 = Math::Cos(p[3]);
+		double sinp3 = Math::Sin(p[3]);
+		double p4sq = p[4] * p[4];
+		double p5sq = p[5] * p[5];
+		double p61 = p[6] + 1;
+		double p4cu = p[4] * p4sq;
+		double p5cu = p[5] * p5sq;
+		double p0p6 = p[0] * p[6];
+		double dx, cosp3dx, sinp3dx, dy, sinp3dy, cosp3dy, cosp3dxsinp3dy, cosp3dysinp3dx, cosp3dxsinp3dysq, cosp3dysinp3dxsq, a, loga, apowp6, apowp61, b, twoZij;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			cosp3dx = cosp3 * dx;
+			sinp3dx = sinp3 * dx;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				dy = p[2] - y[j];
+				sinp3dy = sinp3 * dy;
+				cosp3dy = cosp3 * dy;
+				cosp3dxsinp3dy = cosp3dx + sinp3dy;
+				cosp3dysinp3dx = cosp3dy - sinp3dx;
+				cosp3dxsinp3dysq = cosp3dxsinp3dy * cosp3dxsinp3dy;
+				cosp3dysinp3dxsq = cosp3dysinp3dx * cosp3dysinp3dx;
+				a = cosp3dxsinp3dysq / p4sq + cosp3dysinp3dxsq / p5sq + 1;
+				loga = Math::Log(a);
+				apowp6 = Math::Pow(a, p[6]);
+				apowp61 = apowp6 * a;
+				b = p[7] + p[0] / apowp6;
+				twoZij = 2 * Z[i, j];
+
+				f += 2 * p[7] - twoZij * log(b) + (2 * p[0]) / apowp6;
+
+				grad[0] += 2 / apowp6 - (twoZij) / ((b)*apowp6);
+				grad[1] += (twoZij*p0p6*((2 * cosp3*cosp3dxsinp3dy) / p4sq - (2 * sinp3*cosp3dysinp3dx) / p5sq)) / ((b)*apowp61) - (2 * p0p6*((2 * cosp3*cosp3dxsinp3dy) / p4sq - (2 * sinp3*cosp3dysinp3dx) / p5sq)) / apowp61;
+				grad[2] += (twoZij*p0p6*((2 * cosp3*cosp3dysinp3dx) / p5sq + (2 * sinp3*cosp3dxsinp3dy) / p4sq)) / ((b)*apowp61) - (2 * p0p6*((2 * cosp3*cosp3dysinp3dx) / p5sq + (2 * sinp3*cosp3dxsinp3dy) / p4sq)) / apowp61;
+				grad[3] += (twoZij*p0p6*((2 * cosp3dxsinp3dy*cosp3dysinp3dx) / p4sq - (2 * cosp3dxsinp3dy*cosp3dysinp3dx) / p5sq)) / ((b)*apowp61) - (2 * p0p6*((2 * cosp3dxsinp3dy*cosp3dysinp3dx) / p4sq - (2 * cosp3dxsinp3dy*cosp3dysinp3dx) / p5sq)) / apowp61;
+				grad[4] += (4 * p0p6*cosp3dxsinp3dysq) / (p4cu * apowp61) - (4 * Z[i, j] *p0p6*cosp3dxsinp3dysq) / (p4cu * (b)*apowp61);
+				grad[5] += (4 * p0p6*cosp3dysinp3dxsq) / (p5cu * apowp61) - (4 * Z[i, j] *p0p6*cosp3dysinp3dxsq) / (p5cu * (b)*apowp61);
+				grad[6] += (twoZij*p[0]*loga) / ((b)*apowp6) - (2 * p[0]*loga) / apowp6;
+				grad[7] += 2 - (twoZij) / (b);					
+			}
+		}
+	}
+}
+
+array<double>^ JPFITS::JPMath::Gauss_2D_param_err(array<double>^ p, array<double>^ x, array<double>^ y, array<double, 2>^ Z)
+{
+	array<double, 2>^ hess = gcnew array<double, 2>(p->Length, p->Length);
+	double den;
+
+	if (p->Length == 5)
+	{
+		double p3sq = p[3] * p[3];
+		double p3cu = p[3] * p3sq;
+		double p3qu = p3sq * p3sq;
+		double p3he = p3cu * p3cu;
+		double p0sq = p[0] * p[0];
+		double twop3sq = 2 * p3sq;
+		double p3pe = p3sq * p3cu;
+		double twop1 = 2 * p[1];
+		double twop2 = 2 * p[2];
+		double dx, dxsq, twoxi, twop1mtwoxi, twop1mtwoxisq, dy, dxsqpdysq, exparg, expres, exparg2, expres2, p0expres2, a, dxsqpdysqsq, twoyj, twop2mtwoyj, twop2mtwoyjsq;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			dxsq = dx * dx;
+			twoxi = 2 * x[i];
+			twop1mtwoxi = twop1 - twoxi;
+			twop1mtwoxisq = twop1mtwoxi * twop1mtwoxi;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Z[i, j];
+
+				dy = p[2] - y[j];
+				dxsqpdysq = dxsq + dy * dy;
+				exparg = -dxsqpdysq / p3sq;
+				expres = Math::Exp(exparg);
+				exparg2 = -dxsqpdysq / twop3sq;
+				expres2 = Math::Exp(exparg2);
+				p0expres2 = p[0] * expres2;
+				a = p[4] - Z[i, j] + p0expres2;
+				dxsqpdysqsq = dxsqpdysq * dxsqpdysq;
+				twoyj = 2 * y[j];
+				twop2mtwoyj = twop2 - twoyj;
+				twop2mtwoyjsq = twop2mtwoyj * twop2mtwoyj;
+
+				hess[0, 0] += (2 * expres) / den;
+				hess[1, 1] += (p0sq * expres*twop1mtwoxisq) / (2 * den*p3qu) - (2 * p0expres2*a) / (den*p3sq) + (p0expres2*twop1mtwoxisq * a) / (2 * den*p3qu);
+				hess[2, 2] += (p0sq * expres*twop2mtwoyjsq) / (2 * den*p3qu) - (2 * p0expres2*a) / (den*p3sq) + (p0expres2*twop2mtwoyjsq * a) / (2 * den*p3qu);
+				hess[3, 3] += (2 * p0sq * expres*dxsqpdysqsq) / (den*p3he) - (6 * p0expres2*(dxsqpdysq)*a) / (den*p3qu) + (2 * p0expres2*dxsqpdysqsq * a) / (den*p3he);
+				hess[4, 4] += 2 / den;
+				hess[0, 1] += -(expres2*twop1mtwoxi*a) / (den*p3sq) - (p[0]*expres*twop1mtwoxi) / (den*p3sq);
+				hess[0, 2] += -(expres2*twop2mtwoyj*a) / (den*p3sq) - (p[0]*expres*twop2mtwoyj) / (den*p3sq);
+				hess[0, 3] += (2 * expres2*(dxsqpdysq)*a) / (den*p3cu) + (2 * p[0]*expres*(dxsqpdysq)) / (den*p3cu);
+				hess[0, 4] += (2 * expres2) / den;
+				hess[1, 2] += (p0sq * expres*twop1mtwoxi*twop2mtwoyj) / (2 * den*p3qu) + (p0expres2*twop1mtwoxi*twop2mtwoyj*a) / (2 * den*p3qu);
+				hess[1, 3] += (2 * p0expres2*twop1mtwoxi*a) / (den*p3cu) - (p0sq * expres*twop1mtwoxi*(dxsqpdysq)) / (den*p3pe) - (p0expres2*twop1mtwoxi*(dxsqpdysq)*a) / (den*p3pe);
+				hess[1, 4] += -(p0expres2*twop1mtwoxi) / (den*p3sq);
+				hess[2, 3] += (2 * p0expres2*twop2mtwoyj*a) / (den*p3cu) - (p0sq * expres*twop2mtwoyj*(dxsqpdysq)) / (den*p3pe) - (p0expres2*twop2mtwoyj*(dxsqpdysq)*a) / (den*p3pe);
+				hess[2, 4] += -(p0expres2*twop2mtwoyj) / (den*p3sq);
+				hess[3, 4] += (2 * p0expres2*(dxsqpdysq)) / (den*p3cu);
+			}
+		}
+		hess[1, 0] = hess[0, 1];
+		hess[2, 0] = hess[0, 2];
+		hess[3, 0] = hess[0, 3];
+		hess[4, 0] = hess[0, 4];
+		hess[2, 1] = hess[1, 2];
+		hess[3, 1] = hess[1, 3];
+		hess[4, 1] = hess[1, 4];
+		hess[3, 2] = hess[2, 3];
+		hess[4, 2] = hess[2, 4];
+		hess[4, 3] = hess[3, 4];
+	}
+	else if (p->Length == 7)
+	{
+		double cosp3 = Math::Cos(p[3]);
+		double sinp3 = Math::Sin(p[3]);
+		double p4sq = p[4] * p[4];
+		double p5sq = p[5] * p[5];
+		double p0sq = p[0] * p[0];
+		double cosp3sq = cosp3 * cosp3;
+		double sinp3sq = sinp3 * sinp3;
+		double twop0sq = 2 * p0sq;
+		double twop0 = 2 * p[0];
+		double p4cu = p4sq * p[4];
+		double p5cu = p5sq * p[5];
+		double p4he = p4cu * p4cu;
+		double p5he = p5cu * p5cu;
+		double p4qu = p4sq * p4sq;
+		double p5qu = p5sq * p5sq;
+		double dx, cosp3dx, dy, sinp3dy, a, b, asq, bsq, exarg1, expres1, c, exparg2, expres2, p0expres2, g, twop0sqexpres1, h, k;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			cosp3dx = cosp3 * dx;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Z[i, j];
+
+				dy = p[2] - y[j];
+				sinp3dy = sinp3 * dy;
+				a = cosp3dx + sinp3dy;
+				b = cosp3 * dy - sinp3 * dx;
+				asq = a * a;
+				bsq = b * b;
+				exarg1 = -asq / p4sq - bsq / p5sq;
+				expres1 = Math::Exp(exarg1);
+				c = (cosp3*a) / p4sq - (sinp3*b) / p5sq;
+				exparg2 = -asq / (2 * p4sq) - bsq / (2 * p5sq);
+				expres2 = Math::Exp(exparg2);
+				p0expres2 = p[0] * expres2;
+				g = p[6] - Z[i, j] + p0expres2;
+				twop0sqexpres1 = twop0sq * expres1;
+				h = (cosp3*b) / p5sq + (sinp3*a) / p4sq;
+				k = (a*b) / p4sq - (a*b) / p5sq;
+
+				hess[0, 0] += (2 * expres1) / den;
+				hess[1, 1] += (twop0sqexpres1*c * c) / den + (2 * p0expres2*c * c * g) / den - (2 * p0expres2*(cosp3sq / p4sq + sinp3sq / p5sq)*g) / den;
+				hess[2, 2] += (twop0sqexpres1*h * h) / den + (2 * p0expres2*h * h * g) / den - (2 * p0expres2*(cosp3sq / p5sq + sinp3sq / p4sq)*g) / den;
+				hess[3, 3] += (twop0sqexpres1*k * k) / den + (2 * p0expres2*g*(asq / p4sq - bsq / p4sq - asq / p5sq + bsq / p5sq)) / den + (2 * p0expres2*k * k * g) / den;
+				hess[4, 4] += (twop0sqexpres1*a*a*a*a) / (den*p4he) - (6 * p0expres2*asq * g) / (den*p4qu) + (2 * p0expres2*a*a*a*a * g) / (den*p4he);
+				hess[5, 5] += (twop0sqexpres1*b*b*b*b) / (den*p5he) - (6 * p0expres2*bsq * g) / (den*p5qu) + (2 * p0expres2*b*b*b*b * g) / (den*p5he);
+				hess[6, 6] += 2 / den;
+				hess[0, 1] += -(twop0*expres1*c) / den - (2 * expres2*c*g) / den;
+				hess[0, 2] += -(twop0*expres1*h) / den - (2 * expres2*h*g) / den;
+				hess[0, 3] += -(twop0*expres1*k) / den - (2 * expres2*k*g) / den;
+				hess[0, 4] += (twop0*expres1*asq) / (den*p4cu) + (2 * expres2*asq * g) / (den*p4cu);
+				hess[0, 5] += (twop0*expres1*bsq) / (den*p5cu) + (2 * expres2*bsq * g) / (den*p5cu);
+				hess[0, 6] += (2 * expres2) / den;
+				hess[1, 2] += (twop0sqexpres1*h*c) / den - (2 * p0expres2*((cosp3*sinp3) / p4sq - (cosp3*sinp3) / p5sq)*g) / den + (2 * p0expres2*h*c*g) / den;
+				hess[1, 3] += (twop0sqexpres1*k*c) / den - (2 * p0expres2*g*((cosp3*b) / p4sq - (cosp3*b) / p5sq - (sinp3*a) / p4sq + (sinp3*a) / p5sq)) / den + (2 * p0expres2*k*c*g) / den;
+				hess[1, 4] += (4 * p0expres2*cosp3*a*g) / (den*p4cu) - (2 * p0expres2*asq * c*g) / (den*p4cu) - (twop0sqexpres1*asq * c) / (den*p4cu);
+				hess[1, 5] += -(twop0sqexpres1*bsq * c) / (den*p5cu) - (4 * p0expres2*sinp3*b*g) / (den*p5cu) - (2 * p0expres2*bsq * c*g) / (den*p5cu);
+				hess[1, 6] += -(2 * p0expres2*c) / den;
+				hess[2, 3] += (twop0sqexpres1*k*h) / den - (2 * p0expres2*g*((cosp3*a) / p4sq - (cosp3*a) / p5sq + (sinp3*b) / p4sq - (sinp3*b) / p5sq)) / den + (2 * p0expres2*k*h*g) / den;
+				hess[2, 4] += (4 * p0expres2*sinp3*a*g) / (den*p4cu) - (twop0sqexpres1*asq * h) / (den*p4cu) - (2 * p0expres2*asq * h*g) / (den*p4cu);
+				hess[2, 5] += (4 * p0expres2*cosp3*b*g) / (den*p5cu) - (2 * p0expres2*bsq * h*g) / (den*p5cu) - (twop0sqexpres1*bsq * h) / (den*p5cu);
+				hess[2, 6] += -(2 * p0expres2*h) / den;
+				hess[3, 4] += (4 * p0expres2*a*b*g) / (den*p4cu) - (twop0sqexpres1*asq * k) / (den*p4cu) - (2 * p0expres2*asq * k*g) / (den*p4cu);
+				hess[3, 5] += -(twop0sqexpres1*bsq * k) / (den*p5cu) - (4 * p0expres2*a*b*g) / (den*p5cu) - (2 * p0expres2*bsq * k*g) / (den*p5cu);
+				hess[3, 6] += -(2 * p0expres2*k) / den;
+				hess[4, 5] += (twop0sqexpres1*asq * bsq) / (den*p4cu * p5cu) + (2 * p0expres2*asq * bsq * g) / (den*p4cu * p5cu);
+				hess[4, 6] += (2 * p0expres2*asq) / (den*p4cu);
+				hess[5, 6] += (2 * p0expres2*bsq) / (den*p5cu);
+			}
+		}
+		hess[1, 0] = hess[0, 1];
+		hess[2, 0] = hess[0, 2];
+		hess[3, 0] = hess[0, 3];
+		hess[4, 0] = hess[0, 4];
+		hess[5, 0] = hess[0, 5];
+		hess[6, 0] = hess[0, 6];
+		hess[2, 1] = hess[1, 2];
+		hess[3, 1] = hess[1, 3];
+		hess[4, 1] = hess[1, 4];
+		hess[5, 1] = hess[1, 5];
+		hess[6, 1] = hess[1, 6];
+		hess[3, 2] = hess[2, 3];
+		hess[4, 2] = hess[2, 4];
+		hess[5, 2] = hess[2, 5];
+		hess[6, 2] = hess[2, 6];
+		hess[4, 3] = hess[3, 4];
+		hess[5, 3] = hess[3, 5];
+		hess[6, 3] = hess[3, 6];
+		hess[5, 4] = hess[4, 5];
+		hess[6, 4] = hess[4, 6];
+		hess[6, 5] = hess[5, 6];
+	}
+
+	int info;
+	alglib::matinvreport^ rep;
+	alglib::rmatrixinverse(hess, info, rep);
+	array<double>^ errs = gcnew array<double>(p->Length);
+	for (int i = 0; i < p->Length; i++)
+		errs[i] = Math::Sqrt(hess[i, i]);
+		
+	return errs;
+}
+
+array<double>^ JPFITS::JPMath::Moffat_2D_param_err(array<double>^ p, array<double>^ x, array<double>^ y, array<double, 2>^ Z)
+{
+	array<double, 2>^ hess = gcnew array<double, 2>(p->Length, p->Length);
+	double den;
+
+	if (p->Length == 6)
+	{
+		double p3sq = p[3] * p[3];
+		double p41 = p[4] + 1;
+		double p42 = p[4] + 2;
+		double p3qu = p3sq * p3sq;
+		double p3pe = p3qu * p[3];
+		double p3cu = p3sq * p[3];
+		double p3he = p3cu * p3cu;
+		double p0sq = p[0] * p[0];
+		double p4sq = p[4] * p[4];
+		double p0p4 = p[0] * p[4];
+		double p0sqp4sq = p0sq * p4sq;
+		double twop1 = 2 * p[1];
+		double twop2 = 2 * p[2];
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			double dx = p[1] - x[i];
+			double dxsq = dx * dx;
+			double twoxi = 2 * x[i];
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Z[i, j];
+
+				double dy = p[2] - y[j];
+				double dysq = dy * dy;
+				double dxsqpdysq = dxsq + dysq;
+				double logarg1 = dxsqpdysq / p3sq + 1;
+				double logres1 = Math::Log(logarg1);
+				double logarg1powp4 = Math::Pow(logarg1, p[4]);
+				double logarg1powp41 = logarg1powp4 * logarg1;
+				double logarg1powp42 = logarg1powp41 * logarg1;
+				double a = p[5] - Z[i, j] + p[0] / logarg1powp4;
+				double twoyj = 2 * y[j];
+				double twop1mtwoxi = twop1 - twoxi;
+				double twop2mtwoyj = twop2 - twoyj;
+				double logarg1pow2p4 = logarg1powp4 * logarg1powp4;
+				double logarg1pow2p42 = Math::Pow(logarg1, 2 * p[4] + 2);
+
+				hess[0, 0] += (2 / logarg1pow2p4) / den;
+				hess[1, 1] += (2 * p0sqp4sq * twop1mtwoxi * twop1mtwoxi) / (den*p3qu * logarg1pow2p42) - (4 * p0p4*a) / (den*p3sq * logarg1powp41) + (2 * p0p4*twop1mtwoxi * twop1mtwoxi * p41*a) / (den*p3qu * logarg1powp42);
+				hess[2, 2] += (2 * p0sqp4sq * twop2mtwoyj * twop2mtwoyj) / (den*p3qu * logarg1pow2p42) - (4 * p0p4*a) / (den*p3sq * logarg1powp41) + (2 * p0p4*twop2mtwoyj * twop2mtwoyj * p41*a) / (den*p3qu * logarg1powp42);
+				hess[3, 3] += (8 * p0sqp4sq * dxsqpdysq * dxsqpdysq) / (den*p3he * logarg1pow2p42) - (12 * p0p4*dxsqpdysq*a) / (den*p3qu * logarg1powp41) + (8 * p0p4*dxsqpdysq * dxsqpdysq * p41*a) / (den*p3he * logarg1powp42);
+				hess[4, 4] += (2 * p0sq * logres1 * logres1 / logarg1pow2p4) / den + (2 * p[0]*logres1 * logres1 * a) / (den*logarg1powp4);
+				hess[5, 5] += 2 / den;
+				hess[0, 1] += -(2 * p[4]*twop1mtwoxi*a) / (den*p3sq * logarg1powp41) - (2 * p0p4*twop1mtwoxi) / (den*p3sq * logarg1powp4*logarg1powp41);
+				hess[0, 2] += -(2 * p[4]*twop2mtwoyj*a) / (den*p3sq * logarg1powp41) - (2 * p0p4*twop2mtwoyj) / (den*p3sq * logarg1powp4*logarg1powp41);
+				hess[0, 3] += (4 * p[4]*dxsqpdysq*a) / (den*p3cu * logarg1powp41) + (4 * p0p4*dxsqpdysq) / (den*p3cu * logarg1powp4*logarg1powp41);
+				hess[0, 4] += -(2 * p[0]*logres1 / logarg1pow2p4) / den - (2 * logres1*a) / (den*logarg1powp4);
+				hess[0, 5] += 2 / (den*logarg1powp4);
+				hess[1, 2] += (2 * p0sqp4sq * twop1mtwoxi*twop2mtwoyj) / (den*p3qu * logarg1pow2p42) + (2 * p0p4*twop1mtwoxi*twop2mtwoyj*p41*a) / (den*p3qu * logarg1powp42);
+				hess[1, 3] += (4 * p0p4*twop1mtwoxi*a) / (den*p3cu * logarg1powp41) - (4 * p0sqp4sq * twop1mtwoxi*dxsqpdysq) / (den*p3pe * logarg1pow2p42) - (4 * p0p4*twop1mtwoxi*dxsqpdysq*p41*a) / (den*p3pe * logarg1powp42);
+				hess[1, 4] += (2 * p0p4*logres1*twop1mtwoxi*a) / (den*p3sq * logarg1powp41) - (2 * p[0]*twop1mtwoxi*a) / (den*p3sq * logarg1powp41) + (2 * p0sq * p[4]*logres1*twop1mtwoxi) / (den*p3sq * logarg1powp4*logarg1powp41);
+				hess[1, 5] += -(2 * p0p4*twop1mtwoxi) / (den*p3sq * logarg1powp41);
+				hess[2, 3] += (4 * p0p4*twop2mtwoyj*a) / (den*p3cu * logarg1powp41) - (4 * p0sqp4sq * twop2mtwoyj*dxsqpdysq) / (den*p3pe * logarg1pow2p42) - (4 * p0p4*twop2mtwoyj*dxsqpdysq*p41*a) / (den*p3pe * logarg1powp42);
+				hess[2, 4] += (2 * p0p4*logres1*twop2mtwoyj*a) / (den*p3sq * logarg1powp41) - (2 * p[0]*twop2mtwoyj*a) / (den*p3sq * logarg1powp41) + (2 * p0sq * p[4]*logres1*twop2mtwoyj) / (den*p3sq * logarg1powp4*logarg1powp41);
+				hess[2, 5] += -(2 * p0p4*twop2mtwoyj) / (den*p3sq * logarg1powp41);
+				hess[3, 4] += (4 * p[0]*dxsqpdysq*a) / (den*p3cu * logarg1powp41) - (4 * p0p4*logres1*dxsqpdysq*a) / (den*p3cu * logarg1powp41) - (4 * p0sq * p[4]*logres1*dxsqpdysq) / (den*p3cu * logarg1powp4*logarg1powp41);
+				hess[3, 5] += (4 * p0p4*dxsqpdysq) / (den*p3cu * logarg1powp41);
+				hess[4, 5] += -(2 * p[0]*logres1) / (den*logarg1powp4);
+			}
+		}
+		hess[1, 0] = hess[0, 1];
+		hess[2, 0] = hess[0, 2];
+		hess[3, 0] = hess[0, 3];
+		hess[4, 0] = hess[0, 4];
+		hess[5, 0] = hess[0, 5];
+		hess[2, 1] = hess[1, 2];
+		hess[3, 1] = hess[1, 3];
+		hess[4, 1] = hess[1, 4];
+		hess[5, 1] = hess[1, 5];
+		hess[3, 2] = hess[2, 3];
+		hess[4, 2] = hess[2, 4];
+		hess[5, 2] = hess[2, 5];
+		hess[4, 3] = hess[3, 4];
+		hess[5, 3] = hess[3, 5];
+		hess[5, 4] = hess[4, 5];
+	}
+	else if (p->Length == 8)
+	{
+		double cosp3 = Math::Cos(p[3]);
+		double sinp3 = Math::Sin(p[3]);
+		double p4sq = p[4] * p[4];
+		double p5sq = p[5] * p[5];
+		double twocosp3 = 2 * cosp3;
+		double twosinp3 = 2 * sinp3;
+		double p0sq = p[0] * p[0];
+		double p6sq = p[6] * p[6];
+		double p0p6 = p[0] * p[6];
+		double p0sqp6sq = p0sq * p6sq;
+		double p61 = p[6] + 1;
+		double twocosp3sq = twocosp3 * twocosp3;
+		double twosinp3sq = twosinp3 * twosinp3;
+		double p4cu = p4sq * p[4];
+		double p4he = p4cu * p4cu;
+		double p5cu = p5sq * p[5];
+		double p5he = p5cu * p5cu;
+		double p4qu = p4sq * p4sq;
+		double p5qu = p5sq * p5sq;
+		double dx, cosp3dx, sinp3dx, dy, cosp3dxpsinp3dy, cosp3dymsinp3dx, logarg, logres, logargpowp6, logargpow2p6, logargpowp61, logargpowp62, logargpow2p62, a, b, c, d, dsq, f, fsq, g, gsq, h, k;
+
+		for (int i = 0; i < x->Length; i++)
+		{
+			dx = p[1] - x[i];
+			cosp3dx = cosp3 * dx;
+			sinp3dx = sinp3 * dx;
+
+			for (int j = 0; j < y->Length; j++)
+			{
+				if (Z[i, j] < 1)
+					den = 1;
+				else
+					den = Z[i, j];
+
+				dy = p[2] - y[j];
+				cosp3dxpsinp3dy = cosp3dx + sinp3 * dy;
+				cosp3dymsinp3dx = cosp3 * dy - sinp3dx;
+				logarg = cosp3dxpsinp3dy * cosp3dxpsinp3dy / p4sq + cosp3dymsinp3dx * cosp3dymsinp3dx / p5sq + 1;
+				logres = Math::Log(logarg);
+				logargpowp6 = Math::Pow(logarg, p[6]);
+				logargpow2p6 = logargpowp6 * logargpowp6;
+				logargpowp61 = logargpowp6 * logarg;
+				logargpowp62 = logargpowp61 * logarg;
+				logargpow2p62 = logargpowp61 * logargpowp61;
+				a = p[7] - Z[i, j] + p[0] / logargpowp6;
+				b = cosp3dxpsinp3dy * cosp3dxpsinp3dy;
+				c = cosp3dymsinp3dx * cosp3dymsinp3dx;
+				d = twocosp3 * cosp3dxpsinp3dy / p4sq - twosinp3 * cosp3dymsinp3dx / p5sq;
+				dsq = d * d;
+				f = twocosp3 * cosp3dymsinp3dx / p5sq + twosinp3 * cosp3dxpsinp3dy / p4sq;
+				fsq = f * f;
+				g = 2 * cosp3dxpsinp3dy*cosp3dymsinp3dx / p4sq - 2 * cosp3dxpsinp3dy*cosp3dymsinp3dx / p5sq;
+				gsq = g * g;
+				h = cosp3dxpsinp3dy * cosp3dxpsinp3dy * cosp3dxpsinp3dy * cosp3dxpsinp3dy;
+				k = cosp3dymsinp3dx * cosp3dymsinp3dx * cosp3dymsinp3dx * cosp3dymsinp3dx;
+
+				hess[0, 0] += (2 / logargpow2p6) / den;
+				hess[1, 1] += (2 * p0sqp6sq * dsq) / (den*logargpow2p62) - (2 * p0p6*((twocosp3sq) / p4sq + (twosinp3sq) / p5sq)*(a)) / (den*logargpowp61) + (2 * p0p6*dsq * p61*(a)) / (den*logargpowp62);
+				hess[2, 2] += (2 * p0sqp6sq * fsq) / (den*logargpow2p62) - (2 * p0p6*((twocosp3sq) / p5sq + (twosinp3sq) / p4sq)*(a)) / (den*logargpowp61) + (2 * p0p6*fsq * p61*(a)) / (den*logargpowp62);
+				hess[3, 3] += (2 * p0sqp6sq * gsq) / (den*logargpow2p62) + (2 * p0p6*(a)*((2 * b) / p4sq - (2 * c) / p4sq - (2 * b) / p5sq + (2 * c) / p5sq)) / (den*logargpowp61) + (2 * p0p6*gsq * p61*(a)) / (den*logargpowp62);
+				hess[4, 4] += (8 * p0sqp6sq * h) / (den*p4he * logargpow2p62) - (12 * p0p6*b * (a)) / (den*p4qu * logargpowp61) + (8 * p0p6*h * p61*(a)) / (den*p4he * logargpowp62);
+				hess[5, 5] += (8 * p0sqp6sq * k) / (den*p5he * logargpow2p62) - (12 * p0p6*c * (a)) / (den*p5qu * logargpowp61) + (8 * p0p6*k * p61*(a)) / (den*p5he * logargpowp62);
+				hess[6, 6] += (2 * p0sq * logres * logres / logargpow2p6) / den + (2 * p[0] * logres * logres * (a)) / (den*logargpowp6);
+				hess[7, 7] += 2 / den;
+				hess[0, 1] += -(2 * p[6] * d*(a)) / (den*logargpowp61) - (2 * p0p6*d) / (den*logargpowp61*logargpowp6);
+				hess[0, 2] += -(2 * p[6] * (f)*(a)) / (den*logargpowp61) - (2 * p0p6*(f)) / (den*logargpowp61*logargpowp6);
+				hess[0, 3] += -(2 * p[6] * (g)*(a)) / (den*logargpowp61) - (2 * p0p6*(g)) / (den*logargpowp61*logargpowp6);
+				hess[0, 4] += (4 * p[6] * b * (a)) / (den*p4cu * logargpowp61) + (4 * p0p6*b) / (den*p4cu * logargpowp61*logargpowp6);
+				hess[0, 5] += (4 * p[6] * c * (a)) / (den*p5cu * logargpowp61) + (4 * p0p6*c) / (den*p5cu * logargpowp61*logargpowp6);
+				hess[0, 6] += -(2 * logres*(a)) / (den*logargpowp6) - (2 * p[0] * logres / logargpow2p6) / den;
+				hess[0, 7] += 2 / (den*logargpowp6);
+				hess[1, 2] += (2 * p0sqp6sq * d*(f)) / (den*logargpow2p62) - (2 * p0p6*((twocosp3*sinp3) / p4sq - (twocosp3*sinp3) / p5sq)*(a)) / (den*logargpowp61) + (2 * p0p6*d*(f)*p61*(a)) / (den*logargpowp62);
+				hess[1, 3] += (2 * p0sqp6sq * (g)*d) / (den*logargpow2p62) - (2 * p0p6*(a)*((twocosp3*cosp3dymsinp3dx) / p4sq - (twocosp3*cosp3dymsinp3dx) / p5sq - (twosinp3*cosp3dxpsinp3dy) / p4sq + (twosinp3*cosp3dxpsinp3dy) / p5sq)) / (den*logargpowp61) + (2 * p0p6*(g)*d*p61*(a)) / (den*logargpowp62);
+				hess[1, 4] += (8 * p0p6*cosp3*cosp3dxpsinp3dy*(a)) / (den*p4cu * logargpowp61) - (4 * p0sqp6sq * b * d) / (den*p4cu * logargpow2p62) - (4 * p0p6*b * d*p61*(a)) / (den*p4cu * logargpowp62);
+				hess[1, 5] += -(4 * p0sqp6sq * c * d) / (den*p5cu * logargpow2p62) - (8 * p0p6*sinp3*cosp3dymsinp3dx*(a)) / (den*p5cu * logargpowp61) - (4 * p0p6*c * d*p61*(a)) / (den*p5cu * logargpowp62);
+				hess[1, 6] += (2 * p0p6*logres*d*(a)) / (den*logargpowp61) - (2 * p[0] * d*(a)) / (den*logargpowp61) + (2 * p0sq * p[6] * logres*d) / (den*logargpowp61*logargpowp6);
+				hess[1, 7] += -(2 * p0p6*d) / (den*logargpowp61);
+				hess[2, 3] += (2 * p0sqp6sq * (g)*(f)) / (den*logargpow2p62) - (2 * p0p6*(a)*((twocosp3*cosp3dxpsinp3dy) / p4sq - (twocosp3*cosp3dxpsinp3dy) / p5sq + (twosinp3*cosp3dymsinp3dx) / p4sq - (twosinp3*cosp3dymsinp3dx) / p5sq)) / (den*logargpowp61) + (2 * p0p6*(g)*(f)*p61*(a)) / (den*logargpowp62);
+				hess[2, 4] += (8 * p0p6*sinp3*cosp3dxpsinp3dy*(a)) / (den*p4cu * logargpowp61) - (4 * p0sqp6sq * b * (f)) / (den*p4cu * logargpow2p62) - (4 * p0p6*b * (f)*p61*(a)) / (den*p4cu * logargpowp62);
+				hess[2, 5] += (8 * p0p6*cosp3*cosp3dymsinp3dx*(a)) / (den*p5cu * logargpowp61) - (4 * p0sqp6sq * c * (f)) / (den*p5cu * logargpow2p62) - (4 * p0p6*c * (f)*p61*(a)) / (den*p5cu * logargpowp62);
+				hess[2, 6] += (2 * p0p6*logres*(f)*(a)) / (den*logargpowp61) - (2 * p[0] * (f)*(a)) / (den*logargpowp61) + (2 * p0sq * p[6] * logres*(f)) / (den*logargpowp61*logargpowp6);
+				hess[2, 7] += -(2 * p0p6*(f)) / (den*logargpowp61);
+				hess[3, 4] += (8 * p0p6*cosp3dxpsinp3dy*cosp3dymsinp3dx*(a)) / (den*p4cu * logargpowp61) - (4 * p0sqp6sq * b * (g)) / (den*p4cu * logargpow2p62) - (4 * p0p6*b * (g)*p61*(a)) / (den*p4cu * logargpowp62);
+				hess[3, 5] += -(4 * p0sqp6sq * c * (g)) / (den*p5cu * logargpow2p62) - (8 * p0p6*cosp3dxpsinp3dy*cosp3dymsinp3dx*(a)) / (den*p5cu * logargpowp61) - (4 * p0p6*c * (g)*p61*(a)) / (den*p5cu * logargpowp62);
+				hess[3, 6] += (2 * p0p6*logres*(g)*(a)) / (den*logargpowp61) - (2 * p[0] * (g)*(a)) / (den*logargpowp61) + (2 * p0sq * p[6] * logres*(g)) / (den*logargpowp61*logargpowp6);
+				hess[3, 7] += -(2 * p0p6*(g)) / (den*logargpowp61);
+				hess[4, 5] += (8 * p0sqp6sq * b * c) / (den*p4cu * p5cu * logargpow2p62) + (8 * p0p6*b * c * p61*(a)) / (den*p4cu * p5cu * logargpowp62);
+				hess[4, 6] += (4 * p[0] * b * (a)) / (den*p4cu * logargpowp61) - (4 * p0p6*logres*b * (a)) / (den*p4cu * logargpowp61) - (4 * p0sq * p[6] * logres*b) / (den*p4cu * logargpowp61*logargpowp6);
+				hess[4, 7] += (4 * p0p6*b) / (den*p4cu * logargpowp61);
+				hess[5, 6] += (4 * p[0] * c * (a)) / (den*p5cu * logargpowp61) - (4 * p0p6*logres*c * (a)) / (den*p5cu * logargpowp61) - (4 * p0sq * p[6] * logres*c) / (den*p5cu * logargpowp61*logargpowp6);
+				hess[5, 7] += (4 * p0p6*c) / (den*p5cu * logargpowp61);
+				hess[6, 7] += -(2 * p[0] * logres) / (den*logargpowp6);
+			}
+		}
+		hess[1, 0] = hess[0, 1];
+		hess[2, 0] = hess[0, 2];
+		hess[3, 0] = hess[0, 3];
+		hess[4, 0] = hess[0, 4];
+		hess[5, 0] = hess[0, 5];
+		hess[6, 0] = hess[0, 6];
+		hess[7, 0] = hess[0, 7];
+		hess[2, 1] = hess[1, 2];
+		hess[3, 1] = hess[1, 3];
+		hess[4, 1] = hess[1, 4];
+		hess[5, 1] = hess[1, 5];
+		hess[6, 1] = hess[1, 6];
+		hess[7, 1] = hess[1, 7];
+		hess[3, 2] = hess[2, 3];
+		hess[4, 2] = hess[2, 4];
+		hess[5, 2] = hess[2, 5];
+		hess[6, 2] = hess[2, 6];
+		hess[7, 2] = hess[2, 7];
+		hess[4, 3] = hess[3, 4];
+		hess[5, 3] = hess[3, 5];
+		hess[6, 3] = hess[3, 6];
+		hess[7, 3] = hess[3, 7];
+		hess[5, 4] = hess[4, 5];
+		hess[6, 4] = hess[4, 6];
+		hess[7, 4] = hess[4, 7];
+		hess[6, 5] = hess[5, 6];
+		hess[7, 5] = hess[5, 7];
+		hess[7, 6] = hess[6, 7];
+	}
+
+	int info;
+	alglib::matinvreport^ rep;
+	alglib::rmatrixinverse(hess, info, rep);
+	array<double>^ errs = gcnew array<double>(p->Length);
+	for (int i = 0; i < p->Length; i++)
+		errs[i] = Math::Sqrt(hess[i, i]);
+
+	return errs;
+}
+
+void JPFITS::JPMath::Fit_Moffat2d(array<int>^ xdata, array<int>^ ydata, array<double, 2>^ Mdata, array<double>^ &p, array<double>^ p_LB, array<double>^ p_UB, array<double>^ &p_err, array<double, 2>^ &fit_residuals)
+{
+	int N = Mdata->Length;
+	array<double, 2>^ x = gcnew array<double, 2>(N, 2);
+	array<double>^ y = gcnew array<double>(N);
+	int xw = Mdata->GetLength(0);
+	int yh = Mdata->GetLength(1);
+
+	int i = 0;
+	for (int xaxis = 0; xaxis < xw; xaxis++)
+		for (int yaxis = 0; yaxis < yh; yaxis++)
+		{
+			x[i, 0] = (double)xdata[xaxis];
+			x[i, 1] = (double)ydata[yaxis];
+			y[i] = Mdata[xaxis, yaxis];
+			i++;
+		}
+
+	alglib::ndimensional_pfunc^ pf = gcnew alglib::ndimensional_pfunc(alglib_Moffat_2d);
+	alglib::ndimensional_pgrad ^ pg = gcnew alglib::ndimensional_pgrad(alglib_Moffat_2d_grad);
+	alglib::ndimensional_rep^ rep;
+	Object^ obj;
+	alglib::lsfitstate^ state;
+	alglib::lsfitreport^ report;
+	double epsx = 0.00001;
+	int maxits = 5000;//automatic stopping conditions w epsx & maxits = 0
+	int info;
+	array<double>^ scale;
+
+	double min = JPFITS::JPMath::Min(Mdata, false);
+	double max = JPFITS::JPMath::Max(Mdata, false);
+	double amp = max - min;
+	if (amp == 0)
+		amp = 1;
+	double x0 = (double)xdata[xw / 2];
+	if (x0 == 0)
+		x0 = 1;
+	double y0 = (double)ydata[yh / 2];
+	if (y0 == 0)
+		y0 = 1;
+	double bias = min;
+	if (bias == 0)
+		bias = 1;
+
+	if (p->Length == 6)
+	{
+		scale = gcnew array<double>(6) { amp, x0, y0, 2, 3, bias };
+		if (p_LB == nullptr || p_LB->Length == 0)
+			p_LB = gcnew array<double>(6) { 0, (double)xdata[0], (double)ydata[0], (double)xw / 500, 1.01, min - amp };
+		if (p_UB == nullptr || p_UB->Length == 0)
+			p_UB = gcnew array<double>(6) { 2 * amp, (double)xdata[xw - 1], (double)ydata[yh - 1], (double)xw * 5, (double)xw * 5, max };
+		if (p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 0 && p[4] == 0 && p[5] == 0)
+		{
+			p[0] = amp;
+			p[1] = x0;
+			p[2] = y0;
+			p[3] = 2;
+			p[4] = 4;
+			p[5] = bias;
+		}
+	}
+	if (p->Length == 8)
+	{
+		scale = gcnew array<double>(8) { amp, x0, y0, 1, 2, 2, 3, bias };
+		if (p_LB == nullptr || p_LB->Length == 0)
+			p_LB = gcnew array<double>(8) { 0, (double)xdata[0], (double)ydata[0], -Math::PI, (double)xw / 500, (double)yh / 500, 1.01, min - amp };
+		if (p_UB == nullptr || p_UB->Length == 0)
+			p_UB = gcnew array<double>(8) { 2 * amp, (double)xdata[xw - 1], (double)ydata[yh - 1], Math::PI, (double)xw * 5, (double)xw * 5, (double)xw * 5, max };
+		if (p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 0 && p[4] == 0 && p[5] == 0 && p[6] == 0 && p[7] == 0)
+		{
+			p[0] = amp;
+			p[1] = x0;
+			p[2] = y0;
+			p[3] = 0;
+			p[4] = 2;
+			p[5] = 2;
+			p[6] = 4;
+			p[7] = bias;
+		}
+	}
+
+	alglib::lsfitcreatefg(x, y, p, false, state);
+	alglib::lsfitsetcond(state, epsx, maxits);
+	alglib::lsfitsetscale(state, scale);
+	alglib::lsfitsetbc(state, p_LB, p_UB);
+	alglib::lsfitfit(state, pf, pg, rep, obj);
+	alglib::lsfitresults(state, info, p, report);
+
+	if (p_err->Length != 0)
+		for (int i = 0; i < p_err->Length; i++)
+			p_err[i] = report->errpar[i];
+
+	if (fit_residuals->Length != 0)
+	{
+		double val;
+		array<double>^ X = gcnew array<double>(2);
+		for (int i = 0; i < xw; i++)
+			for (int j = 0; j < xw; j++)
+			{
+				X[0] = (double)xdata[i];
+				X[1] = (double)ydata[j];
+				alglib_Moffat_2d(p, X, val, nullptr);
+				fit_residuals[i, j] = Mdata[i, j] - val;
+			}
+	}
+}
+
+void JPFITS::JPMath::alglib_Moffat_2d(array<double>^ p, array<double>^ x, double %val, Object^ obj)
+{
+	if (p->Length == 6)
+		val = p[0] * Math::Pow(1.0 + ((x[0] - p[1])*(x[0] - p[1]) + (x[1] - p[2])*(x[1] - p[2])) / p[3] / p[3], -p[4]) + p[5];
+	if (p->Length == 8)
+		val = p[0] * Math::Pow(1.0 + (Math::Pow((x[0] - p[1])*Math::Cos(p[3]) + (x[1] - p[2])*Math::Sin(p[3]), 2)) / (p[4] * p[4]) + (Math::Pow(-(x[0] - p[1])*Math::Sin(p[3]) + (x[1] - p[2])*Math::Cos(p[3]), 2)) / (p[5] * p[5]), -p[6]) + p[7];
+}
+
+void JPFITS::JPMath::alglib_Moffat_2d_grad(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj)
+{
+	if (p->Length == 6)
+	{
+		val = p[0] * Math::Pow(1.0 + ((x[0] - p[1])*(x[0] - p[1]) + (x[1] - p[2])*(x[1] - p[2])) / p[3] / p[3], -p[4]) + p[5];
+		grad[0] = Math::Pow(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1, -p[4]);
+		grad[1] = -(p[0] * p[4] * (2 * p[1] - 2 * x[0])) / (p[3] * p[3] * Math::Pow(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1, (p[4] + 1)));
+		grad[2] = -(p[0] * p[4] * (2 * p[2] - 2 * x[1])) / (p[3] * p[3] * Math::Pow(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1, (p[4] + 1)));
+		grad[3] = (2 * p[0] * p[4] * ((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1]))) / (p[3] * p[3] * p[3] * Math::Pow(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1, (p[4] + 1)));
+		grad[4] = -(p[0] * Math::Log(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1)) / Math::Pow(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1, p[4]);
+		grad[5] = 1;
+	}
+	if (p->Length == 8)
+	{
+		val = p[0] * Math::Pow(1.0 + (Math::Pow((x[0] - p[1])*Math::Cos(p[3]) + (x[1] - p[2])*Math::Sin(p[3]), 2)) / (p[4] * p[4]) + (Math::Pow(-(x[0] - p[1])*Math::Sin(p[3]) + (x[1] - p[2])*Math::Cos(p[3]), 2)) / (p[5] * p[5]), -p[6]) + p[7];
+		grad[0] = Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, -p[6]);
+		grad[1] = -(p[0] * p[6] * ((2 * Math::Cos(p[3])*(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]))) / (p[4] * p[4]) - (2 * Math::Sin(p[3])*(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]))) / (p[5] * p[5]))) / Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, (p[6] + 1));
+		grad[2] = -(p[0] * p[6] * ((2 * Math::Cos(p[3])*(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]))) / (p[5] * p[5]) + (2 * Math::Sin(p[3])*(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]))) / (p[4] * p[4]))) / Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, (p[6] + 1));
+		grad[3] = -(p[0] * p[6] * ((2 * (Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]))*(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]))) / (p[4] * p[4]) - (2 * (Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]))*(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]))) / (p[5] * p[5]))) / Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, (p[6] + 1));
+		grad[4] = (2 * p[0] * p[6] * Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2)) / (p[4] * p[4] * p[4] * Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, (p[6] + 1)));
+		grad[5] = (2 * p[0] * p[6] * Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2)) / (p[5] * p[5] * p[5] * Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, (p[6] + 1)));
+		grad[6] = -(p[0] * Math::Log(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1)) / Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, p[6]);
+		grad[7] = 1;
 	}
 }
 
@@ -3801,147 +6467,6 @@ void JPFITS::JPMath::Moffat2d(array<int>^ xdata, array<int>^ ydata, array<double
 	}
 }
 
-void JPFITS::JPMath::Fit_Moffat2d(array<int>^ xdata, array<int>^ ydata, array<double, 2>^ Mdata, array<double>^ &p, array<double>^ p_LB, array<double>^ p_UB, array<double>^ &p_err, array<double, 2>^ &fit_residuals)
-{
-	int N = Mdata->Length;
-	array<double, 2>^ x = gcnew array<double, 2>(N, 2);
-	array<double>^ y = gcnew array<double>(N);
-	int xw = Mdata->GetLength(0);
-	int yh = Mdata->GetLength(1);
-
-	int i = 0;
-	for (int xaxis = 0; xaxis < xw; xaxis++)
-		for (int yaxis = 0; yaxis < yh; yaxis++)
-		{
-			x[i, 0] = (double)xdata[xaxis];
-			x[i, 1] = (double)ydata[yaxis];
-			y[i] = Mdata[xaxis, yaxis];
-			i++;
-		}
-
-	alglib::ndimensional_pfunc^ pf = gcnew alglib::ndimensional_pfunc(alglib_Moffat_2d);
-	alglib::ndimensional_pgrad ^ pg = gcnew alglib::ndimensional_pgrad(alglib_Moffat_2d_grad);
-	alglib::ndimensional_rep^ rep;
-	Object^ obj;
-	alglib::lsfitstate^ state;
-	alglib::lsfitreport^ report;
-	double epsx = 0.00001;
-	int maxits = 5000;//automatic stopping conditions w epsx & maxits = 0
-	int info;
-	array<double>^ scale;
-
-	double min = JPFITS::JPMath::Min(Mdata, false);
-	double max = JPFITS::JPMath::Max(Mdata, false);
-	double amp = max - min;
-	if (amp == 0)
-		amp = 1;
-	double x0 = (double)xdata[xw / 2];
-	if (x0 == 0)
-		x0 = 1;
-	double y0 = (double)ydata[yh / 2];
-	if (y0 == 0)
-		y0 = 1;
-	double bias = min;
-	if (bias == 0)
-		bias = 1;
-
-	if (p->Length == 6)
-	{
-		scale = gcnew array<double>(6) { amp, x0, y0, 2, 3, bias };
-		if (p_LB == nullptr || p_LB->Length == 0)
-			p_LB = gcnew array<double>(6) { 0, (double)xdata[0], (double)ydata[0], (double)xw / 500, 1.01, min - amp };
-		if (p_UB == nullptr || p_UB->Length == 0)
-			p_UB = gcnew array<double>(6) { 2 * amp, (double)xdata[xw - 1], (double)ydata[yh - 1], (double)xw * 5, (double)xw * 5, max };
-		if (p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 0 && p[4] == 0 && p[5] == 0)
-		{
-			p[0] = amp;
-			p[1] = x0;
-			p[2] = y0;
-			p[3] = 2;
-			p[4] = 4;
-			p[5] = bias;
-		}
-	}
-	if (p->Length == 8)
-	{
-		scale = gcnew array<double>(8) { amp, x0, y0, 1, 2, 2, 3, bias };
-		if (p_LB == nullptr || p_LB->Length == 0)
-			p_LB = gcnew array<double>(8) { 0, (double)xdata[0], (double)ydata[0], -Math::PI, (double)xw / 500, (double)yh / 500, 1.01, min - amp };
-		if (p_UB == nullptr || p_UB->Length == 0)
-			p_UB = gcnew array<double>(8) { 2 * amp, (double)xdata[xw - 1], (double)ydata[yh - 1], Math::PI, (double)xw * 5, (double)xw * 5, (double)xw * 5, max };
-		if (p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 0 && p[4] == 0 && p[5] == 0 && p[6] == 0 && p[7] == 0)
-		{
-			p[0] = amp;
-			p[1] = x0;
-			p[2] = y0;
-			p[3] = 0;
-			p[4] = 2;
-			p[5] = 2;
-			p[6] = 4;
-			p[7] = bias;
-		}
-	}
-
-	alglib::lsfitcreatefg(x, y, p, false, state);
-	alglib::lsfitsetcond(state, epsx, maxits);
-	alglib::lsfitsetscale(state, scale);
-	alglib::lsfitsetbc(state, p_LB, p_UB);
-	alglib::lsfitfit(state, pf, pg, rep, obj);
-	alglib::lsfitresults(state, info, p, report);
-
-	if (p_err->Length != 0)
-		for (int i = 0; i < p_err->Length; i++)
-			p_err[i] = report->errpar[i];
-
-	if (fit_residuals->Length != 0)
-	{
-		double val;
-		array<double>^ X = gcnew array<double>(2);
-		for (int i = 0; i < xw; i++)
-			for (int j = 0; j < xw; j++)
-			{
-				X[0] = (double)xdata[i];
-				X[1] = (double)ydata[j];
-				alglib_Moffat_2d(p, X, val, nullptr);
-				fit_residuals[i, j] = Mdata[i, j] - val;
-			}
-	}
-}
-
-void JPFITS::JPMath::alglib_Moffat_2d(array<double>^ p, array<double>^ x, double %val, Object^ obj)
-{
-	if (p->Length == 6)
-		val = p[0] * Math::Pow(1.0 + ((x[0] - p[1])*(x[0] - p[1]) + (x[1] - p[2])*(x[1] - p[2])) / p[3] / p[3], -p[4]) + p[5];
-	if (p->Length == 8)
-		val = p[0] * Math::Pow(1.0 + (Math::Pow((x[0] - p[1])*Math::Cos(p[3]) + (x[1] - p[2])*Math::Sin(p[3]), 2)) / (p[4] * p[4]) + (Math::Pow(-(x[0] - p[1])*Math::Sin(p[3]) + (x[1] - p[2])*Math::Cos(p[3]), 2)) / (p[5] * p[5]), -p[6]) + p[7];
-}
-
-void JPFITS::JPMath::alglib_Moffat_2d_grad(array<double>^ p, array<double>^ x, double %val, array<double>^ grad, Object^ obj)
-{
-	if (p->Length == 6)
-	{
-		val = p[0] * Math::Pow(1.0 + ((x[0] - p[1])*(x[0] - p[1]) + (x[1] - p[2])*(x[1] - p[2])) / p[3] / p[3], -p[4]) + p[5];
-		grad[0] = Math::Pow(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1, -p[4]);
-		grad[1] = -(p[0] * p[4] * (2 * p[1] - 2 * x[0])) / (p[3] * p[3] * Math::Pow(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1, (p[4] + 1)));
-		grad[2] = -(p[0] * p[4] * (2 * p[2] - 2 * x[1])) / (p[3] * p[3] * Math::Pow(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1, (p[4] + 1)));
-		grad[3] = (2 * p[0] * p[4] * ((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1]))) / (p[3] * p[3] * p[3] * Math::Pow(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1, (p[4] + 1)));
-		grad[4] = -(p[0] * Math::Log(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1)) / Math::Pow(((p[1] - x[0])*(p[1] - x[0]) + (p[2] - x[1])*(p[2] - x[1])) / (p[3] * p[3]) + 1, p[4]);
-		grad[5] = 1;
-	}
-	if (p->Length == 8)
-	{
-		val = p[0] * Math::Pow(1.0 + (Math::Pow((x[0] - p[1])*Math::Cos(p[3]) + (x[1] - p[2])*Math::Sin(p[3]), 2)) / (p[4] * p[4]) + (Math::Pow(-(x[0] - p[1])*Math::Sin(p[3]) + (x[1] - p[2])*Math::Cos(p[3]), 2)) / (p[5] * p[5]), -p[6]) + p[7];
-		grad[0] = Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, -p[6]);
-		grad[1] = -(p[0] * p[6] * ((2 * Math::Cos(p[3])*(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]))) / (p[4] * p[4]) - (2 * Math::Sin(p[3])*(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]))) / (p[5] * p[5]))) / Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, (p[6] + 1));
-		grad[2] = -(p[0] * p[6] * ((2 * Math::Cos(p[3])*(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]))) / (p[5] * p[5]) + (2 * Math::Sin(p[3])*(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]))) / (p[4] * p[4]))) / Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, (p[6] + 1));
-		grad[3] = -(p[0] * p[6] * ((2 * (Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]))*(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]))) / (p[4] * p[4]) - (2 * (Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]))*(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]))) / (p[5] * p[5]))) / Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, (p[6] + 1));
-		grad[4] = (2 * p[0] * p[6] * Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2)) / (p[4] * p[4] * p[4] * Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, (p[6] + 1)));
-		grad[5] = (2 * p[0] * p[6] * Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2)) / (p[5] * p[5] * p[5] * Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, (p[6] + 1)));
-		grad[6] = -(p[0] * Math::Log(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1)) / Math::Pow(Math::Pow(Math::Cos(p[3])*(p[1] - x[0]) + Math::Sin(p[3])*(p[2] - x[1]), 2) / (p[4] * p[4]) + Math::Pow(Math::Cos(p[3])*(p[2] - x[1]) - Math::Sin(p[3])*(p[1] - x[0]), 2) / (p[5] * p[5]) + 1, p[6]);
-		grad[7] = 1;
-	}
-}
-
 void JPFITS::JPMath::Fit_Moffat2d_Compound(array<int>^ xdata, array<int>^ ydata, array<double, 2>^ Mdata, array<double, 2>^ &p, array<double, 2>^ p_LB, array<double, 2>^ p_UB, array<double, 2>^ &p_err, array<double, 2>^ &fit_residuals)
 {
 	int N = Mdata->Length;
@@ -4091,32 +6616,14 @@ void JPFITS::JPMath::alglib_Moffat_2d_compound_grad(array<double>^ p, array<doub
 	}
 }
 
-/*void JPFITS::JPMath::Transform2d(array<double>^ x0, array<double>^ y0, array<double>^ p, array<double>^ &xp, array<double>^ &yp)
-{
-	if (p->Length == 4)
-		for (int i = 0; i < x0->Length; i++)
-		{
-			xp[i] = p[0] * (Math::Cos(p[1]) * (x0[i] - p[2]) - Math::Sin(p[1]) * (y0[i] - p[3]));
-			yp[i] = p[0] * (Math::Sin(p[1]) * (x0[i] - p[2]) + Math::Cos(p[1]) * (y0[i] - p[3]));
-
-		}
-
-	if (p->Length == 6)
-		for (int i = 0; i < x0->Length; i++)
-		{
-			xp[i] = p[0] * (x0[i] - p[4]) + p[1] * (y0[i] - p[5]);
-			yp[i] = p[2] * (x0[i] - p[4]) + p[3] * (y0[i] - p[5]);
-		}
-}*/
-
 void JPFITS::JPMath::Fit_WCSTransform2d(array<double>^ x_intrmdt, array<double>^ y_intrmdt, array<double>^ x_pix, array<double>^ y_pix, array<double>^ &p, array<double>^ p_lbnd, array<double>^ p_ubnd, array<double>^ p_scale)
 {
-	double epsx = 0.00000000001;
-	int maxits = 0;
+	double epsx = 0.000000001;
+	int maxits = 1000;
 	alglib::minlmstate^ state;
 	alglib::minlmreport^ report;
-	alglib::ndimensional_fvec^ minfunc = gcnew alglib::ndimensional_fvec(alglib_WCSTransform2d);
-	//alglib::ndimensional_jac^ jac = gcnew alglib::ndimensional_jac(alglib_Transform2d_jac);
+	alglib::ndimensional_fvec^ fvec = gcnew alglib::ndimensional_fvec(alglib_WCSTransform2d_fvec);
+	alglib::ndimensional_jac^ jac = gcnew alglib::ndimensional_jac(alglib_WCSTransform2d_jac);
 	array<Object^>^ objj = gcnew array<Object^>(4);
 	objj[0] = (Object^)x_pix;
 	objj[1] = (Object^)y_pix;
@@ -4124,53 +6631,122 @@ void JPFITS::JPMath::Fit_WCSTransform2d(array<double>^ x_intrmdt, array<double>^
 	objj[3] = (Object^)y_intrmdt;
 	Object^ obj = (Object^)objj;
 
-	//alglib::minlmcreatevj(1, p, state);
-	alglib::minlmcreatev(1, p, 0.00001, state);
+	alglib::minlmcreatevj(y_pix->Length, p, state);
 	alglib::minlmsetcond(state, epsx, maxits);
 	alglib::minlmsetscale(state, p_scale);
 	alglib::minlmsetbc(state, p_lbnd, p_ubnd);
-	//alglib::minlmoptimize(state, minfunc, jac, nullptr, obj);
-	alglib::minlmoptimize(state, minfunc, nullptr, obj);
+	alglib::minlmoptimize(state, fvec, jac, nullptr, obj);
 	alglib::minlmresults(state, p, report);
-
-	/*if (p_err != nullptr)
-		for (int i = 0; i < p_err->Length; i++)
-			p_err[i] = report->errerrpar[i];*/
 }
 
-void JPFITS::JPMath::alglib_WCSTransform2d(array<double>^ p, array<double>^ f, Object^ obj)
+void JPFITS::JPMath::alglib_WCSTransform2d_fvec(array<double>^ p, array<double>^ f, Object^ obj)
 {
 	array<Object^>^ objj = (array<Object^>^)obj;
 	array<double>^ x_pix = (array<double>^)objj[0];
 	array<double>^ y_pix = (array<double>^)objj[1];
 	array<double>^ x_intrmdt = (array<double>^)objj[2];
 	array<double>^ y_intrmdt = (array<double>^)objj[3];
-	f[0] = 0;
-	double xprime, yprime;
+
+	double xres, yres;
 
 	if (p->Length == 4)
 	{
+		double cosp1 = Math::Cos(p[1]);
+		double sinp1 = Math::Sin(p[1]);
+		double xpiximp2, ypiximp3;
+
 		for (int i = 0; i < x_intrmdt->Length; i++)
 		{
-			xprime = p[0] * (Math::Cos(p[1]) * (x_pix[i] - p[2]) - Math::Sin(p[1]) * (y_pix[i] - p[3]));
-			yprime = p[0] * (Math::Sin(p[1]) * (x_pix[i] - p[2]) + Math::Cos(p[1]) * (y_pix[i] - p[3]));
-			xprime -= x_intrmdt[i];
-			yprime -= y_intrmdt[i];
-			f[0] += xprime * xprime + yprime * yprime;
-			//f[0] += (xprime - x_intrmdt[i])*(xprime - x_intrmdt[i]) + (yprime - y_intrmdt[i])*(yprime - y_intrmdt[i]);
+			xpiximp2 = x_pix[i] - p[2];
+			ypiximp3 = y_pix[i] - p[3];
+
+			xres = p[0] * (cosp1 * xpiximp2 - sinp1 * ypiximp3) - x_intrmdt[i];
+			yres = p[0] * (sinp1 * xpiximp2 + cosp1 * ypiximp3) - y_intrmdt[i];
+
+			f[i] = Math::Sqrt(xres * xres + yres * yres);
 		}
+		return;
 	}
 
 	if (p->Length == 6)
 	{
+		double xpiximp4, ypiximp5;
+
 		for (int i = 0; i < x_pix->Length; i++)
 		{
-			xprime = p[0] * (x_pix[i] - p[4]) + p[1] * (y_pix[i] - p[5]);
-			yprime = p[2] * (x_pix[i] - p[4]) + p[3] * (y_pix[i] - p[5]);
-			xprime -= x_intrmdt[i];
-			yprime -= y_intrmdt[i];
-			f[0] += xprime * xprime + yprime * yprime;
-			//f[0] += (xprime - xref[i])*(xprime - xref[i]) + (yprime - yref[i])*(yprime - yref[i]);
+			xpiximp4 = x_pix[i] - p[4];
+			ypiximp5 = y_pix[i] - p[5];
+
+			xres = p[0] * xpiximp4 + p[1] * ypiximp5 - x_intrmdt[i];
+			yres = p[2] * xpiximp4 + p[3] * ypiximp5 - y_intrmdt[i];
+
+			f[i] = Math::Sqrt(xres * xres + yres * yres);
+		}
+	}
+}
+
+void JPFITS::JPMath::alglib_WCSTransform2d_jac(array<double>^ p, array<double>^ f, array<double, 2>^ jac, Object^ obj)
+{
+	array<Object^>^ objj = (array<Object^>^)obj;
+	array<double>^ x_pix = (array<double>^)objj[0];
+	array<double>^ y_pix = (array<double>^)objj[1];
+	array<double>^ x_intrmdt = (array<double>^)objj[2];
+	array<double>^ y_intrmdt = (array<double>^)objj[3];
+	
+	alglib_WCSTransform2d_fvec(p, f, obj);
+
+	if (p->Length == 4)
+	{
+		double cosp1 = Math::Cos(p[1]);
+		double sinp1 = Math::Sin(p[1]);
+		double p2mxpixi, p3mypixi, cosp1p2mxpixisinp1p3mypixi, twox_intrmdtip0cosp1p2mxpixisinp1p3mypixisqy_intrmdtip0cosp1p3mypixisinp1p2mxpixisqroot, x_intrmdtip0cosp1p2mxpixisinp1p3mypixisqy_intrmdtip0cosp1p3mypixisinp1p2mxpixisq, cosp1p3mypixisinp1p2mxpixi, x_intrmdtip0cosp1p2mxpixisinp1p3mypixi, y_intrmdtip0cosp1p3mypixisinp1p2mxpixi, x_intrmdtip0cosp1p2mxpixisinp1p3mypixisq, y_intrmdtip0cosp1p3mypixisinp1p2mxpixisq;
+
+		for (int i = 0; i < x_intrmdt->Length; i++)
+		{
+			p2mxpixi = p[2] - x_pix[i];
+			p3mypixi = p[3] - y_pix[i];
+			cosp1p2mxpixisinp1p3mypixi = cosp1 * p2mxpixi - sinp1 * p3mypixi;
+			cosp1p3mypixisinp1p2mxpixi = cosp1 * p3mypixi + sinp1 * p2mxpixi;
+			x_intrmdtip0cosp1p2mxpixisinp1p3mypixi = x_intrmdt[i] + p[0] * cosp1p2mxpixisinp1p3mypixi;
+			y_intrmdtip0cosp1p3mypixisinp1p2mxpixi = y_intrmdt[i] + p[0] * cosp1p3mypixisinp1p2mxpixi;
+			x_intrmdtip0cosp1p2mxpixisinp1p3mypixisq = x_intrmdtip0cosp1p2mxpixisinp1p3mypixi * x_intrmdtip0cosp1p2mxpixisinp1p3mypixi;
+			y_intrmdtip0cosp1p3mypixisinp1p2mxpixisq = y_intrmdtip0cosp1p3mypixisinp1p2mxpixi * y_intrmdtip0cosp1p3mypixisinp1p2mxpixi;
+			x_intrmdtip0cosp1p2mxpixisinp1p3mypixisqy_intrmdtip0cosp1p3mypixisinp1p2mxpixisq = x_intrmdtip0cosp1p2mxpixisinp1p3mypixisq + y_intrmdtip0cosp1p3mypixisinp1p2mxpixisq;
+			twox_intrmdtip0cosp1p2mxpixisinp1p3mypixisqy_intrmdtip0cosp1p3mypixisinp1p2mxpixisqroot = 2 * Math::Sqrt(x_intrmdtip0cosp1p2mxpixisinp1p3mypixisqy_intrmdtip0cosp1p3mypixisinp1p2mxpixisq);
+
+			jac[i, 0] = (2 * cosp1p2mxpixisinp1p3mypixi*x_intrmdtip0cosp1p2mxpixisinp1p3mypixi + 2 * cosp1p3mypixisinp1p2mxpixi*y_intrmdtip0cosp1p3mypixisinp1p2mxpixi) / twox_intrmdtip0cosp1p2mxpixisinp1p3mypixisqy_intrmdtip0cosp1p3mypixisinp1p2mxpixisqroot;
+			jac[i, 1] = -(2 * p[0] * cosp1p3mypixisinp1p2mxpixi*x_intrmdtip0cosp1p2mxpixisinp1p3mypixi - 2 * p[0] * cosp1p2mxpixisinp1p3mypixi*y_intrmdtip0cosp1p3mypixisinp1p2mxpixi) / twox_intrmdtip0cosp1p2mxpixisinp1p3mypixisqy_intrmdtip0cosp1p3mypixisinp1p2mxpixisqroot;
+			jac[i, 2] = (2 * p[0] * cosp1*x_intrmdtip0cosp1p2mxpixisinp1p3mypixi + 2 * p[0] * sinp1*y_intrmdtip0cosp1p3mypixisinp1p2mxpixi) / twox_intrmdtip0cosp1p2mxpixisinp1p3mypixisqy_intrmdtip0cosp1p3mypixisinp1p2mxpixisqroot;
+			jac[i, 3] = (2 * p[0] * cosp1*y_intrmdtip0cosp1p3mypixisinp1p2mxpixi - 2 * p[0] * sinp1*x_intrmdtip0cosp1p2mxpixisinp1p3mypixi) / twox_intrmdtip0cosp1p2mxpixisinp1p3mypixisqy_intrmdtip0cosp1p3mypixisinp1p2mxpixisqroot;
+		}
+		return;
+	}
+
+	if (p->Length == 6)
+	{
+		double p4mx_pixi, p5my_pixi, p0p4mx_pixi, rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq, x_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq, p1p5my_pixi, p2p4mx_pixi, p3p5my_pixi, x_intrmdtip0p4mx_pixip1p5my_pixi, y_intrmdtip2p4mx_pixip3p5my_pixi, x_intrmdtip0p4mx_pixip1p5my_pixisq, y_intrmdtip2p4mx_pixip3p5my_pixisq;
+
+		for (int i = 0; i < x_pix->Length; i++)
+		{
+			p4mx_pixi = p[4] - x_pix[i];
+			p5my_pixi = p[5] - y_pix[i];
+			p0p4mx_pixi = p[0] * p4mx_pixi;
+			p1p5my_pixi = p[1] * p5my_pixi;
+			p2p4mx_pixi = p[2] * p4mx_pixi;
+			p3p5my_pixi = p[3] * p5my_pixi;
+			x_intrmdtip0p4mx_pixip1p5my_pixi = x_intrmdt[i] + p0p4mx_pixi + p1p5my_pixi;
+			y_intrmdtip2p4mx_pixip3p5my_pixi = y_intrmdt[i] + p2p4mx_pixi + p3p5my_pixi;
+			x_intrmdtip0p4mx_pixip1p5my_pixisq = x_intrmdtip0p4mx_pixip1p5my_pixi * x_intrmdtip0p4mx_pixip1p5my_pixi;
+			y_intrmdtip2p4mx_pixip3p5my_pixisq = y_intrmdtip2p4mx_pixip3p5my_pixi * y_intrmdtip2p4mx_pixip3p5my_pixi;
+			x_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq = x_intrmdtip0p4mx_pixip1p5my_pixisq + y_intrmdtip2p4mx_pixip3p5my_pixisq;
+			rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq = Math::Sqrt(x_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq);
+
+			jac[i, 0] = (p4mx_pixi*x_intrmdtip0p4mx_pixip1p5my_pixi) / rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq;
+			jac[i, 1] = (p5my_pixi*x_intrmdtip0p4mx_pixip1p5my_pixi) / rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq;
+			jac[i, 2] = (p4mx_pixi*y_intrmdtip2p4mx_pixip3p5my_pixi) / rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq;
+			jac[i, 3] = (p5my_pixi*y_intrmdtip2p4mx_pixip3p5my_pixi) / rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq;
+			jac[i, 4] = (2 * p[0]*x_intrmdtip0p4mx_pixip1p5my_pixi + 2 * p[2]*y_intrmdtip2p4mx_pixip3p5my_pixi) / (2 * rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq);
+			jac[i, 5] = (2 * p[1]*x_intrmdtip0p4mx_pixip1p5my_pixi + 2 * p[3]*y_intrmdtip2p4mx_pixip3p5my_pixi) / (2 * rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq);
 		}
 	}
 }
@@ -4181,7 +6757,7 @@ void JPFITS::JPMath::Fit_GeneralTransform2d(array<double>^ x_ref, array<double>^
 	int maxits = 0;
 	alglib::minlmstate^ state;
 	alglib::minlmreport^ report;
-	alglib::ndimensional_fvec^ minfunc = gcnew alglib::ndimensional_fvec(alglib_GeneralTransform2d);
+	alglib::ndimensional_fvec^ fvec = gcnew alglib::ndimensional_fvec(alglib_GeneralTransform2d_fvec);
 	array<Object^>^ objj = gcnew array<Object^>(4);
 	objj[0] = (Object^)x_tran;
 	objj[1] = (Object^)y_tran;
@@ -4189,55 +6765,49 @@ void JPFITS::JPMath::Fit_GeneralTransform2d(array<double>^ x_ref, array<double>^
 	objj[3] = (Object^)y_ref;
 	Object^ obj = (Object^)objj;
 
-	alglib::minlmcreatev(1, p, 0.00001, state);
+	alglib::minlmcreatev(x_ref->Length, p, 0.000001, state);
 	alglib::minlmsetcond(state, epsx, maxits);
 	alglib::minlmsetscale(state, p_scale);
 	alglib::minlmsetbc(state, p_lbnd, p_ubnd);
-	alglib::minlmoptimize(state, minfunc, nullptr, obj);
+	alglib::minlmoptimize(state, fvec, nullptr, obj);
 	alglib::minlmresults(state, p, report);
 }
 
-void JPFITS::JPMath::alglib_GeneralTransform2d(array<double>^ p, array<double>^ f, Object^ obj)
+void JPFITS::JPMath::alglib_GeneralTransform2d_fvec(array<double>^ p, array<double>^ f, Object^ obj)
 {
 	array<Object^>^ objj = (array<Object^>^)obj;
 	array<double>^ x_tran = (array<double>^)objj[0];
 	array<double>^ y_tran = (array<double>^)objj[1];
 	array<double>^ x_ref = (array<double>^)objj[2];
 	array<double>^ y_ref = (array<double>^)objj[3];
-	f[0] = 0;
-	double xprime, yprime;
 
 	if (p->Length == 6)
 	{
+		double xres, yres;
+
 		for (int i = 0; i < x_ref->Length; i++)
 		{
-			xprime = p[0] * (Math::Cos(p[1]) * (x_tran[i] - p[2]) - Math::Sin(p[1]) * (y_tran[i] - p[3])) + p[2] + p[4];
-			yprime = p[0] * (Math::Sin(p[1]) * (x_tran[i] - p[2]) + Math::Cos(p[1]) * (y_tran[i] - p[3])) + p[3] + p[5];
-			xprime -= x_ref[i];
-			yprime -= y_ref[i];
-			f[0] += xprime * xprime + yprime * yprime;
-			//f[0] += (xprime - x_intrmdt[i])*(xprime - x_intrmdt[i]) + (yprime - y_intrmdt[i])*(yprime - y_intrmdt[i]);
+			xres = p[0] * (Math::Cos(p[1]) * (x_tran[i] - p[2]) - Math::Sin(p[1]) * (y_tran[i] - p[3])) + p[2] + p[4] - x_ref[i];
+			yres = p[0] * (Math::Sin(p[1]) * (x_tran[i] - p[2]) + Math::Cos(p[1]) * (y_tran[i] - p[3])) + p[3] + p[5] - y_ref[i];
+
+			f[i] = Math::Sqrt(xres * xres + yres * yres);
 		}
+		return;
 	}
 
 	if (p->Length == 8)
 	{
+		double xres, yres;
+
 		for (int i = 0; i < x_tran->Length; i++)
 		{
-			xprime = p[0] * (x_tran[i] - p[4]) + p[1] * (y_tran[i] - p[5]) + p[4] + p[6];
-			yprime = p[2] * (x_tran[i] - p[4]) + p[3] * (y_tran[i] - p[5]) + p[5] + p[7];
-			xprime -= x_ref[i];
-			yprime -= y_ref[i];
-			f[0] += xprime * xprime + yprime * yprime;
-			//f[0] += (xprime - xref[i])*(xprime - xref[i]) + (yprime - yref[i])*(yprime - yref[i]);
+			xres = p[0] * (x_tran[i] - p[4]) + p[1] * (y_tran[i] - p[5]) + p[4] + p[6] - x_ref[i];
+			yres = p[2] * (x_tran[i] - p[4]) + p[3] * (y_tran[i] - p[5]) + p[5] + p[7] - y_ref[i];
+
+			f[i] = Math::Sqrt(xres * xres + yres * yres);
 		}
 	}
 }
-
-/*void JPFITS::JPMath::alglib_Transform2d_jac(array<double>^ p, array<double>^ f, array<double, 2>^ jac, Object^ obj)
-{
-
-}*/
 
 void JPFITS::JPMath::Fit_Poly1d(array<double>^ xdata, array<double>^ ydata, int poly_degree, bool robust, array<double>^ &poly_coeffs)
 {

@@ -34,6 +34,11 @@ JPFITS::FITSImageSet::FITSImageSet()
 	this->BGWRKR->RunWorkerCompleted += gcnew System::ComponentModel::RunWorkerCompletedEventHandler(this, &JPFITS::FITSImageSet::BGWRKR_RunWorkerCompleted);
 }
 
+//bool JPFITS::FITSImageSet::Write(TypeCode precision, bool do_parallel, JPWaitBar::WaitBar^ waitbar)
+//{
+//
+//}
+
 bool JPFITS::FITSImageSet::Write(TypeCode precision, bool do_parallel, bool show_waitbar, String^ waitbar_message)
 {
 	if (!show_waitbar)
@@ -48,7 +53,7 @@ bool JPFITS::FITSImageSet::Write(TypeCode precision, bool do_parallel, bool show
 		this->WAITBAR = gcnew JPWaitBar::WaitBar();
 		this->WAITBAR->ProgressBar->Maximum = FITSLIST->Count;
 		this->WAITBAR->Text = "Saving Image Set: " + FITSLIST->Count + " files...";
-		//this->WAITBAR->StartPosition = Windows::Forms::FormStartPosition::;
+		this->WAITBAR->TopMost = true;// StartPosition = Windows::Forms::FormStartPosition::;
 		array<Object^>^ arg = gcnew array<Object^>(5);
 		arg[0] = "";
 		arg[1] = "save";
@@ -81,7 +86,7 @@ bool JPFITS::FITSImageSet::Load(array<String^>^ files, array<int>^ range, bool d
 		this->WAITBAR = gcnew JPWaitBar::WaitBar();
 		this->WAITBAR->ProgressBar->Maximum = files->Length;
 		this->WAITBAR->Text = "Loading Image Set: " + files->Length + " files...";
-		//this->WAITBAR->StartPosition = Windows::Forms::FormStartPosition::CenterScreen;
+		this->WAITBAR->TopMost = true;// StartPosition = Windows::Forms::FormStartPosition::;
 		array<Object^>^ arg = gcnew array<Object^>(6);
 		arg[0] = files;
 		arg[1] = "load";
