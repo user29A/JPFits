@@ -92,9 +92,11 @@ JPFITS::FITSImage::FITSImage(System::String ^FullFileName, array<int,1>^ Range, 
 	WORLDCOORDINATESOLUTION = gcnew JPFITS::WorldCoordinateSolution();
 }
 
-JPFITS::FITSImage::FITSImage(String^ FullFileName, String^ extensionName, array<int, 1>^ Range, bool Populate_Header, bool Populate_Data, bool Do_Stats, bool do_parallel)
+JPFITS::FITSImage::FITSImage(String^ FullFileName, int extensionNumber, array<int, 1>^ Range, bool Populate_Header, bool Populate_Data, bool Do_Stats, bool do_parallel)
 {
-	FileStream^ fs = gcnew FileStream(FULLFILENAME, IO::FileMode::Open);
+	FITSImage(FullFileName, "_FINDEXTNUM_" + extensionNumber.ToString(), Range, Populate_Header, Populate_Data, Do_Stats, do_parallel);
+
+	FileStream^ fs = gcnew FileStream(FullFileName, IO::FileMode::Open);
 	bool hasext;
 	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
 	{
@@ -104,19 +106,76 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, String^ extensionName, array<
 
 	ArrayList^ header = gcnew ArrayList();
 	__int64 extensionstartposition, extensionendposition, tableendposition, pcount, theap;
+
+	if (!FITSFILEOPS::SEEKEXTENSION(fs, "IMAGE", extensionNumber, header, extensionstartposition, extensionendposition, tableendposition, pcount, theap))
+	{
+		fs->Close();
+		throw gcnew Exception("Could not find IMAGE extension number '" + extensionNumber + "'");
+		return;
+	}
+
+	HEADER = gcnew JPFITS::FITSImageHeader(header, Populate_Header);
+	EATIMAGEHEADER();
+	HEADER->SetKey(0, "SIMPLE", "T", "");
+
+	HEADER_POP = Populate_Header;
+	DATA_POP = Populate_Data;
+	STATS_POP = Do_Stats;
+	ISEXTENSION = false;//because changed to primary above
+	EXTNAME = "Unnamed" + extensionNumber;
+
+	if (DATA_POP == false)
+	{
+		Do_Stats = false;//can't do stats on data that isn't read
+		STATS_POP = false;
+	}
+
+	FULLFILENAME = FullFileName;
+	int index = FULLFILENAME->LastIndexOf("\\");
+	FILENAME = FULLFILENAME->Substring(index + 1);
+	FILEPATH = FULLFILENAME->Substring(0, index + 1);
+
+	this->FileName = this->FileName->Substring(0, this->FileName->LastIndexOf(".")) + "_" + extensionNumber.ToString("000") +this->FileName->Substring(this->FileName->LastIndexOf("."));
+
+	if (DATA_POP == true)
+		READIMAGE(fs, Range, do_parallel);
+
+	fs->Close();
+
+	if (STATS_POP)
+		StatsUpD(do_parallel);
+
+	WORLDCOORDINATESOLUTION = gcnew JPFITS::WorldCoordinateSolution();
+}
+
+JPFITS::FITSImage::FITSImage(String^ FullFileName, String^ extensionName, array<int, 1>^ Range, bool Populate_Header, bool Populate_Data, bool Do_Stats, bool do_parallel)
+{
+	FileStream^ fs = gcnew FileStream(FullFileName, IO::FileMode::Open);
+	bool hasext;
+	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
+	{
+		fs->Close();
+		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
+	}
+
+	ArrayList^ header = gcnew ArrayList();
+	__int64 extensionstartposition, extensionendposition, tableendposition, pcount, theap;
+
 	if (!FITSFILEOPS::SEEKEXTENSION(fs, "IMAGE", extensionName, header, extensionstartposition, extensionendposition, tableendposition, pcount, theap))
 	{
 		fs->Close();
 		throw gcnew Exception("Could not find IMAGE extension with name '" + extensionName + "'");
 		return;
 	}
-	HEADER = gcnew JPFITS::FITSImageHeader(header, HEADER_POP);
+
+	HEADER = gcnew JPFITS::FITSImageHeader(header, Populate_Header);
 	EATIMAGEHEADER();
+	HEADER->SetKey(0, "SIMPLE", "T", "");
 
 	HEADER_POP = Populate_Header;
 	DATA_POP = Populate_Data;
 	STATS_POP = Do_Stats;
-	ISEXTENSION = true;
+	ISEXTENSION = false;//because changed to primary above
 	EXTNAME = extensionName;
 
 	if (DATA_POP == false)
@@ -129,6 +188,8 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, String^ extensionName, array<
 	int index = FULLFILENAME->LastIndexOf("\\");
 	FILENAME = FULLFILENAME->Substring(index + 1);
 	FILEPATH = FULLFILENAME->Substring(0, index + 1);
+
+	this->FileName = this->FileName->Substring(0, this->FileName->LastIndexOf(".")) + "_" + EXTNAME + this->FileName->Substring(this->FileName->LastIndexOf("."));
 
 	if (DATA_POP == true)
 		READIMAGE(fs, Range, do_parallel);

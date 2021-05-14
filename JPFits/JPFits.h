@@ -78,6 +78,20 @@ namespace JPFITS
 		/// <param name="theap">Returns the position within the filestream of the beginning of the heap relative to the beginning of the main table. Nominally equal to NAXIS1 * NAXIS2 unless THEAP keyword specifies a larger value.</param>
 		static bool SEEKEXTENSION(FileStream^ fs, String^ extension_type, String^ extension_name, ArrayList^ header_return, __int64 &extensionStartPosition, __int64 &extensionEndPosition, __int64 &tableEndPosition, __int64 &pcount, __int64 &theap);
 
+		/// <summary>Find the FITS extension table of the given type and name. Returns false if the XTENSION type of the specified EXTNAME is not found. If extension_name is found the FileStream fs will be placed at the beginning of the extension's main data table block.</summary>
+		/// <param name="fs">The FileStream of the FITS file.
+		/// <para>If EXTNAME is found the FileStream fs will be placed at the beginning of the extension's main data table block.</para>
+		/// <para>If EXTNAME is NOT found it will be at the end of the file.</para></param>
+		/// <param name="extension_type">The XTENSION extension type, either: &quot;BINTABLE&quot;, &quot;TABLE&quot;, or &quot;IMAGE&quot;.</param>
+		/// <param name="extension_number">The ONE-BASED extension number. This can be used when extensions aren't named with the EXTNAME keyword; alternatively if they are named this still returns the XTENSION extension type of the specified number.</param>
+		/// <param name="header_return">Returns the header of the extension as an ArrayList with each 80-character header line being a String^ member of this list. Pass nullptr if not required.</param>
+		/// <param name="extensionStartPosition">Returns the start position within the FileStream of the extension...i.e. at the block boundary at the start of its header.</param>
+		/// <param name="extensionEndPosition">Returns the end position within the FileStream of the extension, including after any heap, rounded up to a multiple of 2880 bytes at the last block boundary.</param>
+		/// <param name="tableEndPosition">Returns the end position within the FileStream of the main data table, NOT rounded to a data block boundary.</param>
+		/// <param name="pcount">Returns the number of bytes of any remaining fill plus supplemental heap data area after the main table endposition, IF any heap data exists. Does not represent fill bytes after the main table if no heap exists. Does not include fill bytes after the heap.</param>
+		/// <param name="theap">Returns the position within the filestream of the beginning of the heap relative to the beginning of the main table. Nominally equal to NAXIS1 * NAXIS2 unless THEAP keyword specifies a larger value.</param>
+		static bool SEEKEXTENSION(FileStream^ fs, String^ extension_type, int extension_number, ArrayList^ header_return, __int64& extensionStartPosition, __int64& extensionEndPosition, __int64& tableEndPosition, __int64& pcount, __int64& theap);
+
 		/// <summary>Gets all extension names of a specified extension type in the FITS file.</summary>
 		/// <param name="FileName">The full file name to read from disk.</param>
 		/// <param name="extension_type">The XTENSION extension type, either: &quot;BINTABLE&quot;, &quot;TABLE&quot;, or &quot;IMAGE&quot;.</param>
@@ -533,6 +547,17 @@ namespace JPFITS
 		/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
 		FITSImage(String^ FullFileName, String^ extensionName, array<int, 1>^ Range, bool Populate_Header, bool Populate_Data, bool Do_Stats, bool do_parallel);
 
+		/// <summary>Create a FITSImage object with extension image data loaded to RAM memory from disk.
+		/// <para>Image data is loaded as double precision independent of storage precision on disk.</para></summary>
+		/// <param name="FullFileName">File name.</param>
+		/// <param name="extensionNumber">The ONE-BASED extension number of the image. Useful when extensions are not named with EXTNAME keyword. Will return the image at the extension number if they are named regardless.</param>
+		/// <param name="Range">Range is ZERO based 1-D int array [xmin xmax ymin ymax].  Pass nullptr or Range[0] = -1 to default to full image size.</param>
+		/// <param name="Populate_Header">Optionally populate the header - sometimes you just want the data, and can skip reading the non-essential header lines.</param>
+		/// <param name="Populate_Data">Optionally populate the image data array - sometimes you just want the header and don't need the data.</param>
+		/// <param name="Do_Stats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data (if populated) - saves time if you don't need those.</param>
+		/// <param name="do_parallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
+		FITSImage(String^ FullFileName, int extensionNumber, array<int, 1>^ Range, bool Populate_Header, bool Populate_Data, bool Do_Stats, bool do_parallel);
+
 		/// <summary>Create a FITSImage object referencing raw UChar data on disk. Image data is loaded as double precision independent of storage precision on disk.</summary>
 		/// <param name="FullFileName">File name for the FITS object.</param>
 		/// <param name="DiskUCharBufferName">File name of the disk byte data.</param>
@@ -600,6 +625,13 @@ namespace JPFITS
 		/// <param name="destFullFileName">The file name to write the extensions to. If it is the same name as the source, then the source will be completely overwritten, including any other existing extensions which that file may have had.</param>
 		/// <param name="layerExtensionNames">The names for each layer extension. Must be equal in length to the number of layers to pull out of the primary data unit; all extenions must have a unique name.</param>
 		static void ExtendizePrimaryImageLayerCube(String^ sourceFullFileName, String^ destFullFileName, array<String^>^ layerExtensionNames);
+
+		/// <summary>Returns an array of all image table extension names in a FITS file. If there are no image table extensions, returns an empty array.</summary>
+		/// <param name="FileName">The full file name to read from disk.</param>
+		static array<String^>^ GetAllExtensionNames(String^ FileName)
+		{
+			return FITSFILEOPS::GETALLEXTENSIONNAMES(FileName, "IMAGE");
+		}
 
 		///// <summary>Convert a FITS image on disk to an image.</summary>
 		//static void ConvertToImage(String^ Source_FullFileName, String^ Destination_FullFileName, String^ file_type, String^ contrast_scaling, bool invert_colormap, bool do_parallel);  

@@ -3624,7 +3624,7 @@ void JPFITS::FITSBinTable::EATRAWBINTABLEHEADER(ArrayList^ header)
 			continue;
 
 		String^ key = strheaderline->Substring(0, 8)->Trim();
-		if (key->Substring(0, 1) == "T" && JPMath::IsNumeric(key->Substring(key->Length - 1)))//then likely it is some other T____n field which isn't explicitly coded above...
+		if (key->Length > 0 && key->Substring(0, 1) == "T" && JPMath::IsNumeric(key->Substring(key->Length - 1)))//then likely it is some other T____n field which isn't explicitly coded above...
 			continue;
 
 		//should now only be where extra keys might remain...so add them etc

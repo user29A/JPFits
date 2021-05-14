@@ -168,7 +168,7 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 					{
 						int f = strheaderline->IndexOf("'");
 						int l = strheaderline->LastIndexOf("'");
-						if (strheaderline->Substring(f + 1, l - f - 1) == extension_type)
+						if (strheaderline->Substring(f + 1, l - f - 1)->Trim() == extension_type)
 							extensiontypefound = true;
 						continue;
 					}
@@ -237,6 +237,11 @@ array<String^>^ JPFITS::FITSFILEOPS::GETALLEXTENSIONNAMES(String^ FileName, Stri
 	return list;
 }
 
+bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, int extension_number, ArrayList^ header_return, __int64& extensionStartPosition, __int64& extensionEndPosition, __int64& tableEndPosition, __int64& pcount, __int64& theap)
+{
+	return SEEKEXTENSION(fs, extension_type, "_FINDEXTNUM_" + extension_number.ToString(), header_return, extensionStartPosition, extensionEndPosition, tableEndPosition, pcount, theap);
+}
+
 bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, String^ extension_name, ArrayList^ header_return, __int64 &extensionStartPosition, __int64 &extensionEndPosition, __int64 &tableEndPosition, __int64 &pcount, __int64 &theap)
 {
 	if (fs->Position == 0)
@@ -246,9 +251,13 @@ bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, 
 	}
 
 	array<unsigned char>^ charheaderblock = gcnew array<unsigned char>(2880);
-	int naxis = 0, naxis1 = 0, naxis2 = 0, bitpix = 0;
+	int naxis = 0, naxis1 = 0, naxis2 = 0, bitpix = 0, extnum = -1, seekedextensionnum = 0;
 	bool endheader = false, extensionnamefound = false, extensiontypefound = false, endfile = false, extnamekeyexists = false, extensionfound = false;
 	String^ strheaderline;
+
+	bool findextnum = extension_name->Contains("_FINDEXTNUM_");
+	if (findextnum)
+		extnum = Convert::ToInt32(extension_name->Substring(extension_name->LastIndexOf("_") + 1));
 
 	if (fs->Position >= fs->Length)
 		endfile = true;
@@ -260,7 +269,7 @@ bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, 
 		endheader = false;
 		extnamekeyexists = false;
 		extensiontypefound = false;
-		naxis = 0, naxis1 = 0, naxis2 = 0, bitpix = 0, pcount = -1, theap = -1;
+		naxis = 0, naxis1 = 0, naxis2 = 0, bitpix = 0, pcount = -1, theap = -1;		
 		if (header_return != nullptr)
 			header_return->Clear();
 		while (!endheader)
@@ -280,7 +289,10 @@ bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, 
 						int f = strheaderline->IndexOf("'");
 						int l = strheaderline->LastIndexOf("'");
 						if (strheaderline->Substring(f + 1, l - f - 1)->Trim() == extension_type)
+						{
 							extensiontypefound = true;
+							seekedextensionnum++;
+						}
 						continue;
 					}
 				if (!extnamekeyexists)
@@ -339,7 +351,7 @@ bool JPFITS::FITSFILEOPS::SEEKEXTENSION(FileStream^ fs, String^ extension_type, 
 		}		
 
 		if (extensiontypefound)
-			if ((extnamekeyexists && extensionnamefound) || (!extnamekeyexists && extension_name == ""))
+			if ((extnamekeyexists && extensionnamefound && !findextnum) || (!extnamekeyexists && extension_name == "" && !findextnum) || (findextnum && extnum == seekedextensionnum))
 				extensionfound = true;
 
 		__int64 TableBytes = __int64(naxis1)*__int64(naxis2)*__int64(::Math::Abs(bitpix)) / 8;
