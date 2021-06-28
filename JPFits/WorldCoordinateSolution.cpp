@@ -39,15 +39,15 @@ JPFITS::WorldCoordinateSolution::WorldCoordinateSolution(JPFITS::FITSImageHeader
 
 void JPFITS::WorldCoordinateSolution::EATHEADERFORWCS(JPFITS::FITSImageHeader^ header)
 {
-	CD1_1 = header->GetKeyIndex("CD1_1", false);
-	if (CD1_1 == -1)
+	CD1_1 = (double)header->GetKeyIndex("CD1_1", false);
+	if (CD1_1 < 0)
 	{
 		WCSEXISTS = false;
 		return;
 	}
 	CD1_1 = Convert::ToDouble(header->HeaderKeyValues[(int)Math::Round(CD1_1)]);
 
-	CTYPEN = gcnew array<String^>(2) {"", ""};
+	CTYPEN = gcnew array<String^>(2);
 	CRPIXN = gcnew array<double>(2);
 	CRVALN = gcnew array<double>(2);
 	
@@ -92,68 +92,125 @@ void JPFITS::WorldCoordinateSolution::EATHEADERFORWCS(JPFITS::FITSImageHeader^ h
 	WCSEXISTS = true;
 
 	//optionally populate this?
-	try
+	#pragma omp parallel sections
 	{
-		#pragma omp parallel sections
+		#pragma omp section
 		{
-			#pragma omp section
-			CCVALD1 = Convert::ToDouble(header->GetKeyValue("CCVALD1"));
-			#pragma omp section
-			CCVALD2 = Convert::ToDouble(header->GetKeyValue("CCVALD2"));
-			#pragma omp section
-			CCVALS1 = header->GetKeyValue("CCVALS1");
-			#pragma omp section
-			CCVALS2 = header->GetKeyValue("CCVALS2");
-			#pragma omp section
-			CPIX1RM = Convert::ToDouble(header->GetKeyValue("CPIX1RM"));
-			#pragma omp section
-			CPIX1RS = Convert::ToDouble(header->GetKeyValue("CPIX1RS"));
-			#pragma omp section
-			CVAL1RM = Convert::ToDouble(header->GetKeyValue("CVAL1RM"));
-			#pragma omp section
-			CVAL1RS = Convert::ToDouble(header->GetKeyValue("CVAL1RS"));
-			#pragma omp section
-			CPIX2RM = Convert::ToDouble(header->GetKeyValue("CPIX2RM"));
-			#pragma omp section
-			CPIX2RS = Convert::ToDouble(header->GetKeyValue("CPIX2RS"));
-			#pragma omp section
-			CVAL2RM = Convert::ToDouble(header->GetKeyValue("CVAL2RM"));
-			#pragma omp section
-			CVAL2RS = Convert::ToDouble(header->GetKeyValue("CVAL2RS"));
-			#pragma omp section
-			CPIXRM = Convert::ToDouble(header->GetKeyValue("CPIXRM"));
-			#pragma omp section
-			CPIXRS = Convert::ToDouble(header->GetKeyValue("CPIXRS"));
-			#pragma omp section
-			CVALRM = Convert::ToDouble(header->GetKeyValue("CVALRM"));
-			#pragma omp section
-			CVALRS = Convert::ToDouble(header->GetKeyValue("CVALRS"));
+			int ind = header->GetKeyIndex("CCVALD1", false);
+			if (ind != -1)
+				CCVALD1 = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
-
-		int num = 0, key = 0;
-		while (key != -1)
+		#pragma omp section
 		{
-			num++;
-			key = header->GetKeyIndex("WCP1_" + num.ToString("000"), false);
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CCVALD2 = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
-		num--;
-		CPIX1 = gcnew array<double>(num);
-		CPIX2 = gcnew array<double>(num);
-		CVAL1 = gcnew array<double>(num);
-		CVAL2 = gcnew array<double>(num);
-
-		#pragma omp parallel for
-		for (int i = 1; i <= CPIX1->Length; i++)
+		#pragma omp section
 		{
-			CPIX1[i - 1] = Convert::ToDouble(header->GetKeyValue("WCP1_" + i.ToString("000")));
-			CPIX2[i - 1] = Convert::ToDouble(header->GetKeyValue("WCP2_" + i.ToString("000")));
-			CVAL1[i - 1] = Convert::ToDouble(header->GetKeyValue("WCV1_" + i.ToString("000")));
-			CVAL2[i - 1] = Convert::ToDouble(header->GetKeyValue("WCV2_" + i.ToString("000")));
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CCVALS1 = header->GetKeyValue("CCVALS1");
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CCVALS2 = header->GetKeyValue("CCVALS2");
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CPIX1RM = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CPIX1RS = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CVAL1RM = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CVAL1RS = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CPIX2RM = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CPIX2RS = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CVAL2RM = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CVAL2RS = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CPIXRM = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CPIXRS = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CVALRM = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		}
+		#pragma omp section
+		{
+			int ind = header->GetKeyIndex("CCVALD2", false);
+			if (ind != -1)
+				CVALRS = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 	}
-	catch (... /*Exception^ e*/)
+
+	int num = 0, key = 0;
+	while (key != -1)
 	{
-		//MessageBox::Show(e->Data + "	" + e->InnerException + "	" + e->Message + "	" + e->Source + "	" + e->StackTrace + "	" + e->TargetSite);
+		num++;
+		key = header->GetKeyIndex("WCP1_" + num.ToString("000"), false);
+	}
+	num--;
+	CPIX1 = gcnew array<double>(num);
+	CPIX2 = gcnew array<double>(num);
+	CVAL1 = gcnew array<double>(num);
+	CVAL2 = gcnew array<double>(num);
+
+	#pragma omp parallel for
+	for (int i = 1; i <= CPIX1->Length; i++)
+	{
+		CPIX1[i - 1] = Convert::ToDouble(header->GetKeyValue("WCP1_" + i.ToString("000")));
+		CPIX2[i - 1] = Convert::ToDouble(header->GetKeyValue("WCP2_" + i.ToString("000")));
+		CVAL1[i - 1] = Convert::ToDouble(header->GetKeyValue("WCV1_" + i.ToString("000")));
+		CVAL2[i - 1] = Convert::ToDouble(header->GetKeyValue("WCV2_" + i.ToString("000")));
 	}
 }
 
@@ -396,109 +453,123 @@ void JPFITS::WorldCoordinateSolution::SET_CDMATRIXINV()
 
 void JPFITS::WorldCoordinateSolution::CopyFrom(JPFITS::WorldCoordinateSolution^ wcs_source)
 {
-	WCSEXISTS = true;
+	try
+	{
+		WCSEXISTS = true;
 
-	this->CD_Matrix = wcs_source->CD_Matrix;
+		this->CD_Matrix = wcs_source->CD_Matrix;
 
-	this->CTYPEN = gcnew array<String^>(2);
-	this->CTYPEN[0] = wcs_source->CTYPEn[1];
-	this->CTYPEN[1] = wcs_source->CTYPEn[2];
+		this->CTYPEN = gcnew array<String^>(2);
+		this->CTYPEN[0] = wcs_source->CTYPEn[1];
+		this->CTYPEN[1] = wcs_source->CTYPEn[2];
 
-	this->CRPIXN = gcnew array<double>(2);
-	this->CRPIXN[0] = wcs_source->CRPIXn[1];
-	this->CRPIXN[1] = wcs_source->CRPIXn[2];
+		this->CRPIXN = gcnew array<double>(2);
+		this->CRPIXN[0] = wcs_source->CRPIXn[1];
+		this->CRPIXN[1] = wcs_source->CRPIXn[2];
 
-	this->CRVALN = gcnew array<double>(2);
-	this->CRVALN[0] = wcs_source->CRVALn[1];
-	this->CRVALN[1] = wcs_source->CRVALn[2];
+		this->CRVALN = gcnew array<double>(2);
+		this->CRVALN[0] = wcs_source->CRVALn[1];
+		this->CRVALN[1] = wcs_source->CRVALn[2];
 
-	this->CDELTN = gcnew array<double>(2);
-	this->CDELTN[0] = wcs_source->CDELTn[1];
-	this->CDELTN[1] = wcs_source->CDELTn[2];
+		this->CDELTN = gcnew array<double>(2);
+		this->CDELTN[0] = wcs_source->CDELTn[1];
+		this->CDELTN[1] = wcs_source->CDELTn[2];
 
-	this->CROTAN = gcnew array<double>(2);
-	this->CROTAN[0] = wcs_source->CROTAn[1];
-	this->CROTAN[1] = wcs_source->CROTAn[2];
+		this->CROTAN = gcnew array<double>(2);
+		this->CROTAN[0] = wcs_source->CROTAn[1];
+		this->CROTAN[1] = wcs_source->CROTAn[2];
 
-	this->CPIX1 = wcs_source->Coordinate_Pixels[1];
-	this->CPIX2 = wcs_source->Coordinate_Pixels[2];
-	this->CVAL1 = wcs_source->Coordinate_Values[1];
-	this->CVAL2 = wcs_source->Coordinate_Values[2];
+		this->CPIX1 = wcs_source->Coordinate_Pixels[1];
+		this->CPIX2 = wcs_source->Coordinate_Pixels[2];
+		this->CVAL1 = wcs_source->Coordinate_Values[1];
+		this->CVAL2 = wcs_source->Coordinate_Values[2];
 
-	this->CCVALD1 = wcs_source->CCVALD1;
-	this->CCVALD2 = wcs_source->CCVALD2;
-	this->CCVALS1 = wcs_source->CCVALS1;
-	this->CCVALS2 = wcs_source->CCVALS2;
+		this->CCVALD1 = wcs_source->CCVALD1;
+		this->CCVALD2 = wcs_source->CCVALD2;
+		this->CCVALS1 = wcs_source->CCVALS1;
+		this->CCVALS2 = wcs_source->CCVALS2;
 
-	this->CPIX1RM = wcs_source->CPIX1RM;
-	this->CPIX1RS = wcs_source->CPIX1RS;
-	this->CVAL1RM = wcs_source->CVAL1RM;
-	this->CVAL1RS = wcs_source->CVAL1RS;
-	this->CPIX2RM = wcs_source->CPIX2RM;
-	this->CPIX2RS = wcs_source->CPIX2RS;
-	this->CVAL2RM = wcs_source->CVAL2RM;
-	this->CVAL2RS = wcs_source->CVAL2RS;
-	this->CPIXRM = wcs_source->CPIXRM;
-	this->CPIXRS = wcs_source->CPIXRS;
-	this->CVALRM = wcs_source->CVALRM;
-	this->CVALRS = wcs_source->CVALRS;
+		this->CPIX1RM = wcs_source->CPIX1RM;
+		this->CPIX1RS = wcs_source->CPIX1RS;
+		this->CVAL1RM = wcs_source->CVAL1RM;
+		this->CVAL1RS = wcs_source->CVAL1RS;
+		this->CPIX2RM = wcs_source->CPIX2RM;
+		this->CPIX2RS = wcs_source->CPIX2RS;
+		this->CVAL2RM = wcs_source->CVAL2RM;
+		this->CVAL2RS = wcs_source->CVAL2RS;
+		this->CPIXRM = wcs_source->CPIXRM;
+		this->CPIXRS = wcs_source->CPIXRS;
+		this->CVALRM = wcs_source->CVALRM;
+		this->CVALRS = wcs_source->CVALRS;
+	}
+	catch (Exception^ e)
+	{
+		MessageBox::Show(e->Data + "	" + e->InnerException + "	" + e->Message + "	" + e->Source + "	" + e->StackTrace + "	" + e->TargetSite);
+	}
 }
 
 void JPFITS::WorldCoordinateSolution::CopyTo(JPFITS::FITSImageHeader^ header)
 {
-	header->SetKey("CTYPE1", CTYPEN[0], "WCS type of horizontal coordinate transformation", true, -1);
-	header->SetKey("CTYPE2", CTYPEN[1], "WCS type of vertical coordinate transformation", true, -1);
-	header->SetKey("CRPIX1", CRPIXN[0].ToString("F5"), "WCS coordinate reference pixel on axis 1", true, -1);
-	header->SetKey("CRPIX2", CRPIXN[1].ToString("F5"), "WCS coordinate reference pixel on axis 2", true, -1);
-	header->SetKey("CRVAL1", CRVALN[0].ToString("F8"), "WCS coordinate reference value on axis 1 (deg)", true, -1);
-	header->SetKey("CRVAL2", CRVALN[1].ToString("F8"), "WCS coordinate reference value on axis 2 (deg)", true, -1);
-	header->SetKey("CD1_1", CDMATRIX[0, 0].ToString("0.0#########e+00"), "WCS rotation and scaling matrix", true, -1);
-	header->SetKey("CD1_2", CDMATRIX[1, 0].ToString("0.0#########e+00"), "WCS rotation and scaling matrix", true, -1);
-	header->SetKey("CD2_1", CDMATRIX[0, 1].ToString("0.0#########e+00"), "WCS rotation and scaling matrix", true, -1);
-	header->SetKey("CD2_2", CDMATRIX[1, 1].ToString("0.0#########e+00"), "WCS rotation and scaling matrix", true, -1);
-	header->SetKey("CDELT1", CDELTN[0].ToString("F8"), "WCS plate scale on axis 1 (arcsec per pixel)", true, -1);
-	header->SetKey("CDELT2", CDELTN[1].ToString("F8"), "WCS plate Scale on axis 2 (arcsec per pixel)", true, -1);
-	header->SetKey("CROTA1", CROTAN[0].ToString("F8"), "WCS field rotation angle on axis 1 (degrees)", true, -1);
-	header->SetKey("CROTA2", CROTAN[1].ToString("F8"), "WCS field rotation angle on axis 2 (degrees)", true, -1);
-	header->SetKey("CCVALD1", CCVALD1.ToString("F8"), "WCS field center on axis 1 (degrees)", true, -1);
-	header->SetKey("CCVALD2", CCVALD2.ToString("F8"), "WCS field center on axis 2 (degrees)", true, -1);
-	header->SetKey("CCVALS1", CCVALS1, "WCS field center on axis 1 (sexigesimal h m s)", true, -1);
-	header->SetKey("CCVALS2", CCVALS2, "WCS field center on axis 2 (sexigesimal d am as)", true, -1);
-	header->SetKey("CPIX1RM", CPIX1RM.ToString("G"), "Mean of WCS residuals on axis 1 (pixels)", true, -1);
-	header->SetKey("CPIX1RS", CPIX1RS.ToString("G"), "Standard dev of WCS residuals on axis 1 (pixels)", true, -1);
-	header->SetKey("CVAL1RM", CVAL1RM.ToString("G"), "Mean of WCS residuals on axis 1 (arcsec)", true, -1);
-	header->SetKey("CVAL1RS", CVAL1RS.ToString("G"), "Standard dev of WCS residuals on axis 1 (arcsec)", true, -1);
-	header->SetKey("CPIX2RM", CPIX2RM.ToString("G"), "Mean of WCS residuals on axis 2 (pixels)", true, -1);
-	header->SetKey("CPIX2RS", CPIX2RS.ToString("G"), "Standard dev of WCS residuals on axis 2 (pixels)", true, -1);
-	header->SetKey("CVAL2RM", CVAL2RM.ToString("G"), "Mean of WCS residuals on axis 2 (arcsec)", true, -1);
-	header->SetKey("CVAL2RS", CVAL2RS.ToString("G"), "Standard dev of WCS residuals on axis 2 (arcsec)", true, -1);
-	header->SetKey("CPIXRM", CPIXRM.ToString("G"), "Mean of WCS residuals (pixels)", true, -1);
-	header->SetKey("CPIXRS", CPIXRS.ToString("G"), "Standard dev of WCS residuals (pixels)", true, -1);
-	header->SetKey("CVALRM", CVALRM.ToString("G"), "Mean of WCS residuals (arcsec)", true, -1);
-	header->SetKey("CVALRS", CVALRS.ToString("G"), "Standard dev of WCS residuals (arcsec)", true, -1);
-
-	int key = 0, num = 1;
-	while (key != -1)
+	try
 	{
-		key = header->GetKeyIndex("WCP1_" + num.ToString("000"), false);
-		header->RemoveKey(key);
-		key = header->GetKeyIndex("WCP2_" + num.ToString("000"), false);
-		header->RemoveKey(key);
-		key = header->GetKeyIndex("WCV1_" + num.ToString("000"), false);
-		header->RemoveKey(key);
-		key = header->GetKeyIndex("WCV2_" + num.ToString("000"), false);
-		header->RemoveKey(key);
-		num++;
+		header->SetKey("CTYPE1", CTYPEN[0], "WCS type of horizontal coordinate transformation", true, -1);
+		header->SetKey("CTYPE2", CTYPEN[1], "WCS type of vertical coordinate transformation", true, -1);
+		header->SetKey("CRPIX1", CRPIXN[0].ToString("F5"), "WCS coordinate reference pixel on axis 1", true, -1);
+		header->SetKey("CRPIX2", CRPIXN[1].ToString("F5"), "WCS coordinate reference pixel on axis 2", true, -1);
+		header->SetKey("CRVAL1", CRVALN[0].ToString("F8"), "WCS coordinate reference value on axis 1 (deg)", true, -1);
+		header->SetKey("CRVAL2", CRVALN[1].ToString("F8"), "WCS coordinate reference value on axis 2 (deg)", true, -1);
+		header->SetKey("CD1_1", CDMATRIX[0, 0].ToString("0.0#########e+00"), "WCS rotation and scaling matrix", true, -1);
+		header->SetKey("CD1_2", CDMATRIX[1, 0].ToString("0.0#########e+00"), "WCS rotation and scaling matrix", true, -1);
+		header->SetKey("CD2_1", CDMATRIX[0, 1].ToString("0.0#########e+00"), "WCS rotation and scaling matrix", true, -1);
+		header->SetKey("CD2_2", CDMATRIX[1, 1].ToString("0.0#########e+00"), "WCS rotation and scaling matrix", true, -1);
+		header->SetKey("CDELT1", CDELTN[0].ToString("F8"), "WCS plate scale on axis 1 (arcsec per pixel)", true, -1);
+		header->SetKey("CDELT2", CDELTN[1].ToString("F8"), "WCS plate Scale on axis 2 (arcsec per pixel)", true, -1);
+		header->SetKey("CROTA1", CROTAN[0].ToString("F8"), "WCS field rotation angle on axis 1 (degrees)", true, -1);
+		header->SetKey("CROTA2", CROTAN[1].ToString("F8"), "WCS field rotation angle on axis 2 (degrees)", true, -1);
+		header->SetKey("CCVALD1", CCVALD1.ToString("F8"), "WCS field center on axis 1 (degrees)", true, -1);
+		header->SetKey("CCVALD2", CCVALD2.ToString("F8"), "WCS field center on axis 2 (degrees)", true, -1);
+		header->SetKey("CCVALS1", CCVALS1, "WCS field center on axis 1 (sexigesimal h m s)", true, -1);
+		header->SetKey("CCVALS2", CCVALS2, "WCS field center on axis 2 (sexigesimal d am as)", true, -1);
+		header->SetKey("CPIX1RM", CPIX1RM.ToString("G"), "Mean of WCS residuals on axis 1 (pixels)", true, -1);
+		header->SetKey("CPIX1RS", CPIX1RS.ToString("G"), "Standard dev of WCS residuals on axis 1 (pixels)", true, -1);
+		header->SetKey("CVAL1RM", CVAL1RM.ToString("G"), "Mean of WCS residuals on axis 1 (arcsec)", true, -1);
+		header->SetKey("CVAL1RS", CVAL1RS.ToString("G"), "Standard dev of WCS residuals on axis 1 (arcsec)", true, -1);
+		header->SetKey("CPIX2RM", CPIX2RM.ToString("G"), "Mean of WCS residuals on axis 2 (pixels)", true, -1);
+		header->SetKey("CPIX2RS", CPIX2RS.ToString("G"), "Standard dev of WCS residuals on axis 2 (pixels)", true, -1);
+		header->SetKey("CVAL2RM", CVAL2RM.ToString("G"), "Mean of WCS residuals on axis 2 (arcsec)", true, -1);
+		header->SetKey("CVAL2RS", CVAL2RS.ToString("G"), "Standard dev of WCS residuals on axis 2 (arcsec)", true, -1);
+		header->SetKey("CPIXRM", CPIXRM.ToString("G"), "Mean of WCS residuals (pixels)", true, -1);
+		header->SetKey("CPIXRS", CPIXRS.ToString("G"), "Standard dev of WCS residuals (pixels)", true, -1);
+		header->SetKey("CVALRM", CVALRM.ToString("G"), "Mean of WCS residuals (arcsec)", true, -1);
+		header->SetKey("CVALRS", CVALRS.ToString("G"), "Standard dev of WCS residuals (arcsec)", true, -1);
+
+		int key = 0, num = 1;
+		while (key != -1)
+		{
+			key = header->GetKeyIndex("WCP1_" + num.ToString("000"), false);
+			header->RemoveKey(key);
+			key = header->GetKeyIndex("WCP2_" + num.ToString("000"), false);
+			header->RemoveKey(key);
+			key = header->GetKeyIndex("WCV1_" + num.ToString("000"), false);
+			header->RemoveKey(key);
+			key = header->GetKeyIndex("WCV2_" + num.ToString("000"), false);
+			header->RemoveKey(key);
+			num++;
+		}
+
+		num = 1;
+		for (int i = 0; i < CPIX1->Length; i++)
+		{
+			header->SetKey("WCP1_" + num.ToString("000"), CPIX1[i].ToString("F5"), "WCS coordinate pixel on axis 1", true, -1);
+			header->SetKey("WCP2_" + num.ToString("000"), CPIX2[i].ToString("F5"), "WCS coordinate pixel on axis 2", true, -1);
+			header->SetKey("WCV1_" + num.ToString("000"), CVAL1[i].ToString("F8"), "WCS coordinate value on axis 1 (degrees)", true, -1);
+			header->SetKey("WCV2_" + num.ToString("000"), CVAL2[i].ToString("F8"), "WCS coordinate value on axis 2 (degrees)", true, -1);
+			num++;
+		}
 	}
-
-	num = 1;
-	for (int i = 0; i < CPIX1->Length; i++)
+	catch (Exception^ e)
 	{
-		header->SetKey("WCP1_" + num.ToString("000"), CPIX1[i].ToString("F5"), "WCS coordinate pixel on axis 1", true, -1);
-		header->SetKey("WCP2_" + num.ToString("000"), CPIX2[i].ToString("F5"), "WCS coordinate pixel on axis 2", true, -1);
-		header->SetKey("WCV1_" + num.ToString("000"), CVAL1[i].ToString("F8"), "WCS coordinate value on axis 1 (degrees)", true, -1);
-		header->SetKey("WCV2_" + num.ToString("000"), CVAL2[i].ToString("F8"), "WCS coordinate value on axis 2 (degrees)", true, -1);
-		num++;
+		MessageBox::Show(e->Data + "	" + e->InnerException + "	" + e->Message + "	" + e->Source + "	" + e->StackTrace + "	" + e->TargetSite);
 	}
 }
 

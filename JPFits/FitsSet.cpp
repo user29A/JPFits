@@ -34,10 +34,97 @@ JPFITS::FITSImageSet::FITSImageSet()
 	this->BGWRKR->RunWorkerCompleted += gcnew System::ComponentModel::RunWorkerCompletedEventHandler(this, &JPFITS::FITSImageSet::BGWRKR_RunWorkerCompleted);
 }
 
-//bool JPFITS::FITSImageSet::Write(TypeCode precision, bool do_parallel, JPWaitBar::WaitBar^ waitbar)
-//{
-//
-//}
+bool JPFITS::FITSImageSet::WriteAsExtensions(String^ fileName, bool firstAsPrimary, JPFITS::FITSImageHeader^ primaryHeader, array<String^>^ extensionNames, array<TypeCode>^ imagePrecisions)
+{
+	if (firstAsPrimary && extensionNames->Length == this->Count)
+	{
+		throw gcnew Exception("Requested first image to be written as the primary block, but supplied extensionNames for all images: the primary image does not require an extension name.");
+		return false;
+	}
+
+	if (firstAsPrimary && primaryHeader != nullptr)
+	{
+		throw gcnew Exception("Requested first image to be written as the primary block, but supplied primaryHeader as if all images are extensions. primaryHeader may only be supplied when all images in the set are to be written as extensions. Pass nullptr when the first image is to be written as the primary unit.");
+		return false;
+	}
+
+	for (int i = 0; i < extensionNames->Length - 1; i++)
+		for (int j = i + 1; j < extensionNames->Length; j++)
+			if (extensionNames[i] == extensionNames[j])
+			{
+				throw gcnew Exception("Extension names extensionNames are not all unique: element " + (i + 1) + " is equal to element " + (j + 1) + " '" + extensionNames[i] + "'");
+				return false;
+			}
+
+	if (extensionNames != nullptr)
+		for (int i = 0; i < extensionNames->Length; i++)
+			if (extensionNames[i] == "")
+			{
+				throw gcnew Exception("Extension name at element " + (i + 1) + " is an emppty String. Please use good practice and name your extensions...");
+				return false;
+			}
+
+	if (extensionNames == nullptr)
+	{
+		extensionNames = gcnew array<String^>(this->Count);
+		for (int i = 0; i < extensionNames->Length; i++)
+			extensionNames[i] = "EXTENS_" + i.ToString("000000");
+	}
+
+	if (imagePrecisions->Length == 1 && this->Count > 1)
+	{
+		TypeCode tc = imagePrecisions[0];
+		imagePrecisions = gcnew array<TypeCode>(this->Count);
+		for (int i = 0; i < this->Count; i++)
+			imagePrecisions[i] = tc;
+	}
+
+	if (!firstAsPrimary && primaryHeader == nullptr)
+		primaryHeader = gcnew JPFITS::FITSImageHeader(true, nullptr);
+	else if (firstAsPrimary)
+		this[0]->WriteImage(fileName, imagePrecisions[0], true);
+
+	FileStream^ fs;
+	if (firstAsPrimary)
+		fs = gcnew FileStream(fileName, FileMode::Append, IO::FileAccess::Write);
+	else
+		fs = gcnew FileStream(fileName, FileMode::Create, IO::FileAccess::Write);
+	
+	array<String^>^ head;
+	array<unsigned char>^ writedata;
+
+	if (!firstAsPrimary)
+	{
+		primaryHeader->SetKey("EXTEND", "T", "File may contain extensions", true, 5);//do this in case where primary header was supplied, but might not have had EXTEND keyword
+
+		head = primaryHeader->GetFormattedHeaderBlock(false, false);
+		writedata = gcnew array<unsigned char>(head->Length * 80);
+		for (int i = 0; i < head->Length; i++)
+			for (int j = 0; j < 80; j++)
+				writedata[i * 80 + j] = (unsigned char)head[i][j];
+
+		fs->Write(writedata, 0, writedata->Length);
+	}
+
+	for (int i = 0; i < this->Count; i++)
+	{
+		if (i == 0 && firstAsPrimary)
+			continue;
+
+		head = this[i]->Header->GetFormattedHeaderBlock(true, false);
+		writedata = gcnew array<unsigned char>(head->Length * 80);
+		for (int i = 0; i < head->Length; i++)
+			for (int j = 0; j < 80; j++)
+				writedata[i * 80 + j] = (unsigned char)head[i][j];
+		fs->Write(writedata, 0, writedata->Length);
+
+		writedata = this[i]->GetFormattedDataBlock(imagePrecisions[i], true);
+		fs->Write(writedata, 0, writedata->Length);
+	}
+	fs->Close();
+
+	return true;
+}
 
 bool JPFITS::FITSImageSet::Write(TypeCode precision, bool do_parallel, bool show_waitbar, String^ waitbar_message)
 {

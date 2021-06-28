@@ -102,6 +102,7 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, int extensionNumber, array<in
 	{
 		fs->Close();
 		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
+		return;
 	}
 
 	ArrayList^ header = gcnew ArrayList();
@@ -156,6 +157,7 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, String^ extensionName, array<
 	{
 		fs->Close();
 		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
+		return;
 	}
 
 	ArrayList^ header = gcnew ArrayList();
@@ -806,7 +808,7 @@ void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 		else if (!filexists && ISEXTENSION)//then write the extension to a new file with an empty primary unit
 		{
 			FITSImageHeader^ hed = gcnew FITSImageHeader(true, nullptr);
-			array<String^>^ pheader = hed->GetFormattedHeaderBlock(true, false);//   MAKEPRIMARYDEFFORMATTEDHEADER(true);// FITSHEADER::MAKEPRIMARYDEFFORMATTEDHEADER(true);
+			array<String^>^ pheader = hed->GetFormattedHeaderBlock(true, false);
 			int NHead = pheader->Length * 80;
 			prependdata = gcnew array<unsigned char>(NHead);
 			for (int i = 0; i < pheader->Length; i++)
@@ -821,7 +823,7 @@ void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 		EATIMAGEHEADER();
 
 		//get formatted header block
-		array<String^>^ HEADER = this->Header->GetFormattedHeaderBlock(ISEXTENSION, false);// FITSHEADER::MAKEFORMATTEDIMAGEHEADER(this->Header->HeaderKeys, this->Header->HeaderKeyValues, this->Header->HeaderKeyComments, ISEXTENSION);
+		array<String^>^ HEADER = this->Header->GetFormattedHeaderBlock(ISEXTENSION, false);
 		int NHead = HEADER->Length * 80;//number of bytes in fitsheader...should always be multiple of 2880.
 		__int64 NIm = __int64(NAXIS1)*__int64(NAXIS2)*__int64(Math::Abs(BITPIX / 8));//number of bytes in image
 		__int64 NImNHead = __int64(NHead) + NIm;//this is the number of bytes in the file + header...but need to write file so multiple of 2880 bytes
@@ -970,10 +972,138 @@ void JPFITS::FITSImage::WRITEIMAGE(TypeCode Precision, bool do_parallel)
 	}*/
 }
 
-/*array<double, 2>^ JPFITS::FITSImage::READIMAGE(FileStream^ fs, array<int, 1>^ Range, int bitpix, int naxis1, int naxis2, double bzero, double bscale, bool do_parallel)
+array<unsigned char>^ JPFITS::FITSImage::GetFormattedDataBlock(TypeCode precision, bool do_parallel)
 {
+	int cc = 0;
+	__int64 NIm = __int64(NAXIS1) * __int64(NAXIS2) * __int64(Math::Abs(BITPIX / 8));//number of bytes in image
+	int NBlocks = int(Math::Ceiling(double(NIm) / 2880.0));
+	int NBytesTot = NBlocks * 2880;
+	double bscale = (double)BSCALE;
+	double bzero = (double)BZERO;
+	array<unsigned char>^ data = gcnew array<unsigned char>(NBytesTot);
 
-}*/
+	switch (precision)
+	{
+		case TypeCode::Byte:
+		case TypeCode::SByte:
+		{
+			__int8 val = 0;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val)
+			for (int j = 0; j < NAXIS2; j++)
+				for (int i = 0; i < NAXIS1; i++)
+				{
+					cc = (j * NAXIS1 + i) * 2;
+					val = __int8((DIMAGE[i, j] - bzero) / bscale);
+					data[cc] = val;
+				}
+			break;
+		}
+
+		case TypeCode::UInt16:
+		case TypeCode::Int16:
+		{
+			__int16 val = 0;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val)
+			for (int j = 0; j < NAXIS2; j++)
+				for (int i = 0; i < NAXIS1; i++)
+				{
+					cc = (j * NAXIS1 + i) * 2;
+					val = __int16((DIMAGE[i, j] - bzero) / bscale);
+					data[cc] = ((val >> 8) & 0xff);
+					data[cc + 1] = (val & 0xff);
+				}
+			break;
+		}
+
+		case TypeCode::UInt32:
+		case TypeCode::Int32:
+		{
+			__int32 val = 0;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val)
+			for (int j = 0; j < NAXIS2; j++)
+				for (int i = 0; i < NAXIS1; i++)
+				{
+					cc = (j * NAXIS1 + i) * 4;
+					val = __int32((DIMAGE[i, j] - bzero) / bscale);
+					data[cc] = ((val >> 24) & 0xff);
+					data[cc + 1] = ((val >> 16) & 0xff);
+					data[cc + 2] = ((val >> 8) & 0xff);
+					data[cc + 3] = (val & 0xff);
+				}
+			break;
+		}
+
+		case TypeCode::UInt64:
+		case TypeCode::Int64:
+		{
+			__int64 val = 0;
+
+			#pragma omp parallel for if (do_parallel) private(cc, val)
+			for (int j = 0; j < NAXIS2; j++)
+				for (int i = 0; i < NAXIS1; i++)
+				{
+					cc = (j * NAXIS1 + i) * 8;
+					val = __int64((DIMAGE[i, j] - bzero) / bscale);
+					data[cc] = ((val >> 56) & 0xff);
+					data[cc + 1] = ((val >> 48) & 0xff);
+					data[cc + 2] = ((val >> 40) & 0xff);
+					data[cc + 3] = ((val >> 32) & 0xff);
+					data[cc + 4] = ((val >> 24) & 0xff);
+					data[cc + 5] = ((val >> 16) & 0xff);
+					data[cc + 6] = ((val >> 8) & 0xff);
+					data[cc + 7] = (val & 0xff);
+				}
+			break;
+		}
+
+		case TypeCode::Single:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc)
+			for (int j = 0; j < NAXIS2; j++)
+			{
+				array<unsigned char>^ sng = gcnew array<unsigned char>(4);
+				for (int i = 0; i < NAXIS1; i++)
+				{
+					cc = (j * NAXIS1 + i) * 4;
+					sng = BitConverter::GetBytes(float((DIMAGE[i, j] - bzero) / bscale));
+					data[cc] = sng[3];
+					data[cc + 1] = sng[2];
+					data[cc + 2] = sng[1];
+					data[cc + 3] = sng[0];
+				}
+			}
+			break;
+		}
+
+		case TypeCode::Double:
+		{
+			#pragma omp parallel for if (do_parallel) private(cc)
+			for (int j = 0; j < NAXIS2; j++)
+			{
+				array<unsigned char>^ dbl = gcnew array<unsigned char>(8);
+				for (int i = 0; i < NAXIS1; i++)
+				{
+					cc = (j * NAXIS1 + i) * 8;
+					dbl = BitConverter::GetBytes((DIMAGE[i, j] - bzero) / bscale);
+					data[cc] = dbl[7];
+					data[cc + 1] = dbl[6];
+					data[cc + 2] = dbl[5];
+					data[cc + 3] = dbl[4];
+					data[cc + 4] = dbl[3];
+					data[cc + 5] = dbl[2];
+					data[cc + 6] = dbl[1];
+					data[cc + 7] = dbl[0];
+				}
+			}
+			break;
+		}
+	}
+
+	return data;
+}
 
 void JPFITS::FITSImage::READIMAGE(FileStream^ fs, array<int, 1>^ Range, bool do_parallel)//assumed READHEADER has been completed, and bs is at beginning of data block
 {

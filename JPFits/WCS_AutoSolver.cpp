@@ -759,42 +759,50 @@ array<JPMath::Triangle^>^ JPFITS::WCS_AutoSolver::ConditionTriangleArrayBrightne
 int JPFITS::WCS_AutoSolver::AstroQuery(String^ catalogue, String^ ra_deg, String^ dec_deg, String^ & result_savepathfilename, String^ radius, String^ square)
 {
 	String^ pypath = (String^)GetReg("CCDLAB", "PythonExePath");
+
 	if (pypath == nullptr || !File::Exists(pypath))
 	{
-		array<String^>^ dirs = ::Directory::GetDirectories("C:\\Program Files\\", "*Python*", ::SearchOption::TopDirectoryOnly);
-		if (dirs->Length == 1)
+		array<String^>^ dirsappdata = ::Directory::GetDirectories(Environment::GetFolderPath(Environment::SpecialFolder::ApplicationData), "*Python*", ::SearchOption::AllDirectories);
+		array<String^>^ dirsprogdata = ::Directory::GetDirectories("C:\\Program Files\\", "*Python*", ::SearchOption::TopDirectoryOnly);
+
+		ArrayList^ locs = gcnew ArrayList();
+
+		for (int i = 0; i < dirsappdata->Length; i++)
 		{
-			::DialogResult res = MessageBox::Show("Use " + dirs[0] + "\\python.exe as your Python environment?", "Finding python.exe...", ::MessageBoxButtons::YesNoCancel);
-			if (res == ::DialogResult::Cancel)
-				return -2;
-			else if (res == ::DialogResult::Yes)
-				pypath = dirs[0] + "\\python.exe";
-			else if (res == ::DialogResult::No)
-			{
-				if (MessageBox::Show("Do you want to show me where your Python installation is located, then?", "Find *python.exe*...", ::MessageBoxButtons::OKCancel) == ::DialogResult::Cancel)
-					return -2;
-
-				::OpenFileDialog^ ofd = gcnew ::OpenFileDialog();
-				ofd->InitialDirectory = "C:\\Program Files\\";
-				ofd->Filter = "exe|*.exe;*";
-				if (ofd->ShowDialog() == ::DialogResult::Cancel)
-					return -2;
-
-				pypath = ofd->FileName;
-			}
+			array<String^>^ files = ::Directory::GetFiles(dirsappdata[i], "*python.exe", ::SearchOption::TopDirectoryOnly);
+			if (files->Length == 1)
+				locs->Add(files[0]);
 		}
-		else if (dirs->Length == 0 || dirs->Length > 1)
+		for (int i = 0; i < dirsprogdata->Length; i++)
 		{
-			if (MessageBox::Show("Please show me where your Python installation is located, OK?", "I cannot find *python.exe*...", ::MessageBoxButtons::OKCancel) == ::DialogResult::Cancel)
+			array<String^>^ files = ::Directory::GetFiles(dirsprogdata[i], "*python.exe", ::SearchOption::TopDirectoryOnly);
+			if (files->Length == 1)
+				locs->Add(files[0]);
+		}
+
+		if (locs->Count == 0)
+		{
+			if (MessageBox::Show("Is Python installed? Please show me where your Python installation is located, OK? \r\n\r\nIf Python is not installed, please gather it from:\r\n\r\n https://www.python.org/downloads/windows/", "I cannot find python.exe", ::MessageBoxButtons::OKCancel) == ::DialogResult::Cancel)
 				return -2;
 
 			::OpenFileDialog^ ofd = gcnew ::OpenFileDialog();
-			ofd->InitialDirectory = "C:\\Program Files\\";
-			ofd->Filter = "exe|*.exe;*";
+			ofd->InitialDirectory = Environment::GetFolderPath(Environment::SpecialFolder::ApplicationData);
+			ofd->Filter = "Executable|*.exe;";
 			if (ofd->ShowDialog() == ::DialogResult::Cancel)
 				return -2;
 
 			pypath = ofd->FileName;
+		}
+		else
+		{
+			pypath = (String^)locs[0];
+			::DateTime date = File::GetCreationTimeUtc((String^)locs[0]);
+			for (int i = 0; i < locs->Count; i++)
+				if (File::GetCreationTimeUtc((String^)locs[i]) > date)
+				{
+					date = File::GetCreationTimeUtc((String^)locs[i]);
+					pypath = (String^)locs[i];
+				}
 		}
 
 		SetReg("CCDLAB", "PythonExePath", pypath);

@@ -301,6 +301,48 @@ array<double, 2>^ JPFITS::JPMath::Crop(array<double, 2>^ data, array<int>^ cropp
 	return result;
 }
 
+array<double, 2>^ JPFITS::JPMath::Excise(array<double, 2>^ data, bool column, int X0, int halfWidth, bool do_parallel)
+{
+	array<double, 2>^ result;
+	array<int>^ xrange;
+	array<int>^ yrange;
+	if (column)
+	{
+		result = gcnew array<double, 2>(data->GetLength(0) - (halfWidth * 2 + 1), data->GetLength(1));
+		yrange = gcnew array<int>(result->GetLength(1));
+		for (int i = 0; i < yrange->Length; i++)
+			yrange[i] = i;
+		
+		xrange = gcnew array<int>(result->GetLength(0));
+		for (int i = 0; i < data->GetLength(0); i++)
+			if (i < X0 - halfWidth)
+				xrange[i] = i;
+			else if (i > X0 + halfWidth)
+				xrange[i - (halfWidth * 2 + 1)] = i;
+	}
+	else
+	{
+		result = gcnew array<double, 2>(data->GetLength(0), data->GetLength(1) - (halfWidth * 2 + 1));
+		xrange = gcnew array<int>(result->GetLength(0));
+		for (int i = 0; i < xrange->Length; i++)
+			xrange[i] = i;
+
+		yrange = gcnew array<int>(result->GetLength(1));
+		for (int i = 0; i < data->GetLength(1); i++)
+			if (i < X0 - halfWidth)
+				yrange[i] = i;
+			else if (i > X0 + halfWidth)
+				yrange[i - (halfWidth * 2 + 1)] = i;
+	}
+
+	#pragma omp parallel for if (do_parallel)
+	for (int x = 0; x < result->GetLength(0); x++)
+		for (int y = 0; y < result->GetLength(1); y++)
+			result[x, y] = data[xrange[x], yrange[y]];
+
+	return result;
+}
+
 array<double>^ JPFITS::JPMath::Bin(array<double>^ data, int Nx)
 {
 	if (Nx > data->GetLength(0))
@@ -975,6 +1017,12 @@ array<int, 2>^ JPFITS::JPMath::Find(array<double, 2>^ data, double val, String^ 
 	if (Double::IsNaN(val))
 		method = 6;
 
+	if (Double::IsPositiveInfinity(val))
+		method = 7;
+	
+	if (Double::IsNegativeInfinity(val))
+		method = 8;
+
 	array<bool, 2>^ finds = gcnew array<bool, 2>(data->GetLength(0), data->GetLength(1));
 	int Nfinds = 0;
 
@@ -1071,6 +1119,34 @@ array<int, 2>^ JPFITS::JPMath::Find(array<double, 2>^ data, double val, String^ 
 				case 6://= NaN
 				{
 					if (Double::IsNaN(data[i, j]))
+					{
+						finds[i, j] = true;
+						Nfinds++;
+						/*#pragma omp critical
+						{
+							ptslist->Add(i);
+							ptslist->Add(j);
+						}*/
+					}
+					break;
+				}
+				case 7://= +ve inf
+				{
+					if (Double::IsPositiveInfinity(data[i, j]))
+					{
+						finds[i, j] = true;
+						Nfinds++;
+						/*#pragma omp critical
+						{
+							ptslist->Add(i);
+							ptslist->Add(j);
+						}*/
+					}
+					break;
+				}
+				case 8://= -ve inf
+				{
+					if (Double::IsNegativeInfinity(data[i, j]))
 					{
 						finds[i, j] = true;
 						Nfinds++;

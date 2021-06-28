@@ -597,6 +597,8 @@ namespace JPFITS
 		void WriteImage(String^ FullFileName, String^ extensionName, bool overwriteExtensionIfExists, TypeCode Precision, bool do_parallel);
 
 		void WriteFileFromDiskBuffer(bool DeleteOrigDiskBuffer);
+
+		array<unsigned char>^ GetFormattedDataBlock(TypeCode precision, bool do_parallel);
 		#pragma endregion
 
 		#pragma region STATICFILEIO
@@ -890,7 +892,13 @@ namespace JPFITS
 		/// <param name="waitbar_message">Message to display on Waitbar progress if it is shown.</param>
 		bool Write(TypeCode precision, bool do_parallel, bool show_waitbar, String^ waitbar_message);
 
-		//bool Write(TypeCode precision, bool do_parallel, JPWaitBar::WaitBar^ waitbar);
+		/// <summary>Write the FITSImage objects from the FITSImageSet as extensions.</summary>
+		/// <param name="fileName">The file name to write to.</param>
+		/// <param name="firstAsPrimary">Option to write the first image in the set as the primary data block, otherwise all images to be written as extensions.</param>
+		/// <param name="primaryHeader">IF the first image is NOT to be written as the primary data block, then a header may still be supplied for the primary block. Throws an exception if firstAsPrimary is true and primaryHeader is not nullptr.</param>
+		/// <param name="extensionNames">The names of the extensions. If firstAsPrimary is true then the length of extensionNames should be ONE LESS than the number of images in the set. No elements may be empty strings; all elements must be unique. Pass nullptr for automatic naming as EXTENS_nnnnnn.</param>
+		/// <param name="imagePrecisions">The precision at which to write the image data. If a single element array is passed then this precision is applied to all images.</param>
+		bool WriteAsExtensions(String^ fileName, bool firstAsPrimary, JPFITS::FITSImageHeader^ primaryHeader, array<String^>^ extensionNames, array<TypeCode>^ imagePrecisions);
 
 		/// <summary>Appends a FITSImage object to the ArrayList FITSImageSet object.</summary>
 		void Add(FITSImage^ FITS)
@@ -1496,6 +1504,7 @@ namespace JPFITS
 
 		static array<double, 2>^ Pad(array<double, 2>^ data, array<int>^ padding, bool do_parallel);
 		static array<double, 2>^ Crop(array<double, 2>^ data, array<int>^ cropping, bool do_parallel);
+		static array<double, 2>^ Excise(array<double, 2>^ data, bool column, int X0, int halfWidth, bool do_parallel);
 
 		/// <summary>Sum a 2-D array along one dimension, resulting in a 1-D vector array.</summary>
 		/// <param name="data">A 2-D double array.</param>
