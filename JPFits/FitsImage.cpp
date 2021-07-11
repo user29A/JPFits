@@ -101,7 +101,10 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, int extensionNumber, array<in
 	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
 	{
 		fs->Close();
-		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
+		if (!hasext)
+			throw gcnew Exception("File indicates no extensions present.");
+		else
+			throw gcnew Exception("File not formatted as FITS file.");
 		return;
 	}
 
@@ -156,7 +159,10 @@ JPFITS::FITSImage::FITSImage(String^ FullFileName, String^ extensionName, array<
 	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
 	{
 		fs->Close();
-		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
+		if (!hasext)
+			throw gcnew Exception("File indicates no extensions present.");
+		else
+			throw gcnew Exception("File not formatted as FITS file.");
 		return;
 	}
 

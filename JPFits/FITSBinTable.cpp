@@ -33,7 +33,10 @@ JPFITS::FITSBinTable::FITSBinTable(String^ fileName, String^ extensionName)
 	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
 	{
 		fs->Close();
-		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
+		if (!hasext)
+			throw gcnew Exception("File indicates no extensions present.");
+		else
+			throw gcnew Exception("File not formatted as FITS file.");
 		return;
 	}
 
@@ -2213,8 +2216,11 @@ void JPFITS::FITSBinTable::RemoveExtension(String^ FileName, String^ ExtensionNa
 	bool hasext = false;
 	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
 	{
-		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
 		fs->Close();
+		if (!hasext)
+			throw gcnew Exception("File indicates no extensions present.");
+		else
+			throw gcnew Exception("File not formatted as FITS file.");
 		return;
 	}
 
@@ -2249,8 +2255,11 @@ bool JPFITS::FITSBinTable::ExtensionExists(String^ FileName, String^ ExtensionNa
 	bool hasext = false;
 	if (!FITSFILEOPS::SCANPRIMARYUNIT(fs, true, nullptr, hasext) || !hasext)
 	{
-		throw gcnew Exception("File not formatted as FITS file, or indicates no extensions present.");
 		fs->Close();
+		if (!hasext)
+			throw gcnew Exception("File indicates no extensions present.");
+		else
+			throw gcnew Exception("File not formatted as FITS file.");
 		return false;
 	}
 

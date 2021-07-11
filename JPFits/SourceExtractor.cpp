@@ -47,6 +47,8 @@ JPFITS::SourceExtractor::SourceExtractor(array<double>^ XCoords, array<double>^ 
 	this->INITARRAYS();
 	this->Centroids_X = XCoords;
 	this->Centroids_Y = YCoords;
+	for (int i = 0; i < N_SRC; i++)
+		CENTROID_POINTS[i] = gcnew JPMath::PointD(CENTROIDS_X[i], CENTROIDS_Y[i], 0);
 }
 
 JPFITS::SourceExtractor::SourceExtractor(JPFITS::FITSBinTable^ BinTablePSE)
@@ -75,6 +77,10 @@ JPFITS::SourceExtractor::SourceExtractor(JPFITS::FITSBinTable^ BinTablePSE)
 	CENTROIDS_AMPLITUDE = BinTablePSE->GetTTYPEEntry("PSE Amplitude");
 	CENTROIDS_VOLUME = BinTablePSE->GetTTYPEEntry("PSE Volume");
 	CENTROIDS_BGESTIMATE = BinTablePSE->GetTTYPEEntry("PSE Background");
+
+	CENTROID_POINTS = gcnew array<JPMath::PointD^>(N_SRC);
+	for (int i = 0; i < N_SRC; i++)
+		CENTROID_POINTS[i] = gcnew JPMath::PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
 	
 	if (BinTablePSE->TTYPEEntryExists("PSE RA (deg)"))
 		CENTROIDS_RA_DEG = BinTablePSE->GetTTYPEEntry("PSE RA (deg)");
@@ -199,6 +205,7 @@ void JPFITS::SourceExtractor::Extract_Sources(array<double, 2>^ image, array<dou
 		CENTROIDS_VOLUME[i] = kernel_sum;
 		CENTROIDS_AMPLITUDE[i] = kernel[KERNEL_RADIUS, KERNEL_RADIUS];
 		CENTROIDS_BGESTIMATE[i] = bg_est;
+		CENTROID_POINTS[i] = gcnew JPMath::PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
 
 		if (SAVE_PS)
 		{
@@ -544,6 +551,7 @@ void JPFITS::SourceExtractor::BGWRKR_DoWork(System::Object^  sender, System::Com
 			CENTROIDS_AMPLITUDE[i] = Convert::ToDouble(Ps[i]);
 			CENTROIDS_VOLUME[i] = Convert::ToDouble(Ks[i]);
 			CENTROIDS_BGESTIMATE[i] = Convert::ToDouble(Bs[i]);
+			CENTROID_POINTS[i] = gcnew JPMath::PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
 		}
 		return;
 	}
@@ -715,7 +723,7 @@ void JPFITS::SourceExtractor::BGWRKR_RunWorkerCompleted(System::Object^  sender,
 
 void JPFITS::SourceExtractor::Extract_Attempt_N_Sources(int N, array<double, 2>^ image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int source_separation, bool auto_background, String^ kernel_filename_template, array<bool, 2>^ ROI_region, bool show_waitbar)
 {
-	JPFITS::FITSImage^ FITS = gcnew FITSImage("", image, true, true);
+	//JPFITS::FITSImage^ FITS = gcnew FITSImage("", image, true, true);
 
 	double immax = JPMath::Max(image, true);
 	double pixthresh = immax / 16;
@@ -1085,6 +1093,7 @@ void JPFITS::SourceExtractor::INITARRAYS()
 	FITS_RA_HMS = gcnew array<String^, 1>(N_SRC);
 	FITS_DEC_DEG = gcnew array<double, 1>(N_SRC);
 	FITS_DEC_DMS = gcnew array<String^, 1>(N_SRC);
+	CENTROID_POINTS = gcnew array<JPMath::PointD^>(N_SRC);
 }
 
 void JPFITS::SourceExtractor::ClipToNBrightest(int NBright)
@@ -1229,7 +1238,96 @@ void JPFITS::SourceExtractor::ClipToNBrightest(int NBright)
 	Array::Resize(FITS_DEC_DMS, NBright);
 	N_SRC = NBright;
 
+	CENTROID_POINTS = gcnew array<JPMath::PointD^>(N_SRC);
+	for (int i = 0; i < N_SRC; i++)
+		CENTROID_POINTS[i] = gcnew JPMath::PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
+
 	/*JPFITS::FITSImage^ ff = gcnew FITSImage("C:\\Users\\Joseph E Postma\\Desktop\\test.fits", IMAGE_KERNEL_INDEX_SOURCE, false);
 	ff->WriteFile(TypeCode::Int32);*/
+}
+
+void JPFITS::SourceExtractor::RECURSGROUP(int I, int J, double groupRadius, int groupid, ArrayList^ groups)
+{
+	GROUPIDS[J] = groupid;
+
+	GraphicsPath^ path = gcnew GraphicsPath();
+	path->AddEllipse(float(CENTROIDS_X[J] - groupRadius), float(CENTROIDS_Y[J ] - groupRadius), float(groupRadius * 2), float(groupRadius * 2));
+	((Group^)groups[groupid])->REGION->Union(path);
+
+	for (int i = 0; i < N_SRC; i++)
+		if (i != J && CENTROID_POINTS[J]->DistanceTo(CENTROID_POINTS[i]) <= groupRadius)
+			if (GROUPIDS[i] == -1)
+				RECURSGROUP(J, i, groupRadius, groupid, groups);
+}
+
+void JPFITS::SourceExtractor::GroupizePSE(double groupRadius)
+{
+	GROUPIDS = gcnew array<int>(N_SRC);
+	for (int i = 0; i < N_SRC; i++)
+		GROUPIDS[i] = -1;
+	
+	int currgroupid = -1;
+	ArrayList^ groups = gcnew ArrayList();
+	array<Color>^ colors = gcnew array<Color>(11) { Color::OrangeRed, Color::Cyan, Color::LawnGreen, Color::BlueViolet, Color::DeepPink, Color::Aqua, Color::Crimson, Color::DarkGoldenrod, Color::Red, Color::Chartreuse, Color::HotPink };
+	int rem = 0;
+
+	for (int i = 0; i < N_SRC - 1; i++)
+		for (int j = i + 1; j < N_SRC; j++)
+			if (CENTROID_POINTS[i]->DistanceTo(CENTROID_POINTS[j]) <= groupRadius)
+				if (GROUPIDS[i] == -1)
+				{
+					GROUPIDS[i] = ++currgroupid;
+
+					GraphicsPath^ path = gcnew GraphicsPath();
+					path->AddEllipse(float(CENTROIDS_X[i] - groupRadius), float(CENTROIDS_Y[i] - groupRadius), float(groupRadius * 2), float(groupRadius * 2));
+					
+					groups->Add(gcnew Group(currgroupid));
+					((Group^)groups[currgroupid])->REGION = gcnew Region(path);
+					Math::DivRem(i, colors->Length, rem);
+					((Group^)groups[currgroupid])->COLOR = colors[rem];
+
+					RECURSGROUP(i, j, groupRadius, currgroupid, groups);
+				}
+				else if (GROUPIDS[j] == -1)
+					RECURSGROUP(i, j, groupRadius, currgroupid, groups);
+
+	NGROUPS = groups->Count;
+
+	GROUPS = gcnew array<Group^>(NGROUPS);
+	for (int i = 0; i < NGROUPS; i++)
+		GROUPS[i] = (Group^)groups[i];
+	
+	for (int i = 0; i < N_SRC; i++)
+		if (GROUPIDS[i] != -1)
+			GROUPS[GROUPIDS[i]]->NElements++;
+
+	for (int i = 0; i < NGROUPS; i++)
+	{
+		GROUPS[i]->ElementIndices = gcnew array<int>(GROUPS[i]->NElements);
+
+		int c = 0;
+		for (int j = 0; j < N_SRC; j++)
+			if (GROUPIDS[j] == i)
+			{
+				GROUPS[i]->ElementIndices[c] = j;
+				c++;
+			}
+	}
+
+	SOURCE_GROUP_MAP = gcnew array<int, 2>(IMAGE->GetLength(0), IMAGE->GetLength(1));
+	#pragma omp parallel for
+	for (int i = 0; i < SOURCE_GROUP_MAP->GetLength(0); i++)
+		for (int j = 0; j < SOURCE_GROUP_MAP->GetLength(1); j++)
+			SOURCE_GROUP_MAP[i, j] = -1;
+
+	#pragma omp parallel for
+	for (int i = 0; i < NGROUPS; i++)
+		for (int j = 0; j < GROUPS[i]->NElements; j++)
+			for (int x = int(CENTROIDS_X[GROUPS[i]->ElementIndices[j]] - groupRadius); x <= int(CENTROIDS_X[GROUPS[i]->ElementIndices[j]] + groupRadius); x++)
+				for (int y = int(CENTROIDS_Y[GROUPS[i]->ElementIndices[j]] - groupRadius); y <= int(CENTROIDS_Y[GROUPS[i]->ElementIndices[j]] + groupRadius); y++)
+					if (x >= 0 && x < IMAGE->GetLength(0) && y >= 0 && y < IMAGE->GetLength(0))
+						if ((x - CENTROIDS_X[GROUPS[i]->ElementIndices[j]]) * (x - CENTROIDS_X[GROUPS[i]->ElementIndices[j]]) + (y - CENTROIDS_Y[GROUPS[i]->ElementIndices[j]]) * (y - CENTROIDS_Y[GROUPS[i]->ElementIndices[j]]) < groupRadius)
+							if (SOURCE_GROUP_MAP[x, y] == -1)
+								SOURCE_GROUP_MAP[x, y] = i;
 }
 

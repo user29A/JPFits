@@ -108,85 +108,85 @@ void JPFITS::WorldCoordinateSolution::EATHEADERFORWCS(JPFITS::FITSImageHeader^ h
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CCVALS1", false);
 			if (ind != -1)
 				CCVALS1 = header->GetKeyValue("CCVALS1");
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CCVALS2", false);
 			if (ind != -1)
 				CCVALS2 = header->GetKeyValue("CCVALS2");
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CPIX1RM", false);
 			if (ind != -1)
 				CPIX1RM = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CPIX1RS", false);
 			if (ind != -1)
 				CPIX1RS = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CVAL1RM", false);
 			if (ind != -1)
 				CVAL1RM = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CVAL1RS", false);
 			if (ind != -1)
 				CVAL1RS = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CPIX2RM", false);
 			if (ind != -1)
 				CPIX2RM = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CPIX2RS", false);
 			if (ind != -1)
 				CPIX2RS = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CVAL2RM", false);
 			if (ind != -1)
 				CVAL2RM = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CVAL2RS", false);
 			if (ind != -1)
 				CVAL2RS = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CPIXRM", false);
 			if (ind != -1)
 				CPIXRM = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CPIXRS", false);
 			if (ind != -1)
 				CPIXRS = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CVALRM", false);
 			if (ind != -1)
 				CVALRM = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
 		#pragma omp section
 		{
-			int ind = header->GetKeyIndex("CCVALD2", false);
+			int ind = header->GetKeyIndex("CVALRS", false);
 			if (ind != -1)
 				CVALRS = Convert::ToDouble(header->HeaderKeyValues[ind]);
 		}
@@ -203,6 +203,8 @@ void JPFITS::WorldCoordinateSolution::EATHEADERFORWCS(JPFITS::FITSImageHeader^ h
 	CPIX2 = gcnew array<double>(num);
 	CVAL1 = gcnew array<double>(num);
 	CVAL2 = gcnew array<double>(num);
+	DVAL1 = gcnew array<double>(num);
+	DVAL2 = gcnew array<double>(num);
 
 	#pragma omp parallel for
 	for (int i = 1; i <= CPIX1->Length; i++)
@@ -211,6 +213,8 @@ void JPFITS::WorldCoordinateSolution::EATHEADERFORWCS(JPFITS::FITSImageHeader^ h
 		CPIX2[i - 1] = Convert::ToDouble(header->GetKeyValue("WCP2_" + i.ToString("000")));
 		CVAL1[i - 1] = Convert::ToDouble(header->GetKeyValue("WCV1_" + i.ToString("000")));
 		CVAL2[i - 1] = Convert::ToDouble(header->GetKeyValue("WCV2_" + i.ToString("000")));
+		DVAL1[i - 1] = Convert::ToDouble(header->GetKeyValue("WCD1_" + i.ToString("000")));
+		DVAL2[i - 1] = Convert::ToDouble(header->GetKeyValue("WCD2_" + i.ToString("000")));
 	}
 }
 
@@ -225,6 +229,8 @@ void JPFITS::WorldCoordinateSolution::Solve_WCS(String^ WCS_Type, array<double>^
 	CPIX2 = gcnew array<double>(X_pix->Length);
 	CVAL1 = gcnew array<double>(X_pix->Length);
 	CVAL2 = gcnew array<double>(X_pix->Length);
+	DVAL1 = gcnew array<double>(X_pix->Length);
+	DVAL2 = gcnew array<double>(X_pix->Length);
 	for (int i = 0; i < X_pix->Length; i++)
 	{
 		CPIX1[i] = X_pix[i];
@@ -296,6 +302,9 @@ void JPFITS::WorldCoordinateSolution::Solve_WCS(String^ WCS_Type, array<double>^
 		this->Get_Pixel(CVAL1[i], CVAL2[i], "TAN", xpix, ypix, false);
 		dxpix[i] = xpix - CPIX1[i];
 		dypix[i] = ypix - CPIX2[i];
+
+		DVAL1[i] = dxpix[i] * CDELTN[0];
+		DVAL2[i] = dypix[i] * CDELTN[1];
 	}
 
 	CPIX1RM = JPMath::Mean(dxpix, true);
@@ -317,9 +326,6 @@ void JPFITS::WorldCoordinateSolution::Solve_WCS(String^ WCS_Type, array<double>^
 	if (header == nullptr)
 		return;
 
-	Clear(header);
-	this->CopyTo(header);
-
 	double ccvald1, ccvald2;
 	String^ ccvals1;
 	String^ ccvals2;
@@ -330,6 +336,9 @@ void JPFITS::WorldCoordinateSolution::Solve_WCS(String^ WCS_Type, array<double>^
 	CCVALD2 = ccvald2;
 	CCVALS1 = ccvals1;
 	CCVALS2 = ccvals2;
+
+	Clear(header);
+	this->CopyTo(header);	
 }
 
 void JPFITS::WorldCoordinateSolution::Get_Pixel(double cval1, double cval2, String^ WCS_Type, double &X_pix, double &Y_pix, bool return_zero_based_pixels)
@@ -546,6 +555,10 @@ void JPFITS::WorldCoordinateSolution::CopyTo(JPFITS::FITSImageHeader^ header)
 		int key = 0, num = 1;
 		while (key != -1)
 		{
+			key = header->GetKeyIndex("WCD1_" + num.ToString("000"), false);
+			header->RemoveKey(key);
+			key = header->GetKeyIndex("WCD2_" + num.ToString("000"), false);
+			header->RemoveKey(key);
 			key = header->GetKeyIndex("WCP1_" + num.ToString("000"), false);
 			header->RemoveKey(key);
 			key = header->GetKeyIndex("WCP2_" + num.ToString("000"), false);
@@ -564,6 +577,8 @@ void JPFITS::WorldCoordinateSolution::CopyTo(JPFITS::FITSImageHeader^ header)
 			header->SetKey("WCP2_" + num.ToString("000"), CPIX2[i].ToString("F5"), "WCS coordinate pixel on axis 2", true, -1);
 			header->SetKey("WCV1_" + num.ToString("000"), CVAL1[i].ToString("F8"), "WCS coordinate value on axis 1 (degrees)", true, -1);
 			header->SetKey("WCV2_" + num.ToString("000"), CVAL2[i].ToString("F8"), "WCS coordinate value on axis 2 (degrees)", true, -1);
+			header->SetKey("WCD1_" + num.ToString("000"), DVAL1[i].ToString("F8"), "WCS coordinate delta on axis 1 (arcsec)", true, -1);
+			header->SetKey("WCD2_" + num.ToString("000"), DVAL2[i].ToString("F8"), "WCS coordinate delta on axis 2 (arcsec)", true, -1);
 			num++;
 		}
 	}
@@ -645,6 +660,10 @@ void JPFITS::WorldCoordinateSolution::Clear(JPFITS::FITSImageHeader^ header)
 	int key = 0, num = 1;
 	while (key != -1)
 	{
+		key = header->GetKeyIndex("WCD1_" + num.ToString("000"), false);
+		header->RemoveKey(key);
+		key = header->GetKeyIndex("WCD2_" + num.ToString("000"), false);
+		header->RemoveKey(key);
 		key = header->GetKeyIndex("WCP1_" + num.ToString("000"), false);
 		header->RemoveKey(key);
 		key = header->GetKeyIndex("WCP2_" + num.ToString("000"), false);

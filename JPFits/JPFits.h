@@ -26,6 +26,7 @@ using namespace System::ComponentModel;
 using namespace System::Windows::Forms;
 using namespace Microsoft::Win32;
 using namespace System::Drawing;
+using namespace System::Drawing::Drawing2D;
 using namespace System::Drawing::Imaging;
 #include "String.h"
 #include "omp.h"
@@ -492,6 +493,8 @@ namespace JPFITS
 		array<double, 2>^ CDMATRIXINV;
 		array<double>^ CVAL1;
 		array<double>^ CVAL2;
+		array<double>^ DVAL1;
+		array<double>^ DVAL2;
 		array<double>^ CPIX1;
 		array<double>^ CPIX2;
 		array<double>^ CRVALN;
@@ -2248,7 +2251,7 @@ namespace JPFITS
 	/// <summary>SourceExtractor class provides functionality for extracting sources from image arrays.</summary>
 	public ref class SourceExtractor
 	{
-	public:
+		public:
 		SourceExtractor();
 		SourceExtractor(array<double>^ XCoords, array<double>^ YCoords);
 		SourceExtractor(JPFITS::FITSBinTable^ BinTablePSE);
@@ -2272,6 +2275,9 @@ namespace JPFITS
 			{
 				CENTROIDS_X = xcentroids;
 				N_SRC = CENTROIDS_X->Length;
+				CENTROID_POINTS = gcnew array<JPMath::PointD^>(N_SRC);
+				for (int i = 0; i < N_SRC; i++)
+					CENTROID_POINTS[i] = gcnew JPMath::PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
 			}
 		}
 
@@ -2283,6 +2289,9 @@ namespace JPFITS
 			{
 				CENTROIDS_Y = ycentroids;
 				N_SRC = CENTROIDS_Y->Length;
+				CENTROID_POINTS = gcnew array<JPMath::PointD^>(N_SRC);
+				for (int i = 0; i < N_SRC; i++)
+					CENTROID_POINTS[i] = gcnew JPMath::PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
 			}
 		}
 
@@ -2400,6 +2409,11 @@ namespace JPFITS
 			bool get() { return PSEPARAMSSET; }
 		}
 
+		property int NGroups
+		{
+			int get() { return NGROUPS; }
+		}
+
 		/// <summary>Searches for sources withn a 2D image array.</summary>
 		/// <param name="image">The 2D image array to find sources in.</param>
 		/// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
@@ -2459,8 +2473,40 @@ namespace JPFITS
 
 		void ClipToNBrightest(int NBright);
 
+		void GroupizePSE(double groupRadius);
+
+		ref class Group
+		{
+			public:
+			Group(int id)
+			{
+				ID = id;
+			}
+
+			int ID = -1;			
+			int NElements = 0;
+			array<int>^ ElementIndices;
+			Region^ REGION;
+			Color COLOR;
+		};
+
+		property array<Group^>^ Groups
+		{
+			array<Group^>^ get() { return GROUPS; }
+		}
+
+		property array<int>^ GroupIDs
+		{
+			array<int>^ get() { return GROUPIDS; }
+		}
+
+		property array<int, 2>^ SourceGroupMap
+		{
+			array<int, 2>^ get() { return SOURCE_GROUP_MAP; }
+		}
 		
-	private:
+		private:
+
 		JPWaitBar::WaitBar^ WAITBAR;
 		BackgroundWorker^ BGWRKR;
 		Object^ BGWRKR_RESULT;
@@ -2478,6 +2524,8 @@ namespace JPFITS
 		void INITARRAYS();
 		void INITTHIS();
 
+		void RECURSGROUP(int I, int J, double groupRadius, int groupid, ArrayList^ groups);
+
 		bool FITTED = false;
 		String^ FIT_EQUATION;
 		bool WCS_GENERATED = false;
@@ -2485,7 +2533,7 @@ namespace JPFITS
 		bool PSEPARAMSSET = false;
 
 		int IMAGEWIDTH, IMAGEHEIGHT;
-		int N_SRC = 0;								// number of sources found
+		int N_SRC = 0;							// number of sources found
 		int N_SATURATED = 0;
 		int KERNEL_RADIUS;						// source widths for centroiding
 		int KERNEL_WIDTH;
@@ -2501,15 +2549,20 @@ namespace JPFITS
 		bool SEARCH_ROI;
 		array<bool, 2>^ ROI_REGION;
 		bool SHOWWAITBAR;
-
+		int NGROUPS = 0;
+		
 		String^ SAVE_PS_FILENAME;
 		array<double, 2>^ IMAGE;
 		array<bool, 2>^ SOURCE_BOOLEAN_MAP;
 		array<int, 2>^ SOURCE_INDEX_MAP;
+		array<int, 2>^ SOURCE_GROUP_MAP;
 
+		array<int>^ GROUPIDS;
+		array<Group^>^ GROUPS;
+		array<JPMath::PointD^>^ CENTROID_POINTS;
 		array<double>^ CENTROIDS_X;				// x centroid positions of sources
 		array<double>^ CENTROIDS_Y;				// y centroid positions of sources
-		array<double>^ CENTROIDS_RA_DEG;			// right ascension centroid positions of sources - if available
+		array<double>^ CENTROIDS_RA_DEG;		// right ascension centroid positions of sources - if available
 		array<String^>^ CENTROIDS_RA_HMS;		// right ascension centroid positions of sources - if available
 		array<double>^ CENTROIDS_DEC_DEG;		// declination centroid positions of sources - if available
 		array<String^>^ CENTROIDS_DEC_DMS;		// declination centroid positions of sources - if available
@@ -2523,14 +2576,14 @@ namespace JPFITS
 		array<double>^ FITS_FWHM_Y;				// FWHM of sources
 		array<double>^ FITS_PHI;				// rotation theta of elliptical fits
 		array<double>^ FITS_RA_DEG;				// right ascension centroid positions of sources - if available
-		array<String^>^ FITS_RA_HMS;				// right ascension centroid positions of sources - if available
-		array<double>^ FITS_DEC_DEG;				// declination centroid positions of sources - if available
+		array<String^>^ FITS_RA_HMS;			// right ascension centroid positions of sources - if available
+		array<double>^ FITS_DEC_DEG;			// declination centroid positions of sources - if available
 		array<String^>^ FITS_DEC_DMS;			// declination centroid positions of sources - if available
 		array<double, 2>^ FITS_PARAMS;			// fitted paramaters of sources - 2d because multiple parameters per source
 		array<double>^ FITS_AMPLITUDE;			// 
 		array<double>^ FITS_VOLUME;				// 
 		array<double>^ FITS_BGESTIMATE;			// 
-		array<double>^ FITS_CHISQNORM;			// 
+		array<double>^ FITS_CHISQNORM;			//
 
 		array<String^, 2>^ PSE_TABLE;
 
