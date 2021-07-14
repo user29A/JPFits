@@ -209,12 +209,36 @@ void JPFITS::WorldCoordinateSolution::EATHEADERFORWCS(JPFITS::FITSImageHeader^ h
 	#pragma omp parallel for
 	for (int i = 1; i <= CPIX1->Length; i++)
 	{
-		CPIX1[i - 1] = Convert::ToDouble(header->GetKeyValue("WCP1_" + i.ToString("000")));
+		int ind = header->GetKeyIndex("WCP1_" + i.ToString("000"), false);
+		if (ind != -1)
+			CPIX1[i - 1] = Convert::ToDouble(header->HeaderKeyValues[ind]);
+
+		ind = header->GetKeyIndex("WCP2_" + i.ToString("000"), false);
+		if (ind != -1)
+			CPIX2[i - 1] = Convert::ToDouble(header->HeaderKeyValues[ind]);
+
+		ind = header->GetKeyIndex("WCV1_" + i.ToString("000"), false);
+		if (ind != -1)
+			CVAL1[i - 1] = Convert::ToDouble(header->HeaderKeyValues[ind]);
+
+		ind = header->GetKeyIndex("WCV2_" + i.ToString("000"), false);
+		if (ind != -1)
+			CVAL2[i - 1] = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		
+		ind = header->GetKeyIndex("WCD1_" + i.ToString("000"), false);
+		if (ind != -1)
+			DVAL1[i - 1] = Convert::ToDouble(header->HeaderKeyValues[ind]);
+
+		ind = header->GetKeyIndex("WCD2_" + i.ToString("000"), false);
+		if (ind != -1)
+			DVAL2[i - 1] = Convert::ToDouble(header->HeaderKeyValues[ind]);
+		
+		/*CPIX1[i - 1] = Convert::ToDouble(header->GetKeyValue("WCP1_" + i.ToString("000")));
 		CPIX2[i - 1] = Convert::ToDouble(header->GetKeyValue("WCP2_" + i.ToString("000")));
 		CVAL1[i - 1] = Convert::ToDouble(header->GetKeyValue("WCV1_" + i.ToString("000")));
 		CVAL2[i - 1] = Convert::ToDouble(header->GetKeyValue("WCV2_" + i.ToString("000")));
 		DVAL1[i - 1] = Convert::ToDouble(header->GetKeyValue("WCD1_" + i.ToString("000")));
-		DVAL2[i - 1] = Convert::ToDouble(header->GetKeyValue("WCD2_" + i.ToString("000")));
+		DVAL2[i - 1] = Convert::ToDouble(header->GetKeyValue("WCD2_" + i.ToString("000")));*/
 	}
 }
 
@@ -309,12 +333,12 @@ void JPFITS::WorldCoordinateSolution::Solve_WCS(String^ WCS_Type, array<double>^
 
 	CPIX1RM = JPMath::Mean(dxpix, true);
 	CPIX1RS = JPMath::Stdv(dxpix, true);
-	CVAL1RM = JPMath::Mean(dxpix, true) * CDELTN[0];
-	CVAL1RS = JPMath::Stdv(dxpix, true) * CDELTN[0];
+	CVAL1RM = CPIX1RM * CDELTN[0];
+	CVAL1RS = CPIX1RS * CDELTN[0];
 	CPIX2RM = JPMath::Mean(dypix, true);
 	CPIX2RS = JPMath::Stdv(dypix, true);
-	CVAL2RM = JPMath::Mean(dypix, true) * CDELTN[1];
-	CVAL2RS = JPMath::Stdv(dypix, true) * CDELTN[1];
+	CVAL2RM = CPIX2RM * CDELTN[1];
+	CVAL2RS = CPIX2RS * CDELTN[1];
 
 	CPIXRM = Math::Sqrt(CPIX1RM * CPIX1RM + CPIX2RM * CPIX2RM);
 	CPIXRS = Math::Sqrt(CPIX1RS * CPIX1RS + CPIX2RS * CPIX2RS);

@@ -442,7 +442,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Solves the projection parameters for a given list of pixel and coordinate values. Pass nullptr for FITS if writing WCS parameters to a primary header not required.</summary>
-		/// <param name="WCS_Type">The world coordinate solution type. For example: TAN, for tangent-plane or Gnomic projection.</param>
+		/// <param name="WCS_Type">The world coordinate solution type. For example: TAN, for tangent-plane or Gnomic projection. Only TAN is currently supported.</param>
 		/// <param name="X_pix">An array of the image x-axis pixel locations.</param>
 		/// <param name="Y_pix">An array of the image y-axis pixel locations.</param>
 		/// <param name="zero_based_pixels">A boolean to indicate if the X_Pix and Y_Pix are zero-based coordinates. They will be converted to one-based if true.</param>
@@ -503,7 +503,7 @@ namespace JPFITS
 		array<double>^ CROTAN;
 		array<String^>^ CTYPEN;
 		double CD1_1, CD1_2, CD2_1, CD2_2, CPIX1RM, CPIX1RS, CVAL1RM, CVAL1RS, CPIX2RM, CPIX2RS, CVAL2RM, CVAL2RS, CPIXRM, CPIXRS, CVALRM, CVALRS, CCVALD1, CCVALD2;
-		String^  CCVALS1;
+		String^ CCVALS1;
 		String^ CCVALS2;
 		void SET_CDMATRIXINV();
 		bool WCSEXISTS = false;
